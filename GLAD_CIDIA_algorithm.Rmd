@@ -351,19 +351,16 @@ freq(CIDIA.items$cidia.criterion_D_numeric)
 CIDIA.items$no.info<-0
 #+1 to missingness score if criterion A variable is NA
 CIDIA.items$no.info<-with(CIDIA.items,
-                             ifelse(is.na(cidia.criterion_A_numeric), 1, 0
-                                    )
+                             ifelse(is.na(cidia.criterion_A_numeric), 1, no.info)
                              )
 #+1 to missingness score if difficulty controlling worry (criterion B) variable is NA
 CIDIA.items$no.info<-with(CIDIA.items,
-                             ifelse(is.na(cidia.criterion_B_numeric), 1, 0
-                                    )
+                             ifelse(is.na(cidia.criterion_B_numeric), 1, no.info)
                              )
 #+1 to missingness score if functioning (criterion D) is unanswered
 CIDIA.items$no.info <- with(CIDIA.items,
                                ifelse(is.na(cidia.functioning),
-                                      no.info + 1, 0
-                                                )
+                                      no.info + 1, no.info)
                                       )
 
 summary(as.factor(CIDIA.items$no.info))
