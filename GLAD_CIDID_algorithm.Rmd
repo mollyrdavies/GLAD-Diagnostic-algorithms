@@ -334,6 +334,7 @@ CIDID.items <- CIDID.items %>%
              cidid.criterion_A_score_numeric == 3 & cidid.criterion_A_score_numeric.NA > 1 ~ NA_real_,
              cidid.criterion_A_score_numeric == 2 & cidid.criterion_A_score_numeric.NA > 2 ~ NA_real_,
              cidid.criterion_A_score_numeric == 1 & cidid.criterion_A_score_numeric.NA > 3 ~ NA_real_,
+             cidid.screener_numeric == 1 & cidid.criterion_A_score_numeric == 0 & cidid.criterion_A_score_numeric.NA > 4 ~ NA_real_,
           #Ppts are coded NA if they met screening criteria but didn't respond to at least one of the other criteria
              cidid.screener_numeric == 1 & no.info >0 ~ NA_real_,
           #Ppts are coded 0 if they don't meet screening criteria
