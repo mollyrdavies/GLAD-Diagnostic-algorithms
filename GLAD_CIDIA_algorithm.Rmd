@@ -236,12 +236,11 @@ In each case where more than 1 response fulfills a diagnostic criterion, a new v
 Note: These criterion variables will have a large number of NAs if the screening criteria aren't met, as the question is not displayed in these cases. This is accounted for in the algorithm.
 
 A. Excessive  anxiety  and  worry  (apprehensive  expectation), occurring more days than not for at least 6 months, about a number of events or activities.
-Note: Duration is not included here, as the screener variable accounts for those responses.
+Note: Worry and duration are not included here, as the screener variable accounts for those responses.
 ```{r variable for criterion A}
 CIDIA.items <- CIDIA.items %>% 
   mutate(cidia.criterion_A_numeric =
            case_when(
-             cidia.felt_worried == "No" & cidia.felt_worried_more == "No" & cidia.worry_stronger_than_others == "No" ~ 0,
              cidia.most_days == "No" ~ 0,
              (cidia.more_than_one_thing == "No" & cidia.different_worries == "No") ~ 0,
              #A. Excessive  anxiety  and  worry
@@ -359,7 +358,7 @@ CIDIA.items$no.info<-with(CIDIA.items,
                              )
 #+1 to missingness score if functioning (criterion D) is unanswered
 CIDIA.items$no.info <- with(CIDIA.items,
-                               ifelse(is.na(cidia.functioning),
+                               ifelse(is.na(cidia.criterion_D_numeric),
                                       no.info + 1, no.info)
                                       )
 
@@ -370,33 +369,33 @@ summary(as.factor(CIDIA.items$no.info))
 ```{r anxiety symptom NA count score}
 #Create score to calculate how many missing values are in the anxiety symptom scores
 
-CIDIA.items$cidia.criterion_A_score_numeric.NA<-0
+CIDIA.items$cidia.criterion_C_score_numeric.NA<-0
 
-CIDIA.items$cidia.criterion_A_score_numeric.NA<-with(CIDIA.items, 
+CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items, 
                                     ifelse(is.na(cidia.restless_on_edge), 
-                                           cidia.criterion_A_score_numeric.NA + 1, cidia.criterion_A_score_numeric.NA))
+                                           cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
-CIDIA.items$cidia.criterion_A_score_numeric.NA<-with(CIDIA.items,
+CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items,
                                     ifelse(is.na(cidia.tired),
-                                           cidia.criterion_A_score_numeric.NA + 1, cidia.criterion_A_score_numeric.NA))
+                                           cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
-CIDIA.items$cidia.criterion_A_score_numeric.NA<-with(CIDIA.items,
+CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items,
                                     ifelse(is.na(cidia.difficulty_concentrating),
-                                           cidia.criterion_A_score_numeric.NA + 1, cidia.criterion_A_score_numeric.NA))
+                                           cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
-CIDIA.items$cidia.criterion_A_score_numeric.NA<-with(CIDIA.items, 
+CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items, 
                                     ifelse(is.na(cidia.irritable), 
-                                           cidia.criterion_A_score_numeric.NA + 1, cidia.criterion_A_score_numeric.NA))
+                                           cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
-CIDIA.items$cidia.criterion_A_score_numeric.NA<-with(CIDIA.items, 
+CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items, 
                                     ifelse(is.na(cidia.tense_muscles), 
-                                           cidia.criterion_A_score_numeric.NA + 1, cidia.criterion_A_score_numeric.NA))
+                                           cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
-CIDIA.items$cidia.criterion_A_score_numeric.NA<-with(CIDIA.items, 
+CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items, 
                                     ifelse(is.na(cidia.trouble_sleeping), 
-                                           cidia.criterion_A_score_numeric.NA + 1, cidia.criterion_A_score_numeric.NA))
+                                           cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
-summary(as.factor(CIDIA.items$cidia.criterion_A_score_numeric.NA))
+summary(as.factor(CIDIA.items$cidia.criterion_C_score_numeric.NA))
 
 ```
 
@@ -406,29 +405,25 @@ summary(as.factor(CIDIA.items$cidia.criterion_A_score_numeric.NA))
 CIDIA.items <- CIDIA.items %>% 
   mutate(cidia.diagnosis_numeric =
            case_when(
+             #Ppts are coded NA if they didn't respond to any of the screening questions
              is.na(cidia.screener_numeric) ~ NA_real_,
-             
+             #Ppts are coded NA if they didn't respond to symptom questions that may have met diagnostic criteria
+             cidia.criterion_C_score_numeric == 2 & cidia.criterion_C_score_numeric.NA > 0 ~ NA_real_,
+             cidia.criterion_C_score_numeric == 1 & cidia.criterion_C_score_numeric.NA > 1 ~ NA_real_,
+             cidia.screener_numeric == 1 & (cidia.criterion_C_score_numeric == 0 & cidia.criterion_C_score_numeric.NA > 2) ~ NA_real_,
+             #Ppts are coded NA if they met screening criteria but didn't respond to at least one of the other criteria
+             cidia.screener_numeric == 1 & no.info > 0 ~ NA_real_,
              cidia.screener_numeric == 0 ~ 0,
              cidia.criterion_A_numeric == 0 |
                cidia.criterion_B_numeric == 0 |
                cidia.criterion_C_score_numeric < 3 |
                cidia.criterion_D_numeric == 0 ~ 0,
-             cidia.criterion_A_numeric == 1 |
-               cidia.criterion_B_numeric == 1 |
-               cidia.criterion_C_score_numeric >= 3 |
+             cidia.screener_numeric == 1 &
+               cidia.criterion_A_numeric == 1 &
+               cidia.criterion_B_numeric == 1 &
+               cidia.criterion_C_score_numeric >= 3 &
                cidia.criterion_D_numeric == 1 ~ 1
            ))
-
-
-$cidia.lifetime_anxiety.calc <- with(CIDIA.items,
-                                                      ifelse(
-                                                        no.info > 0, NA,
-                                                        ifelse((!is.na(cidia.criterion_A_score_numeric) & cidia.criterion_A_score_numeric > 2)
-                                                               & (!is.na(cidia.anxiety_screen.calc) & 
-                                                                    cidia.anxiety_screen.calc == 1), 1, 0
-                                                               )
-                                                        )
-                                                      )
 
 freq(CIDIA.items$cidia.diagnosis_numeric)
 
