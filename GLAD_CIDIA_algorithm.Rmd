@@ -196,7 +196,7 @@ If the participant reports either anxiety or worry but doesn't report symptoms l
 
 
 Create variable for worry and duration screen
-```{r variable for worry & duration (criterion A) screener}
+```{r variable for worry and duration screener}
 CIDIA.items <- CIDIA.items %>% 
   mutate(cidia.screener_numeric = 
            case_when(
@@ -221,8 +221,46 @@ In each case where more than 1 response fulfills a diagnostic criterion, a new v
 
 Note: These criterion variables will have a large number of NAs if the screening criteria aren't met, as the question is not displayed in these cases. This is accounted for in the algorithm.
 
-```{r}
+A. Excessive  anxiety  and  worry  (apprehensive  expectation), occurring  more  days  than not for at least 6 months, about a number of events or activities (such as work or school performance).
+```{r variable for criterion A}
+CIDIA.items <- CIDIA.items %>% 
+  mutate(cidia.criterion_A_numeric =
+           case_when(
+             cidia.felt_worried == "No" & cidia.felt_worried_more == "No" & cidia.worry_stronger_than_others == "No" ~ 0,
+             cidia.most_days == "No" ~ 0,
+             (cidia.more_than_one_thing == "No" & cidia.different_worries == "No") ~ 0,
+             #A. Excessive  anxiety  and  worry
+             (cidia.felt_worried == "Yes" | cidia.felt_worried_more == "Yes" | cidia.worry_stronger_than_others == "Yes") &
+               #A. occurring  more  days  than not (frequency)
+               cidia.most_days == "Yes" &
+               #A. about a number of events or activities
+               (cidia.more_than_one_thing == "Yes" | cidia.different_worries == "Yes") ~ 1
+         ))
 
+freq(CIDIA.items$cidia.criterion_A_numeric)
+```
+
+```{r variable for criterion B}
+
+```
+
+```{r}
+ #A. Excessive anxiety/worry
+                                             (cidia.felt_worried == "Yes" | cidia.felt_worried_more == "Yes" | cidia.worry_stronger_than_others == "Yes") &
+                                               #A. at least 6 months (duration)
+                                               (cidia.longest_period_worry_categorical_combined == "Between 6 and 12 months" |
+                                                  cidia.longest_period_worry_categorical_combined == "Between 1 and 5 years" |
+                                                  cidia.longest_period_worry_categorical_combined == "More than 5 years" |
+                                                  cidia.longest_period_worry_categorical_combined == "All of my life/as long as I can remember") &
+                                               #A. occurring  more  days  than not (frequency)
+                                               (cidia.most_days == "Yes") &
+                                               #A. about a number of events or activities (such as work or school performance)
+                                               (cidia.more_than_one_thing == "Yes" | cidia.different_worries == "Yes") & 
+                                               #B. The  individual finds it difficult to control the worry.
+                                               (cidia.difficult_to_stop == "Yes" | cidia.couldnt_stop == "Yes" | cidia.difficult_to_control == "Yes") &
+                                               #D. The anxiety, worry, or physical symptoms cause impairment in functioning.
+                                               (cidia.functioning == "A lot" | cidia.functioning == "Some"), #A lot (3) or some (2)
+                                             1, 0
 ```
 
 
