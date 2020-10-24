@@ -30,12 +30,12 @@ library(data.table)
 ```
 
 ```{r source path for reading/saving data}
-#Source raw data directory (path) & clean data export directory (export_path)
+#Source raw data directory (raw_path) & clean data export directory (cleaned_path)
 source("../GLAD_data_path.R")
 ```
 
 ```{r read in cleaned CIDIA data}
-CIDIA_file <- paste(path, "CIDIA.rds", sep = "")
+CIDIA_file <- paste(raw_path, "CIDIA.rds", sep = "")
 
 CIDIA.cc <- read_rds(CIDIA_file)
 ```
@@ -489,8 +489,8 @@ CIDIA.clean <- CIDIA.cc %>%
         cidia.diagnosis_numeric)
 
 #Export into a rds file:
-saveRDS(object = CIDIA.clean, file = paste0(export_path, "CIDIA_cleaned.rds"))
+saveRDS(object = CIDIA.clean, file = paste0(cleaned_path, "CIDIA_cleaned.rds"))
 
 # Saves the R data including the recoding
-#save.image(file = "../data/GLAD_CIDIA_clean.RData")
+#save.image(file = paste0(cleaned_path, "GLAD_CIDIA_clean.RData")
 ```

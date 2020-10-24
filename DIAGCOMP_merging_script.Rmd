@@ -1,0 +1,116 @@
+---
+title: "DIAGCOMP_merge_datasets_181020"
+author: "Molly Davies"
+date: "18/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Set up
+```{r Setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      comment=NA,
+                      prompt=FALSE,
+                      cache=FALSE)
+
+
+options(bitmapType = 'quartz') # to render fonts better
+```
+
+Clear global environment
+```{r Clear global environment}
+remove(list = ls())
+```
+
+Retrieve the current date to use it for file endings to not overwrite files when one exports files
+```{r Recent date}
+date = Sys.Date()
+```
+
+
+Load packages
+```{r}
+library(tidyverse)
+library(skimr)
+```
+
+# Read data
+```{r set paths}
+#Names
+dem_name <- "DEM_cleaned.rds"
+mhd_name <- "MHD_cleaned.rds"
+CIDID_name <- "CIDID_cleaned.rds"
+CIDIA_name <- "CIDIA_cleaned.rds"
+SPEC_name <- "SPEC_cleaned.rds"
+SOCP_name <- "SOCP_cleaned.rds"
+PAD_name <- "PAD_cleaned.rds"
+AGP_name <- "AGP_cleaned.rds"
+
+#Path
+data_path <- "../../Datasets/Relabelled_cleaned/"
+
+#Files
+dem_filename <- paste(datpath, dem_name, sep = "")
+mhd_filename <- paste(datpath, mhd_name, sep = "")
+CIDID_filename <- paste(datpath, CIDID_name, sep = "")
+CIDIA_filename <- paste(datpath, CIDIA_name, sep = "")
+SPEC_filename <- paste(datpath, SPEC_name, sep = "")
+SOCP_filename <- paste(datpath, SOCP_name, sep = "")
+PAD_filename <- paste(datpath, PAD_name, sep = "")
+AGP_filename <- paste(datpath, AGP_name, sep = "")
+
+```
+
+# Import data
+```{r import data}
+dem <- read_rds(dem_filename)
+dim(dem)
+
+mhd <- read_rds(mhd_filename)
+dim(mhd)
+
+CIDID <- read_rds(CIDID_filename)
+dim(CIDID)
+
+CIDIA <- read_rds(CIDIA_filename)
+dim(CIDIA)
+
+SPEC <- read_rds(SPEC_filename)
+dim(SPEC)
+
+SOCP <- read_rds(SOCP_filename)
+dim(SOCP)
+
+PAD <- read_rds(PAD_filename)
+dim(PAD)
+
+AGP <- read_rds(AGP_filename)
+dim(AGP)
+```
+
+glad/edgi data frame list
+```{r glad/edgi data frame list}
+dat <- bind_rows(
+  dem,
+  mhd,
+  CIDID,
+  CIDIA,
+  SPEC,
+  SOCP,
+  PAD,
+  AGP
+)
+```
+
+```{r Skim data}
+#look at the data
+skimr::skim(dat)
+```
+
+```{r Save four cohorts as rds file}
+saveRDS(object = dat, file = paste0(data_path, "combined_cleaned.rds"))
+```
+
