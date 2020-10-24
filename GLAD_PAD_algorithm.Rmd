@@ -109,7 +109,7 @@ PAD.items[PAD.items == -99] <- NA
 PAD.items[PAD.items == -77] <- NA
 ```
 
-## DSM-5 panic disorder diagnostic criteria
+# DSM-5 panic disorder diagnostic criteria
 
 A.   Recurrent unexpected panic attacks. A panic attack is an abrupt surge of intense fear or intense discomfort that reaches a peak within minutes, and during which time four (or more) of the following symptoms occur; Note: The abrupt surge can occur from a calm state or an anxious state.
 1.	Palpitations, pounding heart, or accelerated heart rate.
@@ -320,19 +320,19 @@ PAD.items$no.info<-0
 #+1 to missingness score if criterion B is missing
 PAD.items$no.info <- with(PAD.items,
                                ifelse(is.na(pad.criterion_B_numeric),
-                                      no.info + 1, 0
+                                      no.info + 1, no.info
                                                 )
                                       )
 #+1 to missingness if criterion C item is missing
 PAD.items$no.info <- with(PAD.items,
                                ifelse(is.na(pad.physical_cause),
-                                      no.info + 1, 0
+                                      no.info + 1, no.info
                                                 )
                                       )
 #+1 to missingness if criterion D items are missing
 PAD.items$no.info <- with(PAD.items,
                                ifelse(is.na(pad.heights) & is.na(pad.random),
-                                      no.info + 1, 0
+                                      no.info + 1, no.info
                                                 )
                                       )
 

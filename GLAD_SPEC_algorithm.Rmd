@@ -92,17 +92,18 @@ G.  The  disturbance is not better explained by the symptoms of another mental d
 ## Screening variables
 The specific phobia section screening questions include:
 1) At least one phobia (criterion A) must be endorsed
-2) If at least one phobia is endorsed, participants must report that frequency of these fears (criterion B) are almost always or always present when exposed to the phobia
+2) Frequency of these fears (criterion B) are almost always or always present when exposed to the phobia
 
 
 *How the screening questions work*
 If participants answer 'No' to all phobias in criterion A, then they are given a 0 for diagnosis and skip the remaining questions.
 
 If participants answer 'Yes' to any phobia in criterion A but report frequency of these fears as "Never", "Only one or two times ever", or "Some of the time", then they are given a 0 for diagnosis and skip the remaining questions.
+
 ```{r specific phobia screener}
 #Criterion A screening variable
 SPEC.items <- SPEC.items %>% 
-  mutate(specific_phobia_screener = 
+  mutate(specific_phobia_screener_numeric = 
            case_when(
              spec.environment_phobia == "No" & spec.situation_phobia == "No" & spec.animal_phobia == "No" & spec.blood_injection_phobia == "No" & spec.other_phobia == "No" ~ 0,
              !is.na(spec.phobia_frequency) & (spec.phobia_frequency == "Never" | spec.phobia_frequency == "Only one or two times ever" | spec.phobia_frequency == "Some of the time") ~ 0,
@@ -111,18 +112,18 @@ SPEC.items <- SPEC.items %>%
            ))
 #Criterion A screening variable (NA coded as 0)
 ## This variable is created to remove NAs solely for the purpose of coding the variable in the following chunk (spec.specific_phobia_screen.calc.NA)
-SPEC.items$specific_phobia_screener_noNA <- with(SPEC.items,
-                                        ifelse(is.na(specific_phobia_screener), 0, specific_phobia_screener))
+SPEC.items$specific_phobia_screener_numeric_noNA <- with(SPEC.items,
+                                        ifelse(is.na(specific_phobia_screener_numeric), 0, specific_phobia_screener_numeric))
 
-summary(as.factor(SPEC.items$specific_phobia_screener))
-summary(as.factor(SPEC.items$specific_phobia_screener_noNA))
+summary(as.factor(SPEC.items$specific_phobia_screener_numeric))
+summary(as.factor(SPEC.items$specific_phobia_screener_numeric_noNA))
 ```
 
 # DSM-5 specific phobia algorithm
 Applying the diagnostic algorithm to questionnaire responses
 ```{r diagnostic algorithm for specific phobia}
 SPEC.items <- SPEC.items %>% 
-  mutate(specific_phobia_any.numeric <-
+  mutate(specific_phobia_any_numeric <-
            case_when(
 #No phobia
         #Criterion A (not met)
@@ -153,7 +154,7 @@ SPEC.items <- SPEC.items %>%
         (spec.avoid_phobias == "Yes" | spec.endure_phobias_with_anxiety == "Yes") ~ 1)) #Criterion C. Avoid or endure
 
 #Get frequencies
-freq(SPEC.items$specific_phobia_any.numeric)
+freq(SPEC.items$specific_phobia_any_numeric)
 ```
 
 ## Missingness
@@ -167,34 +168,36 @@ SPEC.items$spec.specific_phobia_screen.calc.NA<-0
 #If any criterion A (screening criteria) are NA (and diagnostic status is 0)
 SPEC.items$spec.specific_phobia_screen.calc.NA<-with(SPEC.items, 
                                     ifelse(
-                                      (specific_phobia_any.numeric == 0 | is.na(specific_phobia_any.numeric)) & 
+                                      (specific_phobia_any_numeric == 0 | is.na(specific_phobia_any_numeric)) & 
                                         (is.na(spec.environment_phobia) | is.na(spec.situation_phobia) | is.na(spec.animal_phobia) | is.na(spec.blood_injection_phobia) | is.na(spec.other_phobia)), 
                                            spec.specific_phobia_screen.calc.NA + 1, spec.specific_phobia_screen.calc.NA))
 #If criterian B (almost always provoking fear) is NA, but criterion A was met
 SPEC.items$spec.specific_phobia_screen.calc.NA<-with(SPEC.items,
-                                    ifelse(specific_phobia_screener_noNA == 1 & is.na(spec.phobia_frequency),
+                                    ifelse(specific_phobia_screener_numeric_noNA == 1 & is.na(spec.phobia_frequency),
                                            spec.specific_phobia_screen.calc.NA + 1, spec.specific_phobia_screen.calc.NA))
 
 summary(as.factor(SPEC.items$spec.specific_phobia_screen.calc.NA))
 ```
 
 *Symptom missingness variable:*
-Similarly, once participants pass the screeners, if any of the other core symptoms are NA then the participant might have received a diagnosis of specific phobia, but we won't know. If a participant has an NA in this score but was far from meeting diagnostic criteria, then we may still want to keep them as a '0' for diagnosis. This score is therefore counted separately to allow for this flexibility.
+Similarly, once participants pass the screeners, if any of the other core symptoms are NA then the participant might have received a diagnosis of specific phobia, but we won't know. 
+
+Future considerations: If a participant has an NA in this score but was far from meeting diagnostic criteria, then we may still want to keep them as a '0' for diagnosis.
 ```{r specific phobia NA symptom count score}
 
 SPEC.items$spec.specific_phobia_symptoms.calc.NA<-0
 #If criterion D is NA
 SPEC.items$spec.specific_phobia_symptoms.calc.NA<-with(SPEC.items, 
-                                    ifelse(specific_phobia_screener_noNA == 1 & is.na(spec.phobia_out_of_proportion), 
+                                    ifelse(specific_phobia_screener_numeric_noNA == 1 & is.na(spec.phobia_out_of_proportion), 
                                            spec.specific_phobia_symptoms.calc.NA + 1, spec.specific_phobia_symptoms.calc.NA))
 
 #If criterion F (functional impairment) is NA
 SPEC.items$spec.specific_phobia_symptoms.calc.NA<-with(SPEC.items,
-                                    ifelse(specific_phobia_screener_noNA == 1 & is.na(spec.phobia_interfered),
+                                    ifelse(specific_phobia_screener_numeric_noNA == 1 & is.na(spec.phobia_interfered),
                                            spec.specific_phobia_symptoms.calc.NA + 1, spec.specific_phobia_symptoms.calc.NA))
 #If both items for criterion C (avoid or endure) are NA
 SPEC.items$spec.specific_phobia_symptoms.calc.NA<-with(SPEC.items, 
-                                    ifelse(specific_phobia_screener_noNA == 1 & is.na(spec.avoid_phobias) & is.na(spec.endure_phobias_with_anxiety), 
+                                    ifelse(specific_phobia_screener_numeric_noNA == 1 & is.na(spec.avoid_phobias) & is.na(spec.endure_phobias_with_anxiety), 
                                            spec.specific_phobia_symptoms.calc.NA + 1, spec.specific_phobia_symptoms.calc.NA))
 
 summary(as.factor(SPEC.items$spec.specific_phobia_symptoms.calc.NA))
@@ -204,44 +207,44 @@ summary(as.factor(SPEC.items$spec.specific_phobia_symptoms.calc.NA))
 Ppts are coded NA if they didn't respond to questions that could have met diagnostic criteria.
 ```{r recode any phobia missingness as NA}
 #Frequencies before accounting for missingness
-freq(SPEC.items$specific_phobia_any.numeric)
+freq(SPEC.items$specific_phobia_any_numeric)
 
 #Recode as NA for missingness
-SPEC.items$specific_phobia_any.numeric <- with(SPEC.items,
+SPEC.items$specific_phobia_any_numeric <- with(SPEC.items,
                                        ifelse(
                                          spec.specific_phobia_screen.calc.NA == 1 | 
                                            spec.specific_phobia_symptoms.calc.NA > 0,
-                                         NA, specific_phobia_any.numeric
+                                         NA, specific_phobia_any_numeric
                                        ))
 
 #Frequencies after accounting for missingness
-freq(SPEC.items$specific_phobia_any.numeric)
+freq(SPEC.items$specific_phobia_any_numeric)
 
 ```
 
 An extra check is completed below to ensure that no participants that didn't meet screening criteria were coded as NA.
 ```{r recode any phobia as 0 if didn't meet screening criteria}
-SPEC.items$specific_phobia_any.numeric <- with(SPEC.items,
+SPEC.items$specific_phobia_any_numeric <- with(SPEC.items,
                                     ifelse((!is.na(spec.environment_phobia) & spec.environment_phobia == "No" & 
                                              !is.na(spec.situation_phobia) & spec.situation_phobia == "No" & 
                                              !is.na(spec.animal_phobia) & spec.animal_phobia == "No" &
                                              !is.na(spec.blood_injection_phobia) & spec.blood_injection_phobia == "No" & 
-                                             !is.na(spec.other_phobia) & spec.other_phobia == "No"), 0, specific_phobia_any.numeric))
+                                             !is.na(spec.other_phobia) & spec.other_phobia == "No"), 0, specific_phobia_any_numeric))
 
 
 #Get frequencies
-freq(SPEC.items$specific_phobia_any.numeric)
+freq(SPEC.items$specific_phobia_any_numeric)
 
 ```
 
 ```{r recode any phobia as a factor}
 #Recode any phobia variable and change variable name
-SPEC.items$spec.diagnosis <- recode_factor(SPEC.items$specific_phobia_any.numeric,
+SPEC.items$spec.diagnosis <- recode_factor(SPEC.items$specific_phobia_any_numeric,
                              "0" = "No phobia",
                              "1" = "Any specific phobia"
                              )
 #Rename numeric variable
-SPEC.items$spec.diagnosis.numeric <- SPEC.items$specific_phobia_any.numeric
+SPEC.items$spec.diagnosis_numeric <- SPEC.items$specific_phobia_any_numeric
 ```
 
 # Create individual specific phobia variables
@@ -249,82 +252,82 @@ SPEC.items$spec.diagnosis.numeric <- SPEC.items$specific_phobia_any.numeric
 ```{r individual specific phobia variables}
 #Environmental phobia
 SPEC.items <- SPEC.items %>% 
-  mutate(environment_phobia_diagnosis.numeric = 
+  mutate(environment_phobia_diagnosis_numeric = 
            case_when(
-             spec.environment_phobia == "Yes" & spec.diagnosis.numeric == 1 ~ 0,
-             spec.environment_phobia == "No" & spec.diagnosis.numeric == 1 ~ 0,
-             spec.diagnosis.numeric == 0 ~ 0,
-             is.na(spec.diagnosis.numeric) ~ NA_real_,
+             spec.environment_phobia == "Yes" & spec.diagnosis_numeric == 1 ~ 0,
+             spec.environment_phobia == "No" & spec.diagnosis_numeric == 1 ~ 0,
+             spec.diagnosis_numeric == 0 ~ 0,
+             is.na(spec.diagnosis_numeric) ~ NA_real_,
              is.na(spec.environment_phobia) ~ NA_real_
            ))
 ## Recode factor
 SPEC.items <- SPEC.items %>% 
   mutate(environment_phobia_diagnosis =
-           recode_factor(environment_phobia_diagnosis.numeric,
+           recode_factor(environment_phobia_diagnosis_numeric,
                          "0" = "No environment phobia",
                          "1" = "Environment phobia"))
 #Situational phobia
 SPEC.items <- SPEC.items %>% 
-  mutate(situation_phobia_diagnosis.numeric = 
+  mutate(situation_phobia_diagnosis_numeric = 
            case_when(
-             spec.situation_phobia == "Yes" & spec.diagnosis.numeric == 1 ~ 0,
-             spec.situation_phobia == "No" & spec.diagnosis.numeric == 1 ~ 0,
-             spec.diagnosis.numeric == 0 ~ 0,
-             is.na(spec.diagnosis.numeric) ~ NA_real_,
+             spec.situation_phobia == "Yes" & spec.diagnosis_numeric == 1 ~ 0,
+             spec.situation_phobia == "No" & spec.diagnosis_numeric == 1 ~ 0,
+             spec.diagnosis_numeric == 0 ~ 0,
+             is.na(spec.diagnosis_numeric) ~ NA_real_,
              is.na(spec.situation_phobia) ~ NA_real_
            ))
 ## Recode factor
 SPEC.items <- SPEC.items %>% 
   mutate(situation_phobia_diagnosis =
-           recode_factor(situation_phobia_diagnosis.numeric,
+           recode_factor(situation_phobia_diagnosis_numeric,
                          "0" = "No situation phobia",
                          "1" = "Situation phobia"))
 #Animal phobia
 SPEC.items <- SPEC.items %>% 
-  mutate(animal_phobia_diagnosis.numeric = 
+  mutate(animal_phobia_diagnosis_numeric = 
            case_when(
-             spec.animal_phobia == "Yes" & spec.diagnosis.numeric == 1 ~ 0,
-             spec.animal_phobia == "No" & spec.diagnosis.numeric == 1 ~ 0,
-             spec.diagnosis.numeric == 0 ~ 0,
-             is.na(spec.diagnosis.numeric) ~ NA_real_,
+             spec.animal_phobia == "Yes" & spec.diagnosis_numeric == 1 ~ 0,
+             spec.animal_phobia == "No" & spec.diagnosis_numeric == 1 ~ 0,
+             spec.diagnosis_numeric == 0 ~ 0,
+             is.na(spec.diagnosis_numeric) ~ NA_real_,
              is.na(spec.animal_phobia) ~ NA_real_
            ))
 ## Recode factor
 SPEC.items <- SPEC.items %>% 
   mutate(animal_phobia_diagnosis =
-           recode_factor(animal_phobia_diagnosis.numeric,
+           recode_factor(animal_phobia_diagnosis_numeric,
                          "0" = "No animal phobia",
                          "1" = "Animal phobia"))
 #Blood injection phobia
 SPEC.items <- SPEC.items %>% 
-  mutate(blood_injection_phobia_diagnosis.numeric = 
+  mutate(blood_injection_phobia_diagnosis_numeric = 
            case_when(
-             spec.blood_injection_phobia == "Yes" & spec.diagnosis.numeric == 1 ~ 0,
-             spec.blood_injection_phobia == "No" & spec.diagnosis.numeric == 1 ~ 0,
-             spec.diagnosis.numeric == 0 ~ 0,
-             is.na(spec.diagnosis.numeric) ~ NA_real_,
+             spec.blood_injection_phobia == "Yes" & spec.diagnosis_numeric == 1 ~ 0,
+             spec.blood_injection_phobia == "No" & spec.diagnosis_numeric == 1 ~ 0,
+             spec.diagnosis_numeric == 0 ~ 0,
+             is.na(spec.diagnosis_numeric) ~ NA_real_,
              is.na(spec.blood_injection_phobia) ~ NA_real_
            ))
 ## Recode factor
 SPEC.items <- SPEC.items %>% 
   mutate(blood_injection_phobia_diagnosis =
-           recode_factor(blood_injection_phobia_diagnosis.numeric,
+           recode_factor(blood_injection_phobia_diagnosis_numeric,
                          "0" = "No blood or injection phobia",
                          "1" = "Blood or injection phobia"))
 #Other phobia
 SPEC.items <- SPEC.items %>% 
-  mutate(other_phobia_diagnosis.numeric = 
+  mutate(other_phobia_diagnosis_numeric = 
            case_when(
-             spec.other_phobia == "Yes" & spec.diagnosis.numeric == 1 ~ 0,
-             spec.other_phobia == "No" & spec.diagnosis.numeric == 1 ~ 0,
-             spec.diagnosis.numeric == 0 ~ 0,
-             is.na(spec.diagnosis.numeric) ~ NA_real_,
+             spec.other_phobia == "Yes" & spec.diagnosis_numeric == 1 ~ 0,
+             spec.other_phobia == "No" & spec.diagnosis_numeric == 1 ~ 0,
+             spec.diagnosis_numeric == 0 ~ 0,
+             is.na(spec.diagnosis_numeric) ~ NA_real_,
              is.na(spec.other_phobia) ~ NA_real_
            ))
 ## Recode factor
 SPEC.items <- SPEC.items %>% 
   mutate(other_phobia_diagnosis =
-           recode_factor(other_phobia_diagnosis.numeric,
+           recode_factor(other_phobia_diagnosis_numeric,
                          "0" = "No other phobia",
                          "1" = "Other phobia"))
 ```
@@ -347,18 +350,18 @@ SPEC.clean <- SPEC.items %>%
         spec.phobia_lasted,
         spec.phobia_interfered,
         spec.phobia_out_of_proportion,
-        spec.environment_phobia_diagnosis_diagnosis.numeric,
+        spec.environment_phobia_diagnosis_numeric,
         spec.environment_phobia_diagnosis,
-        spec.situation_phobia_diagnosis.numeric,
+        spec.situation_phobia_diagnosis_numeric,
         spec.situation_phobia_diagnosis,
-        spec.animal_phobia_diagnosis.numeric,
+        spec.animal_phobia_diagnosis_numeric,
         spec.animal_phobia_diagnosis,
-        spec.blood_injection_phobia_diagnosis.numeric,
+        spec.blood_injection_phobia_diagnosis_numeric,
         spec.blood_injection_phobia_diagnosis,
-        spec.other_phobia_diagnosis.numeric,
+        spec.other_phobia_diagnosis_numeric,
         spec.other_phobia_diagnosis,
         spec.diagnosis,
-        spec.diagnosis.numeric)
+        spec.diagnosis_numeric)
 
 #Export data
 saveRDS(object = SPEC.clean, file = paste0(export_path, "SPEC_cleaned.rds"))
