@@ -107,24 +107,24 @@ categorical, and allows for easy analysis of all participants together.
 The continuous variable consisted of months and years, which need to be added together.
 ```{r longest_period_worry combine years and months}
 #Visualise data
-summary(CIDIA.cc$cidia.longest_period_worry_years)
-summary(CIDIA.cc$cidia.longest_period_worry_months)
+summary(CIDIA.items$cidia.longest_period_worry_years)
+summary(CIDIA.items$cidia.longest_period_worry_months)
 #Convert months to years
-CIDIA.cc$cidia.longest_period_worry_months.years <- CIDIA.cc$cidia.longest_period_worry_months/12
+CIDIA.items$cidia.longest_period_worry_months.years <- CIDIA.items$cidia.longest_period_worry_months/12
 #Combine month & year values for total time of longest period of worry
-CIDIA.cc$cidia.longest_period_worry_combined.unc <- rowSums(cbind(CIDIA.cc$cidia.longest_period_worry_months.years, CIDIA.cc$cidia.longest_period_worry_years))
+CIDIA.items$cidia.longest_period_worry_combined.unc <- rowSums(cbind(CIDIA.items$cidia.longest_period_worry_months.years, CIDIA.items$cidia.longest_period_worry_years))
 #Round the new variable
-CIDIA.cc$cidia.longest_period_worry_combined <- round(CIDIA.cc$cidia.longest_period_worry_combined.unc, digits = 2)
-summary(CIDIA.cc$cidia.longest_period_worry_combined)
+CIDIA.items$cidia.longest_period_worry_combined <- round(CIDIA.items$cidia.longest_period_worry_combined.unc, digits = 2)
+summary(CIDIA.items$cidia.longest_period_worry_combined)
 ```
 
 ### Longest period of worry categorical + continuous (all)
 Combine categorical and continuous variables into a single categorical variable.
 ```{r create longest_period_worry_categorical.combined}
 #Create column
-CIDIA.cc$cidia.longest_period_worry_categorical_combined.unc <- NA
+CIDIA.items$cidia.longest_period_worry_categorical_combined.unc <- NA
 #Combine columns into single categorical variable
-CIDIA.cc$cidia.longest_period_worry_categorical_combined.unc <- with(CIDIA.cc,
+CIDIA.items$cidia.longest_period_worry_categorical_combined.unc <- with(CIDIA.items,
                                                                      ifelse(is.na(cidia.longest_period_worry_categorical) 
                                                                             & !is.na(cidia.longest_period_worry_combined),
                                                                        (cut(cidia.longest_period_worry_combined,
@@ -136,8 +136,8 @@ CIDIA.cc$cidia.longest_period_worry_categorical_combined.unc <- with(CIDIA.cc,
 
 ```{r recode longest_period_worry_categorical.combined}
 #Recode factor
-CIDIA.cc$cidia.longest_period_worry_categorical_combined <-
-  recode_factor(CIDIA.cc$cidia.longest_period_worry_categorical_combined.unc,
+CIDIA.items$cidia.longest_period_worry_categorical_combined <-
+  recode_factor(CIDIA.items$cidia.longest_period_worry_categorical_combined.unc,
                              "1" = "Less than 6 months",
                              "2" = "Between 6 and 12 months",
                              "3" = "Between 1 and 5 years", 
@@ -147,15 +147,15 @@ CIDIA.cc$cidia.longest_period_worry_categorical_combined <-
 ```
 
 ```{r longest_period_worry_categorical summary, results='asis'}
-summarytools::freq(CIDIA.cc$cidia.longest_period_worry_categorical_combined,
+summarytools::freq(CIDIA.items$cidia.longest_period_worry_categorical_combined,
                    style = "rmarkdown")
 ```
 
 ```{r compare total NA in combined variable to originals}
 #There should be fewer NAs in the categorical_combined variable than in the categorical and continuous variables alone
-sum(is.na(CIDIA.cc$cidia.longest_period_worry_categorical)) #Categorical
-sum(is.na(CIDIA.cc$cidia.longest_period_worry_combined)) #Continuous
-sum(is.na(CIDIA.cc$cidia.longest_period_worry_categorical_combined)) #Combined
+sum(is.na(CIDIA.items$cidia.longest_period_worry_categorical)) #Categorical
+sum(is.na(CIDIA.items$cidia.longest_period_worry_combined)) #Continuous
+sum(is.na(CIDIA.items$cidia.longest_period_worry_categorical_combined)) #Combined
 
 ```
 
@@ -181,7 +181,54 @@ F.   The  disturbance  is  not  better  explained  by  another  mental  disorder
 
 *The CIDIA does not measure these items
 
-```{r variable for missingness}
+# Screening variables
+The GAD screening questions include:
+1) Anxiety or worry (criterion A)
+2) Duration of 6 months or more
+
+
+*How the screening works*
+If the participant responds No (0) to both anxiety and worry variables they are scored 0 for diagnosis and skip the remaining questions.
+
+If the participant reports either anxiety or worry but doesn't report symptoms lasting 6 months or longer, then:
+    i) If they signed up before April 2020, they skipped the remaining questions
+    ii) If they signed up during or after April 2020, they are asked follow-up questions about duration in months. If they report symptoms lasting at least 1 month, they continue to the remaining questions to assess subthreshold GAD. They have the option to select 6 months in this question, so researchers conducting analyses on datasets post April 2020 should take this into account.
+
+
+Create variable for worry and duration screen
+```{r variable for worry & duration (criterion A) screener}
+CIDIA.items <- CIDIA.items %>% 
+  mutate(cidia.screener_numeric = 
+           case_when(
+             cidia.felt_worried == "No" & cidia.felt_worried_more == "No" 
+             ~ 0,
+             (cidia.felt_worried == "Yes" | cidia.felt_worried_more == "Yes") & 
+               cidia.longest_period_worry_categorical_combined == "Less than 6 months"
+             ~ 0,
+             (cidia.felt_worried == "Yes" | cidia.felt_worried_more == "Yes") &
+               (cidia.longest_period_worry_categorical_combined == "Between 6 and 12 months" |
+                  cidia.longest_period_worry_categorical_combined == "Between 1 and 5 years" |
+                  cidia.longest_period_worry_categorical_combined == "More than 5 years" |
+                  cidia.longest_period_worry_categorical_combined == "All of my life/as long as I can remember") ~ 1
+           ))
+
+summary(as.factor(CIDIA.items$cidia.screener_numeric))
+
+```
+
+## Criterion variables
+In each case where more than 1 response fulfills a diagnostic criterion, a new variable is created.
+
+Note: These criterion variables will have a large number of NAs if the screening criteria aren't met, as the question is not displayed in these cases. This is accounted for in the algorithm.
+
+```{r}
+
+```
+
+
+## Missingness
+
+```{r variable for symptom missingness}
 #Missing responses/no information on any of the core symptoms of anxiety
 #(Later, if no.info > 1 overall, then lifetime GAD will be coded as NA)
 
@@ -246,31 +293,7 @@ summary(as.factor(CIDIA.items$cidia.anxiety_screen.calc))
 
 ```
 
-Worry and duration screen
-If the participant responds No (0) to both of these variables or doesn't report symptoms lasting 6 months or longer, they are scored 0 for lifetime_anxiety.
 
-```{r variable for worry & duration screener}
-CIDIA.items$cidia.worry_duration_screen <- with(CIDIA.items,
-                                                    ifelse(
-                                                      ((cidia.felt_worried == "Yes" | cidia.felt_worried_more == "Yes") & 
-                                                         (cidia.longest_period_worry_categorical_combined == "Between 6 and 12 months" |
-                                                  cidia.longest_period_worry_categorical_combined == "Between 1 and 5 years" |
-                                                  cidia.longest_period_worry_categorical_combined == "More than 5 years" |
-                                                  cidia.longest_period_worry_categorical_combined == "All of my life/as long as I can remember")),
-                                                      1, 0
-                                                    ))
-# Recode as NA if missing values in longest period of worry
-CIDIA.items$cidia.worry_duration_screen <- with(CIDIA.items,
-                                                   ifelse(is.na(cidia.longest_period_worry_categorical_combined),
-                                                   NA, cidia.longest_period_worry_categorical_combined))
-# Recode as NA if missing values in both felt_worried variables
-CIDIA.items$cidia.worry_duration_screen <- with(CIDIA.items,
-                                                   ifelse(is.na(cidia.felt_worried) & is.na(cidia.felt_worried_more),
-                                                   NA, cidia.longest_period_worry_categorical_combined))
-
-summary(as.factor(CIDIA.items$cidia.worry_duration_screen))
-
-```
 
 ```{r variable for restless & keyed up/on edge}
 #Create variable for restlessness or keyed up/on edge (which is a single symptom criterion in the DSM for GAD)
@@ -419,7 +442,7 @@ CIDIA.items$cidia.lifetime_anxiety.calc <- with(CIDIA.items,
                                                       ifelse(
                                                         is.na(cidia.lifetime_anxiety.calc), 
                                                         ifelse(
-                                                        cidia.worry_duration_screen == 0, 
+                                                        cidia.screener_numeric == 0, 
                                                         0, cidia.lifetime_anxiety.calc), 
                                                         cidia.lifetime_anxiety.calc
                                                                )
