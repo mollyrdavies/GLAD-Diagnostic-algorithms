@@ -1,5 +1,5 @@
 ---
-title: "DIAGCOMP_merge_datasets_181020"
+title: "Merge lifetime diagnoses datasets"
 author: "Molly Davies"
 date: "18/10/2020"
 output: html_document
@@ -38,6 +38,12 @@ library(skimr)
 ```
 
 # Read data
+
+```{r source path for reading/saving data}
+#Source raw data directory (raw_path) & clean data export directory (cleaned_path)
+source("../GLAD_data_path.R")
+```
+
 ```{r set paths}
 #Names
 dem_name <- "DEM_cleaned.rds"
@@ -48,9 +54,6 @@ SPEC_name <- "SPEC_cleaned.rds"
 SOCP_name <- "SOCP_cleaned.rds"
 PAD_name <- "PAD_cleaned.rds"
 AGP_name <- "AGP_cleaned.rds"
-
-#Path
-data_path <- "../../Datasets/Relabelled_cleaned/"
 
 #Files
 dem_filename <- paste(datpath, dem_name, sep = "")
