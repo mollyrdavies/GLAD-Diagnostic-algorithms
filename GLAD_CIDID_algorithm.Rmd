@@ -90,24 +90,26 @@ Note: Do not include symptoms that are clearly attributable to another medical c
   2.   Markedly diminished  interest or pleasure in all,  or almost all,  activities  most of the day,  nearly every day (as indicated  by either subjective account or observation).
   3.   Significant weight loss when not dieting or weight gain (e.g., a change of more than5% of body weight in a month), or decrease or increase in appetite nearly every day.(Note: In children, consider failure to make expected weight gain.)
   4.   Insomnia or hypersomnia nearly every day.
-  5.   Psychomotor agitation  or  retardation  nearly  every day  (observable  by others,  notmerely subjective feelings of restlessness or being slowed down).***
+  5.   Psychomotor agitation  or  retardation  nearly  every day  (observable  by others,  notmerely subjective feelings of restlessness or being slowed down).*
   6.   Fatigue or loss of energy nearly every day.
-  7.   Feelings of worthlessness or excessive or inappropriate guilt*** (which  may be delusional)  nearly every day (not merely self-reproach or guilt about being sick).
+  7.   Feelings of worthlessness or excessive or inappropriate guilt* (which  may be delusional)  nearly every day (not merely self-reproach or guilt about being sick).
   8.   Diminished  ability to think or concentrate,  or indecisiveness,  nearly every day  (either by subjective account or as observed by others).
   9.   Recurrent thoughts of death (not just fear of dying), recurrent suicidal ideation without a specific plan,  or a suicide attempt or a specific plan for committing suicide
   
-B.  The  symptoms  cause  clinically  significant  distress***  or  impairment  in  social,  occupational, or other important areas of functioning.
+B.  The  symptoms  cause  clinically  significant  distress*  or  impairment  in  social,  occupational, or other important areas of functioning.
 
-C.  The episode is not attributable to the physiological effects of a substance or to another medical condition.***
+C.  The episode is not attributable to the physiological effects of a substance or to another medical condition.*
 
 Note: Criteria A-C  represent a major depressive episode.
 
-D.  The  occurrence  of the  major depressive  episode  is  not  better explained  by  schizoaffective  disorder,  schizophrenia,  schizophreniform  disorder,  delusional  disorder,  orother specified and unspecified schizophrenia spectrum and other psychotic disorders.***
+D.  The  occurrence  of the  major depressive  episode  is  not  better explained  by  schizoaffective  disorder,  schizophrenia,  schizophreniform  disorder,  delusional  disorder,  orother specified and unspecified schizophrenia spectrum and other psychotic disorders.*
 
-E.  There has never been a manic episode or a hypomanic episode.***
+E.  There has never been a manic episode or a hypomanic episode.*
 Note: This exclusion does not apply if all of the manic-like or hypomanic-like episodesare substance-induced or are attributable to the physiological effects of another medical condition.
 
+
 *The CIDID does not measure these items
+
 
 ## Screening variables
 The major depressive disorder screening questions include:
@@ -123,46 +125,132 @@ Create combined low mood & anhedonia screening variable.
 CIDID.items <- CIDID.items %>% 
   mutate(cidid.screener_numeric = 
            case_when(
-             cidid.low_mood
+             cidid.low_mood == "No" & cidid.anhedonia == "No" ~ 0,
+             cidid.low_mood == "Yes" ~ 1,
+             cidid.anhedonia == "Yes" ~ 1
            )
-           )
-$cidid.screener_numeric <- with(CIDID.items,
-                                                    ifelse(
-                                                      (cidid.low_mood == "Yes" | cidid.anhedonia == "Yes"),
-                                                      1, 0
-                                                    ))
+  )
 
-summary(as.factor(CIDID.items$cidid.screener_numeric))
+freq(CIDID.items$cidid.screener_numeric)
 
 ```
 
-```{r variable for missingness}
-#Missing responses/no information on core symptoms
-CIDID.items$no.info<-0
-#+1 to missingness score if both low mood and anhedonia are missing
-CIDID.items$no.info<-with(CIDID.items,
-                             ifelse(is.na(cidid.low_mood) & is.na(cidid.anhedonia), 1, 0))
-#+1 to missingness score if either duration, frequency, or functioning criteria have missing values
-CIDID.items$no.info <- with(CIDID.items,
-                               ifelse(is.na(cidid.how_long) |
-                                        is.na(cidid.how_often) |
-                                        is.na(cidid.functioning),
-                                      no.info + 1, 0
-                                                )
-                                      )
-summary(as.factor(CIDID.items$no.info))
-```
 
-```{r recode incorrect MDD variable}
-#These variables need to be re-exported with correct coding. At the moment they backwards and need to be recoded.
+## Criterion variables
+In each case where more than 1 response fulfills a diagnostic criterion, a new variable is created.
+
+Note: These criterion variables will have a large number of NAs if the screening criteria aren't met, as the question is not displayed in these cases. This is accounted for in the algorithm.
+
+Weight & appetite screen
+Criterion A.3. Significant weight loss when not dieting or weight gain (e.g., a change of more than5% of body weight in a month), or decrease or increase in appetite nearly every day.(Note: In children, consider failure to make expected weight gain.)
+
+These variables were separated in the CIDID but fulfil a single criterion in the DSM5, so are combined.
+
+```{r variable for criterion A.3 weight & appetite change}
+#Create variable for weight & appetite change (separate questions in the CIDID)
 CIDID.items <- CIDID.items %>% 
-  mutate(cidid.how_often = 
+  mutate(cidid.weight_appetite_change_numeric = 
+           case_when(
+             cidid.appetite_change == "No changes in appetite" & cidid.weight_change == "Stayed about the same or was on a diet" ~ 0,
+             cidid.appetite_change == "Increased appetite" ~ 1,
+             cidid.appetite_change == "Decreased appetite" ~ 1,
+             cidid.appetite_change == "Experienced both increased an decreased appetite during the same depression episode" ~ 1,
+             cidid.weight_change == "Lost weight" ~ 1,
+             cidid.weight_change == "Gained weight" ~ 1,
+             cidid.weight_change == "Both gained weight and lost some weight during the episode" ~ 1
+           ))
+
+summary(as.factor(CIDID.items$cidid.weight_appetite_change_numeric))
+
+```
+
+Calculate depression symptoms 'score' (the number of criterion A symptoms endorsed)
+
+Criterion A: Five (or more) of the following symptoms have been present during the same 2-week period and represent a change from previous functioning:
+1.   Depressed mood most of the day,  nearly every day,  as indicated by either subjective  report  (e.g.,  feels sad,  empty,  hopeless)  or observation  made  by others  (e.g.,appears tearful). 
+  (Note: In children and adolescents,  can be irritable mood.)
+  2.   Markedly diminished  interest or pleasure in all,  or almost all,  activities  most of the day,  nearly every day (as indicated  by either subjective account or observation).
+  3.   Significant weight loss when not dieting or weight gain (e.g., a change of more than5% of body weight in a month), or decrease or increase in appetite nearly every day.(Note: In children, consider failure to make expected weight gain.)
+  4.   Insomnia or hypersomnia nearly every day.
+  5.   Psychomotor agitation  or  retardation  nearly  every day  (observable  by others,  notmerely subjective feelings of restlessness or being slowed down).***
+  6.   Fatigue or loss of energy nearly every day.
+  7.   Feelings of worthlessness or excessive or inappropriate guilt*** (which  may be delusional)  nearly every day (not merely self-reproach or guilt about being sick).
+  8.   Diminished  ability to think or concentrate,  or indecisiveness,  nearly every day  (either by subjective account or as observed by others).
+  9.   Recurrent thoughts of death (not just fear of dying), recurrent suicidal ideation without a specific plan,  or a suicide attempt or a specific plan for committing suicide
+
+*A.5 - CIDID has no measure of psychomotor agitation or retardation
+*A.7 - CIDID has no measure of inappropriate guilt, phrasing is 'feel down on themselves, no good, worthless'
+
+```{r depression symptom score (criterion A)}
+#Create score for depression symptoms
+#Do NOT use 'is.na' for these as then you cannot +1 to it. Use the no.info item for NA (below). 
+CIDID.items$cidid.criterion_A_score_numeric<-0
+
+#Criterion A.1 - low mood
+CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
+                                    ifelse(!is.na(cidid.low_mood) 
+                                           & cidid.low_mood == "Yes", 
+                                           cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
+#Criterion A.2 - anhedonia
+CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items,
+                                    ifelse(!is.na(cidid.anhedonia) 
+                                           & cidid.anhedonia == "Yes",
+                                           cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
+#Criterion A.3 - weight &/or appetite change
+CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items,
+                                    ifelse(!is.na(cidid.weight_appetite_change_numeric) 
+                                           & cidid.weight_appetite_change_numeric > 0,
+                                           cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
+#Criterion A.4 - sleep change (insomnia or hypersomnia)
+CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
+                                    ifelse(!is.na(cidid.sleep_change) &
+                                             cidid.sleep_change == "Yes", 
+                                           cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
+#Criterion A.6 - fatigue or loss of energy
+CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
+                                    ifelse(!is.na(cidid.fatigue) & cidid.fatigue == "Yes", 
+                                           cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
+#Criterion A.7 - Feelings of worthlesness
+CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
+                                    ifelse(!is.na(cidid.worthlessness) 
+                                           & cidid.worthlessness == "Yes", 
+                                           cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
+#Criterion A.8 - Diminished ability to concentrate
+CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items,
+                                    ifelse(!is.na(cidid.trouble_concentrating) 
+                                           & cidid.trouble_concentrating == "Yes",
+                                           cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
+#Criterion A.9 - Recurrent thoughts of death or suicidal ideation
+CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
+                                    ifelse(!is.na(cidid.thoughts_of_death) 
+                                           & cidid.thoughts_of_death == "Yes", 
+                                           cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
+#Check distribution of scores (range should be 0-8)
+summary(as.factor(CIDID.items$cidid.criterion_A_score_numeric))
+
+```
+
+## Fix temporary coding error (April 2020 data freeze)
+```{r recode incorrect MDD variable}
+#These variables need to be re-exported with correct coding. At the moment they are backwards and need to be recoded.
+
+#If "Every day" is less frequently endorsed than "Less often", cidid.how_often is recoded.
+if (
+  sum(ifelse(CIDID.items$cidid.how_often %in% "Less often", 1, 0)) > sum(ifelse(CIDID.items$cidid.how_often %in% "Every day", 1, 0))
+  ) 
+    {
+      CIDID.items <- CIDID.items %>% 
+        mutate(cidid.how_often = 
          case_when(
            cidid.how_often == "Every day" ~ "Less often",
            cidid.how_often == "Almost every day" ~ "Almost every day",
            cidid.how_often == "Less often" ~ "Every day"
          ))
-
+}
+#If "All day long" is less frequently endorsed than "Less than half of the day", cidid.how_long is recoded.
+if (
+  sum(ifelse(CIDID.items$cidid.how_long %in% "Less than half of the day", 1, 0)) > sum(ifelse(CIDID.items$cidid.how_long %in% "All day long", 1, 0))
+  ) {
 CIDID.items <- CIDID.items %>% 
   mutate(cidid.how_long = 
          case_when(
@@ -171,6 +259,7 @@ CIDID.items <- CIDID.items %>%
            cidid.how_long == "Most of the day" ~ "About half of the day",
            cidid.how_long == "All day long" ~ "Less than half of the day"
          ))
+}
 
 ```
 
@@ -195,146 +284,63 @@ summary(as.factor(CIDID.items$cidid.depression_screen.calc))
 
 ```
 
+## Missingness
 
-Weight & appetite screen
-Criterion A.3. Significant weight loss when not dieting or weight gain (e.g., a change of more than5% of body weight in a month), or decrease or increase in appetite nearly every day.(Note: In children, consider failure to make expected weight gain.)
-
-These variables were separated in the CIDID but fulfil a single criterion in the DSM5, so are combined.
-
-```{r variable for weight & appetite change}
-#Create variable for weight & appetite change (separate questions in the CIDID)
-CIDID.items$cidid.weight_appetite_change.calc <- NA
-CIDID.items$cidid.weight_appetite_change.calc <- with(CIDID.items,
-                                                    ifelse(
-                                                      (!is.na(cidid.appetite_change) 
-                                                       & cidid.appetite_change == "Increased appetite") |
-                                                        (!is.na(cidid.appetite_change) 
-                                                       & cidid.appetite_change == "Decreased appetite") |
-                                                        (!is.na(cidid.appetite_change) 
-                                                       & cidid.appetite_change == "Experienced both increased an decreased appetite during the same depression episode") |
-                                                        (!is.na(cidid.weight_change) 
-                                                         & cidid.weight_change == "Gained weight") |
-                                                        (!is.na(cidid.weight_change) 
-                                                         & cidid.weight_change == "Lost weight") |
-                                                        (!is.na(cidid.weight_change) 
-                                                         & cidid.weight_change == "Both gained weight and lost some weight during the episode"),
-                                                      1, 0
-                                                    ))
-
-CIDID.items$cidid.weight_appetite_change.calc <- with(CIDID.items,
-                                                    ifelse(is.na(cidid.appetite_change) 
-                                                           & is.na(cidid.weight_change), 
-                                                    NA, cidid.weight_appetite_change.calc)
-                                                    )
-
-summary(as.factor(CIDID.items$cidid.weight_appetite_change.calc))
-
-```
-
-Calculate depression symptoms 'score' (the number of criterion A symptoms endorsed)
-
-Criterion A: Five (or more) of the following symptoms have been present during the same 2-week period and represent a change from previous functioning:
-1.   Depressed mood most of the day,  nearly every day,  as indicated by either subjective  report  (e.g.,  feels sad,  empty,  hopeless)  or observation  made  by others  (e.g.,appears tearful). 
-  (Note: In children and adolescents,  can be irritable mood.)
-  2.   Markedly diminished  interest or pleasure in all,  or almost all,  activities  most of the day,  nearly every day (as indicated  by either subjective account or observation).
-  3.   Significant weight loss when not dieting or weight gain (e.g., a change of more than5% of body weight in a month), or decrease or increase in appetite nearly every day.(Note: In children, consider failure to make expected weight gain.)
-  4.   Insomnia or hypersomnia nearly every day.
-  5.   Psychomotor agitation  or  retardation  nearly  every day  (observable  by others,  notmerely subjective feelings of restlessness or being slowed down).***
-  6.   Fatigue or loss of energy nearly every day.
-  7.   Feelings of worthlessness or excessive or inappropriate guilt*** (which  may be delusional)  nearly every day (not merely self-reproach or guilt about being sick).
-  8.   Diminished  ability to think or concentrate,  or indecisiveness,  nearly every day  (either by subjective account or as observed by others).
-  9.   Recurrent thoughts of death (not just fear of dying), recurrent suicidal ideation without a specific plan,  or a suicide attempt or a specific plan for committing suicide
-
-*A.5 - CIDID has no measure of psychomotor agitation or retardation
-*A.7 - CIDID has no measure of inappropriate guilt, phrasing is 'feel down on themselves, no good, worthless'
-
-```{r depression symptom score}
-#Create score for depression symptoms
-#Do NOT use 'is.na' for these as then you cannot +1 to it. Use the no.info item for NA (below). 
-CIDID.items$cidid.lifetime_depression_total.calc<-0
-
-#Criterion A.1 - low mood
-CIDID.items$cidid.lifetime_depression_total.calc<-with(CIDID.items, 
-                                    ifelse(!is.na(cidid.low_mood) 
-                                           & cidid.low_mood == "Yes", 
-                                           cidid.lifetime_depression_total.calc + 1, cidid.lifetime_depression_total.calc))
-#Criterion A.2 - anhedonia
-CIDID.items$cidid.lifetime_depression_total.calc<-with(CIDID.items,
-                                    ifelse(!is.na(cidid.anhedonia) 
-                                           & cidid.anhedonia == "Yes",
-                                           cidid.lifetime_depression_total.calc + 1, cidid.lifetime_depression_total.calc))
-#Criterion A.3 - weight &/or appetite change
-CIDID.items$cidid.lifetime_depression_total.calc<-with(CIDID.items,
-                                    ifelse(!is.na(cidid.weight_appetite_change.calc) 
-                                           & cidid.weight_appetite_change.calc > 0,
-                                           cidid.lifetime_depression_total.calc + 1, cidid.lifetime_depression_total.calc))
-#Criterion A.4 - sleep change (insomnia or hypersomnia)
-CIDID.items$cidid.lifetime_depression_total.calc<-with(CIDID.items, 
-                                    ifelse(!is.na(cidid.sleep_change) &
-                                             cidid.sleep_change == "Yes", 
-                                           cidid.lifetime_depression_total.calc + 1, cidid.lifetime_depression_total.calc))
-#Criterion A.6 - fatigue or loss of energy
-CIDID.items$cidid.lifetime_depression_total.calc<-with(CIDID.items, 
-                                    ifelse(!is.na(cidid.fatigue) & cidid.fatigue == "Yes", 
-                                           cidid.lifetime_depression_total.calc + 1, cidid.lifetime_depression_total.calc))
-#Criterion A.7 - Feelings of worthlesness
-CIDID.items$cidid.lifetime_depression_total.calc<-with(CIDID.items, 
-                                    ifelse(!is.na(cidid.worthlessness) 
-                                           & cidid.worthlessness == "Yes", 
-                                           cidid.lifetime_depression_total.calc + 1, cidid.lifetime_depression_total.calc))
-#Criterion A.8 - Diminished ability to concentrate
-CIDID.items$cidid.lifetime_depression_total.calc<-with(CIDID.items,
-                                    ifelse(!is.na(cidid.trouble_concentrating) 
-                                           & cidid.trouble_concentrating == "Yes",
-                                           cidid.lifetime_depression_total.calc + 1, cidid.lifetime_depression_total.calc))
-#Criterion A.9 - Recurrent thoughts of death or suicidal ideation
-CIDID.items$cidid.lifetime_depression_total.calc<-with(CIDID.items, 
-                                    ifelse(!is.na(cidid.thoughts_of_death) 
-                                           & cidid.thoughts_of_death == "Yes", 
-                                           cidid.lifetime_depression_total.calc + 1, cidid.lifetime_depression_total.calc))
-#Check distribution of scores
-summary(as.factor(CIDID.items$cidid.lifetime_depression_total.calc))
-
+```{r variable for missingness}
+#Missing responses/no information on core symptoms
+CIDID.items$no.info<-0
+#+1 to missingness score if both low mood and anhedonia are missing
+CIDID.items$no.info<-with(CIDID.items,
+                             ifelse(is.na(cidid.low_mood) & is.na(cidid.anhedonia), 1, 0))
+#+1 to missingness score if either duration, frequency, or functioning criteria have missing values
+CIDID.items$no.info <- with(CIDID.items,
+                               ifelse(is.na(cidid.how_long) |
+                                        is.na(cidid.how_often) |
+                                        is.na(cidid.functioning),
+                                      no.info + 1, 0
+                                                )
+                                      )
+summary(as.factor(CIDID.items$no.info))
 ```
 
 ```{r depression symptom NA count score}
 #Create score to calculate how many missing values are in the depression symptom scores
 
-CIDID.items$cidid.lifetime_depression_total.calc.NA<-0
+CIDID.items$cidid.criterion_A_score_numeric.NA<-0
 
-CIDID.items$cidid.lifetime_depression_total.calc.NA<-with(CIDID.items, 
+CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
                                     ifelse(is.na(cidid.low_mood), 
-                                           cidid.lifetime_depression_total.calc.NA + 1, cidid.lifetime_depression_total.calc.NA))
+                                           cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
-CIDID.items$cidid.lifetime_depression_total.calc.NA<-with(CIDID.items,
+CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items,
                                     ifelse(is.na(cidid.anhedonia),
-                                           cidid.lifetime_depression_total.calc.NA + 1, cidid.lifetime_depression_total.calc.NA))
+                                           cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
-CIDID.items$cidid.lifetime_depression_total.calc.NA<-with(CIDID.items,
-                                    ifelse(is.na(cidid.weight_appetite_change.calc),
-                                           cidid.lifetime_depression_total.calc.NA + 1, cidid.lifetime_depression_total.calc.NA))
+CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items,
+                                    ifelse(is.na(cidid.weight_appetite_change_numeric),
+                                           cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
-CIDID.items$cidid.lifetime_depression_total.calc.NA<-with(CIDID.items, 
+CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
                                     ifelse(is.na(cidid.sleep_change), 
-                                           cidid.lifetime_depression_total.calc.NA + 1, cidid.lifetime_depression_total.calc.NA))
+                                           cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
-CIDID.items$cidid.lifetime_depression_total.calc.NA<-with(CIDID.items, 
+CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
                                     ifelse(is.na(cidid.fatigue), 
-                                           cidid.lifetime_depression_total.calc.NA + 1, cidid.lifetime_depression_total.calc.NA))
+                                           cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
-CIDID.items$cidid.lifetime_depression_total.calc.NA<-with(CIDID.items, 
+CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
                                     ifelse(is.na(cidid.worthlessness), 
-                                           cidid.lifetime_depression_total.calc.NA + 1, cidid.lifetime_depression_total.calc.NA))
+                                           cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
-CIDID.items$cidid.lifetime_depression_total.calc.NA<-with(CIDID.items,
+CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items,
                                     ifelse(is.na(cidid.trouble_concentrating),
-                                           cidid.lifetime_depression_total.calc.NA + 1, cidid.lifetime_depression_total.calc.NA))
+                                           cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
-CIDID.items$cidid.lifetime_depression_total.calc.NA<-with(CIDID.items, 
+CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
                                     ifelse(is.na(cidid.thoughts_of_death), 
-                                           cidid.lifetime_depression_total.calc.NA + 1, cidid.lifetime_depression_total.calc.NA))
+                                           cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
-summary(as.factor(CIDID.items$cidid.lifetime_depression_total.calc.NA))
+summary(as.factor(CIDID.items$cidid.criterion_A_score_numeric.NA))
 
 ```
 
@@ -345,7 +351,7 @@ CIDID.items$cidid.lifetime_depression <- with(CIDID.items,
                                                         #Code lifetime MDD as NA if any core symptoms were missed
                                                         no.info > 0, NA,
                                                         #If at least 5 symptoms endorsed (criterion A)...
-                                                        ifelse((!is.na(cidid.lifetime_depression_total.calc) & cidid.lifetime_depression_total.calc > 4)
+                                                        ifelse((!is.na(cidid.criterion_A_score_numeric) & cidid.criterion_A_score_numeric > 4)
                                                                #...and core symptoms are met
                                                                & (!is.na(cidid.depression_screen.calc) & cidid.depression_screen.calc == 1),
                                                                #Code lifetime MDD as 1
@@ -364,19 +370,19 @@ summary(as.factor(CIDID.items$cidid.lifetime_depression))
 #e.g. if the ppt endorsed 3 symptoms, but didn't respond to minimum 2 other questions, then they are coded as NA
 
 CIDID.items$cidid.lifetime_depression <- with(CIDID.items,
-                                                      ifelse(cidid.lifetime_depression_total.calc == 4 & cidid.lifetime_depression_total.calc.NA > 0,
+                                                      ifelse(cidid.criterion_A_score_numeric == 4 & cidid.criterion_A_score_numeric.NA > 0,
                                                              NA, cidid.lifetime_depression))
 
 CIDID.items$cidid.lifetime_depression <- with(CIDID.items,
-                                                      ifelse(cidid.lifetime_depression_total.calc == 3 & cidid.lifetime_depression_total.calc.NA > 1,
+                                                      ifelse(cidid.criterion_A_score_numeric == 3 & cidid.criterion_A_score_numeric.NA > 1,
                                                              NA, cidid.lifetime_depression))
 
 CIDID.items$cidid.lifetime_depression <- with(CIDID.items,
-                                                      ifelse(cidid.lifetime_depression_total.calc == 2 & cidid.lifetime_depression_total.calc.NA > 2,
+                                                      ifelse(cidid.criterion_A_score_numeric == 2 & cidid.criterion_A_score_numeric.NA > 2,
                                                              NA, cidid.lifetime_depression))
 
 CIDID.items$cidid.lifetime_depression <- with(CIDID.items,
-                                                      ifelse(cidid.lifetime_depression_total.calc == 1 & cidid.lifetime_depression_total.calc.NA > 3,
+                                                      ifelse(cidid.criterion_A_score_numeric == 1 & cidid.criterion_A_score_numeric.NA > 3,
                                                              NA, cidid.lifetime_depression))
 
 summary(as.factor(CIDID.items$cidid.lifetime_depression))
@@ -397,7 +403,7 @@ summary(as.factor(CIDID.items$cidid.lifetime_depression))
 
 ```{r merge lifetime depression variable into dataset}
 
-CIDI.dep <- CIDID.items[,c("ID", "cidid.depression_screen.calc", "cidid.weight_appetite_change.calc", "cidid.lifetime_depression_total.calc", "cidid.lifetime_depression_total.calc.NA", "cidid.lifetime_depression")]
+CIDI.dep <- CIDID.items[,c("ID", "cidid.depression_screen.calc", "cidid.weight_appetite_change_numeric", "cidid.criterion_A_score_numeric", "cidid.criterion_A_score_numeric.NA", "cidid.lifetime_depression")]
 
 CIDID.cc <- left_join(CIDID.cc, CIDI.dep, by = "ID")
 
@@ -423,32 +429,32 @@ summarytools::freq(CIDID.cc$cidid.depression_screen.calc,
 ```
 
 ```{r weight_appetite_change recode}
-summary(CIDID.cc$cidid.weight_appetite_change.calc)
+summary(CIDID.cc$cidid.weight_appetite_change_numeric)
 
 #Store old variable as unc
-CIDID.cc$cidid.weight_appetite_change.calc.unc <- NA
-CIDID.cc$cidid.weight_appetite_change.calc.unc <- CIDID.cc$cidid.weight_appetite_change.calc
+CIDID.cc$cidid.weight_appetite_change_numeric.unc <- NA
+CIDID.cc$cidid.weight_appetite_change_numeric.unc <- CIDID.cc$cidid.weight_appetite_change_numeric
 
 #Recode as factor
-CIDID.cc$cidid.weight_appetite_change.calc <- recode_factor(CIDID.cc$cidid.weight_appetite_change.calc.unc,
+CIDID.cc$cidid.weight_appetite_change_numeric <- recode_factor(CIDID.cc$cidid.weight_appetite_change_numeric.unc,
                              "0" = "No",
                              "1" = "Yes")
 ```
 
 ```{r weight_appetite_change summary, results='asis'}
-summarytools::freq(CIDID.cc$cidid.weight_appetite_change.calc,
+summarytools::freq(CIDID.cc$cidid.weight_appetite_change_numeric,
                    style = "rmarkdown")
 ```
 
 ```{r lifetime_depression_total recode}
 #Summary of raw variable
-summary(CIDID.cc$cidid.lifetime_depression_total.calc)
+summary(CIDID.cc$cidid.criterion_A_score_numeric)
 
 #Store old variable as unc
-CIDID.cc$cidid.lifetime_depression_total.calc.unc <- NA
-CIDID.cc$cidid.lifetime_depression_total.calc.unc <- CIDID.cc$cidid.lifetime_depression_total.calc
+CIDID.cc$cidid.criterion_A_score_numeric.unc <- NA
+CIDID.cc$cidid.criterion_A_score_numeric.unc <- CIDID.cc$cidid.criterion_A_score_numeric
 
-CIDID.cc$cidid.lifetime_depression_total.calc <- recode_factor(CIDID.cc$cidid.lifetime_depression_total.calc.unc,
+CIDID.cc$cidid.criterion_A_score_numeric <- recode_factor(CIDID.cc$cidid.criterion_A_score_numeric.unc,
                              "0" = "None",                             
                              "1" = "One",
                              "2" = "Two",
@@ -459,18 +465,18 @@ CIDID.cc$cidid.lifetime_depression_total.calc <- recode_factor(CIDID.cc$cidid.li
                              "7" = "Seven",
                              "8" = "Eight")
 #Summary of recoded variable
-summary(CIDID.cc$cidid.lifetime_depression_total.calc)
+summary(CIDID.cc$cidid.criterion_A_score_numeric)
 ```
 
 ```{r lifetime_depression_total recode}
 #Summary of raw variable
-summary(CIDID.cc$cidid.lifetime_depression_total.calc.NA)
+summary(CIDID.cc$cidid.criterion_A_score_numeric.NA)
 
 #Store old variable as unc
-CIDID.cc$cidid.lifetime_depression_total.calc.NA.unc <- NA
-CIDID.cc$cidid.lifetime_depression_total.calc.NA.unc <- CIDID.cc$cidid.lifetime_depression_total.calc.NA
+CIDID.cc$cidid.criterion_A_score_numeric.NA.unc <- NA
+CIDID.cc$cidid.criterion_A_score_numeric.NA.unc <- CIDID.cc$cidid.criterion_A_score_numeric.NA
 
-CIDID.cc$cidid.lifetime_depression_total.calc.NA <- recode_factor(CIDID.cc$cidid.lifetime_depression_total.calc.NA.unc,
+CIDID.cc$cidid.criterion_A_score_numeric.NA <- recode_factor(CIDID.cc$cidid.criterion_A_score_numeric.NA.unc,
                              "0" = "None",                             
                              "1" = "One",
                              "2" = "Two",
@@ -481,7 +487,7 @@ CIDID.cc$cidid.lifetime_depression_total.calc.NA <- recode_factor(CIDID.cc$cidid
                              "7" = "Seven",
                              "8" = "Eight")
 #Summary of recoded variable
-summary(CIDID.cc$cidid.lifetime_depression_total.calc.NA)
+summary(CIDID.cc$cidid.criterion_A_score_numeric.NA)
 ```
 
 ```{r MDD diagnosis variable recode}
@@ -539,7 +545,7 @@ CIDID.clean <- CIDID.cc %>%
         cidid.perinatal_depression,
         cidid.adverse_life_event,
         cidid.depression_screen.calc,
-        cidid.weight_appetite_change.calc,
+        cidid.weight_appetite_change_numeric,
         cidid.diagnosis_numeric,
         cidid.diagnosis)
 
