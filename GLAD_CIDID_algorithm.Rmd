@@ -81,7 +81,7 @@ CIDID.items[CIDID.items == -99] <- NA
 CIDID.items[CIDID.items == -77] <- NA
 ```
 
-### DSM-5 MDD Diagnostic Algorithm
+# DSM-5 MDD diagnostic criteria
 
 A.  Five (or more) of the following symptoms have been present during the same 2-week period and represent a change from previous functioning: at least one of the symptoms is either (1) depressed mood or (2)  loss of interest or pleasure.
 Note: Do not include symptoms that are clearly attributable to another medical condition.
@@ -111,7 +111,7 @@ Note: This exclusion does not apply if all of the manic-like or hypomanic-like e
 *The CIDID does not measure these items
 
 
-## Screening variables
+# Screening variables
 The major depressive disorder screening questions include:
 1) Low mood or anhedonia (criterion A)
 
@@ -136,7 +136,7 @@ freq(CIDID.items$cidid.screener_numeric)
 ```
 
 
-## Criterion variables
+# Criterion variables
 In each case where more than 1 response fulfills a diagnostic criterion, a new variable is created.
 
 Note: These criterion variables will have a large number of NAs if the screening criteria aren't met, as the question is not displayed in these cases. This is accounted for in the algorithm.
@@ -230,7 +230,7 @@ summary(as.factor(CIDID.items$cidid.criterion_A_score_numeric))
 
 ```
 
-## Fix temporary coding error (April 2020 data freeze)
+# Fix temporary coding error (April 2020 data freeze)
 ```{r recode incorrect MDD variable}
 #These variables need to be re-exported with correct coding. At the moment they are backwards and need to be recoded.
 
@@ -263,7 +263,7 @@ CIDID.items <- CIDID.items %>%
 
 ```
 
-## Missingness
+# Missingness
 
 ```{r variable for missingness}
 #Missing responses/no information on core symptoms
@@ -320,7 +320,7 @@ summary(as.factor(CIDID.items$cidid.criterion_A_score_numeric.NA))
 
 ```
 
-## DSM-5 MDD diagnostic algorithm
+# DSM-5 MDD diagnostic algorithm
 
 ```{r lifetime MDD diagnosis variable}
 
@@ -372,7 +372,7 @@ CIDID.items$cidid.diagnosis <- recode_factor(CIDID.items$cidid.diagnosis_numeric
 summary(CIDID.items$cidid.diagnosis)
 ```
 
-## Clean CIDID dataset
+# Clean CIDID dataset
 
 ```{r clean CIDID dataframe}
 
