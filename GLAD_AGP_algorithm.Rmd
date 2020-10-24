@@ -13,20 +13,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Clear workspace
 ```{r clear workspace}
-#rm(list = ls())
+rm(list = ls())
 ```
 
 ```{r load packages}
-library(knitr)
 library(tidyverse)
-library(car)
 library(psych)
-library(lubridate)
-library(broom)
-library(ggfortify)
 library(summarytools)
-library(ggformula)
-library(data.table)
 ```
 
 ```{r source path for reading/saving data}
