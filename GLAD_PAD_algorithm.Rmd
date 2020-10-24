@@ -1,0 +1,443 @@
+---
+title: "Lifetime DSM-5 panic disorder: Diagnostic algorithm (GLAD Study data)"
+author: "Molly Davies"
+date: "24/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set up
+
+Clear workspace
+```{r clear workspace}
+#rm(list = ls())
+```
+
+```{r load packages}
+library(knitr)
+library(tidyverse)
+library(car)
+library(psych)
+library(lubridate)
+library(broom)
+library(ggfortify)
+library(summarytools)
+library(ggformula)
+library(data.table)
+```
+
+```{r source path for reading/saving data}
+#Source raw data directory (path) & clean data export directory (export_path)
+source("../GLAD_data_path.R")
+```
+
+```{r read in cleaned PAD data}
+PAD_file <- paste(path, "PAD.rds", sep = "")
+
+PAD.cc <- read_rds(PAD_file)
+```
+
+```{r visualise PAD data}
+head(PAD.cc)
+```
+
+```{r create dataset of PAD diagnostic variables}
+
+#Create dataset of all variables needed for PAD diagnosis
+PAD.items <- PAD.cc %>%
+  select(ID,
+         pad.heart_pounding,
+         pad.sweating,
+         pad.trembling,
+         pad.short_of_breath,
+         pad.choking,
+         pad.chest_pain,
+         pad.nauseous,
+         pad.dizzy,
+         pad.hot_cold,
+         pad.numbness,
+         pad.detached,
+         pad.lose_control,
+         pad.going_to_die,
+         pad.anx_future_panic_attacks,
+         pad.worried_future_panic_attacks,
+         pad.avoid_situation_panic_attacks,
+         pad.duration,
+         pad.physical_cause,
+         pad.heights,
+         pad.random,
+         pad.heart_pounding_numeric,
+         pad.sweating_numeric,
+         pad.trembling_numeric,
+         pad.short_of_breath_numeric,
+         pad.choking_numeric,
+         pad.chest_pain_numeric,
+         pad.nauseous_numeric,
+         pad.dizzy_numeric,
+         pad.hot_cold_numeric,
+         pad.numbness_numeric,
+         pad.detached_numeric,
+         pad.lose_control_numeric,
+         pad.going_to_die_numeric,
+         pad.anx_future_panic_attacks_numeric,
+         pad.worried_future_panic_attacks_numeric,
+         pad.avoid_situation_panic_attacks_numeric,
+         pad.duration_numeric,
+         pad.physical_cause_numeric,
+         pad.heights_numeric,
+         pad.random_numeric,
+         pad.anx_future_panic_attacks,
+         pad.worried_future_panic_attacks,
+         pad.avoid_situation_panic_attacks,
+         pad.duration,
+         pad.physical_cause,
+         pad.heights,
+         pad.random
+         )
+```
+
+```{r recode as NAs}
+#Change all prefer not to answers and don't knows to NA
+PAD.items[PAD.items == "Don't know"] <- NA
+PAD.items[PAD.items == "Prefer not to answer"] <- NA
+PAD.items[PAD.items == "Seen but not answered"] <- NA
+PAD.items[PAD.items == -88] <- NA
+PAD.items[PAD.items == -99] <- NA
+PAD.items[PAD.items == -77] <- NA
+```
+
+## DSM-5 panic disorder diagnostic criteria
+
+A.   Recurrent unexpected panic attacks. A panic attack is an abrupt surge of intense fear or intense discomfort that reaches a peak within minutes, and during which time four (or more) of the following symptoms occur; Note: The abrupt surge can occur from a calm state or an anxious state.
+1.	Palpitations, pounding heart, or accelerated heart rate.
+2.	Sweating.
+3.	Trembling or shaking.
+4.	Sensations of shortness of breath or smothering.
+5.	Feelings of choking.
+6.	Chest pain or discomfort.
+7.	Nausea or abdominal distress.
+8.	Feeling dizzy, unsteady, light-headed, or faint.
+9.	Chills or heat sensations.
+10.	Paresthesias (numbness or tingling sensations).
+11.	Derealization (feelings of unreality) or depersonalization (being detached from one¬self).
+12.	Fear of losing control or “going crazy.”
+13.	Fear of dying. 
+Note: Culture-specific symptoms (e.g., tinnitus, neck soreness, headache, uncontrol¬lable screaming or crying) may be seen. Such symptoms should not count as one of the four required symptoms.*
+
+B.  At least one of the attacks has been followed by 1 month (or more) of one or both of the following:
+1.	Persistent concern or worry about additional panic attacks or their consequences (e.g., losing control, having a heart attack, “going crazy”).
+2.	A significant maladaptive change in behavior related to the attacks (e.g., behaviors designed to avoid having panic attacks, such as avoidance of exercise or unfamiliar situations).
+
+C.  The disturbance is not attributable to the physiological effects of a substance (e.g., a drug of abuse, a medication) or another medical condition (e.g., hyperthyroidism, car¬diopulmonary disorders).
+
+D.  The disturbance is not better explained by another mental disorder (e.g., the panic at¬tacks do not occur only in response to feared social situations, as in social anxiety dis¬order: in response to circumscribed phobic objects or situations, as in specific phobia: in  response to obsessions, as in  obsessive-compulsive  disorder: in response to re¬minders of traumatic events, as in posttraumatic stress disorder: or in response to separation from attachment figures, as in separation anxiety disorder)*
+
+
+*The questionnaire does not adequately or fully measure these criteria
+
+## Screening variables
+The panic disorder screening questions include:
+1) 4 or more panic symptoms (criterion A) must be endorsed
+
+*How the screening questions work*
+If participants endorse fewer than 4 panic symptoms, then they are given a 0 for diagnosis 
+
+
+Calculate PAD symptoms 'score' (the number of criterion A symptoms endorsed)
+```{r PAD symptom score}
+#Create score for PAD symptoms
+#Do NOT use 'is.na' for these as then you cannot +1 to it. Use the no.info item for NA (below). 
+PAD.items$pad.panic_symptoms_numeric<-0
+
+#Criterion A.1 - Heart was pounding or racing
+PAD.items$pad.panic_symptoms_numeric<-with(PAD.items, 
+                                    ifelse(!is.na(pad.heart_pounding_numeric) 
+                                           & pad.heart_pounding_numeric == 1, 
+                                           pad.panic_symptoms_numeric + 1, pad.panic_symptoms_numeric))
+#Criterion A.2 - Sweating
+PAD.items$pad.panic_symptoms_numeric<-with(PAD.items,
+                                    ifelse(!is.na(pad.sweating_numeric) 
+                                           & pad.sweating_numeric == 1,
+                                           pad.panic_symptoms_numeric + 1, pad.panic_symptoms_numeric))
+#Criterion A.3 - Trembling or shaking
+PAD.items$pad.panic_symptoms_numeric<-with(PAD.items,
+                                    ifelse(!is.na(pad.short_of_breath_numeric) 
+                                           & pad.short_of_breath_numeric == 1,
+                                           pad.panic_symptoms_numeric + 1, pad.panic_symptoms_numeric))
+#Criterion A.4 - Short of breath
+PAD.items$pad.panic_symptoms_numeric<-with(PAD.items, 
+                                    ifelse(!is.na(pad.short_of_breath_numeric) &
+                                             pad.short_of_breath_numeric == 1, 
+                                           pad.panic_symptoms_numeric + 1, pad.panic_symptoms_numeric))
+#Criterion A.5 - Felt like you were choking
+PAD.items$pad.panic_symptoms_numeric<-with(PAD.items, 
+                                    ifelse(!is.na(pad.choking_numeric) &
+                                             pad.choking_numeric == 1, 
+                                           pad.panic_symptoms_numeric + 1, pad.panic_symptoms_numeric))
+#Criterion A.6 - Had pain or discomfort in chest
+PAD.items$pad.panic_symptoms_numeric<-with(PAD.items, 
+                                    ifelse(!is.na(pad.chest_pain_numeric) & pad.chest_pain_numeric == 1, 
+                                           pad.panic_symptoms_numeric + 1, pad.panic_symptoms_numeric))
+#Criterion A.7 - Nauseous or felt sick in the stomach
+PAD.items$pad.panic_symptoms_numeric<-with(PAD.items, 
+                                    ifelse(!is.na(pad.nauseous_numeric) 
+                                           & pad.nauseous_numeric == 1, 
+                                           pad.panic_symptoms_numeric + 1, pad.panic_symptoms_numeric))
+#Criterion A.8 - Dizzy, unsteady, light-headed or faint
+PAD.items$pad.panic_symptoms_numeric<-with(PAD.items,
+                                    ifelse(!is.na(pad.dizzy_numeric) 
+                                           & pad.dizzy_numeric == 1,
+                                           pad.panic_symptoms_numeric + 1, pad.panic_symptoms_numeric))
+#Criterion A.9 - Felt hot or cold
+PAD.items$pad.panic_symptoms_numeric<-with(PAD.items, 
+                                    ifelse(!is.na(pad.hot_cold_numeric) 
+                                           & pad.hot_cold_numeric == 1, 
+                                           pad.panic_symptoms_numeric + 1, pad.panic_symptoms_numeric))
+#Criterion A.10 - Felt numbness or tingling sensations
+PAD.items$pad.panic_symptoms_numeric<-with(PAD.items, 
+                                    ifelse(!is.na(pad.numbness_numeric) 
+                                           & pad.numbness_numeric == 1, 
+                                           pad.panic_symptoms_numeric + 1, pad.panic_symptoms_numeric))
+#Criterion A.11 - Felt like things weren't real, or felt detached from self
+PAD.items$pad.panic_symptoms_numeric<-with(PAD.items, 
+                                    ifelse(!is.na(pad.detached_numeric) 
+                                           & pad.detached_numeric == 1, 
+                                           pad.panic_symptoms_numeric + 1, pad.panic_symptoms_numeric))
+#Criterion A.12 - Afraid going to lose control or go crazy
+PAD.items$pad.panic_symptoms_numeric<-with(PAD.items, 
+                                    ifelse(!is.na(pad.lose_control_numeric) 
+                                           & pad.lose_control_numeric == 1, 
+                                           pad.panic_symptoms_numeric + 1, pad.panic_symptoms_numeric))
+#Criterion A.13 - Afraid going to die
+PAD.items$pad.panic_symptoms_numeric<-with(PAD.items, 
+                                    ifelse(!is.na(pad.going_to_die_numeric) 
+                                           & pad.going_to_die_numeric == 1, 
+                                           pad.panic_symptoms_numeric + 1, pad.panic_symptoms_numeric))
+#Check distribution of scores
+summary(as.factor(PAD.items$pad.panic_symptoms_numeric))
+
+```
+
+## Combining criterion variables
+Criterion B for panic disorder includes both persistent worry about panic attacks and also a duration of 1 month or longer.
+
+In the questionnaire, the duration question is not displayed if the participant indicates 'no' to all the worry symptoms. (Rationale: if the participant doesn't have these worries, then it doesn't make sense to ask how long they've had the worries for)
+```{r panic disorder criterion B}
+PAD.items <- PAD.items %>% 
+  mutate(pad.criterion_B_numeric =
+    case_when(pad.anx_future_panic_attacks == "No" & pad.worried_future_panic_attacks == "No" & pad.avoid_situation_panic_attacks == "No" ~ 0,
+              pad.duration_numeric == 1 ~ 0,
+              pad.anx_future_panic_attacks == "Yes" & pad.duration_numeric > 1 ~ 1, 
+              pad.worried_future_panic_attacks == "Yes" & pad.duration_numeric > 1 ~ 1, 
+              pad.avoid_situation_panic_attacks == "Yes" & pad.duration_numeric > 1 ~ 1,
+              is.na(pad.anx_future_panic_attacks) ~ NA_real_,
+              is.na(pad.worried_future_panic_attacks) ~ NA_real_,
+              is.na(pad.avoid_situation_panic_attacks) ~ NA_real_,
+              (pad.anx_future_panic_attacks == "Yes" | pad.worried_future_panic_attacks == "Yes" | pad.worried_future_panic_attacks == "Yes") & is.na(pad.duration_numeric) ~ NA_real_
+              )
+  )
+
+freq(PAD.items$pad.criterion_B_numeric)
+```
+
+# Missingness
+
+*Screening missingness variable:*
+If participants do not respond to the screening questions, then they are not shown the remaining questions and should autmatically have "NA" as their score.
+
+Note: The way that the questionnaire is designed in Qualtrics (the GLAD survey software), it's impossible for participants to have NA in one criterion A item and not another. They either have all NAs, or none. As a result, the 'pad.panic_symptoms.NA' variable created in the chunk below will only have 0 and 13 as values.
+```{r panic attack symptoms NA count score}
+#Create score to calculate how many missing values are in the PAD symptom scores
+PAD.items$pad.panic_symptoms.NA<-0
+
+#Criterion A.1 - Heart was pounding or racing
+PAD.items$pad.panic_symptoms.NA<-with(PAD.items, 
+                                    ifelse(is.na(pad.heart_pounding_numeric), 
+                                           pad.panic_symptoms.NA + 1, pad.panic_symptoms.NA))
+#Criterion A.2 - Sweating
+PAD.items$pad.panic_symptoms.NA<-with(PAD.items,
+                                    ifelse(is.na(pad.sweating_numeric),
+                                           pad.panic_symptoms.NA + 1, pad.panic_symptoms.NA))
+#Criterion A.3 - Trembling or shaking
+PAD.items$pad.panic_symptoms.NA<-with(PAD.items,
+                                    ifelse(is.na(pad.short_of_breath_numeric),
+                                           pad.panic_symptoms.NA + 1, pad.panic_symptoms.NA))
+#Criterion A.4 - Short of breath
+PAD.items$pad.panic_symptoms.NA<-with(PAD.items, 
+                                    ifelse(is.na(pad.short_of_breath_numeric), 
+                                           pad.panic_symptoms.NA + 1, pad.panic_symptoms.NA))
+#Criterion A.5 - Felt like you were choking
+PAD.items$pad.panic_symptoms.NA<-with(PAD.items, 
+                                    ifelse(is.na(pad.choking_numeric), 
+                                           pad.panic_symptoms.NA + 1, pad.panic_symptoms.NA))
+#Criterion A.6 - Had pain or discomfort in chest
+PAD.items$pad.panic_symptoms.NA<-with(PAD.items, 
+                                    ifelse(is.na(pad.chest_pain_numeric), 
+                                           pad.panic_symptoms.NA + 1, pad.panic_symptoms.NA))
+#Criterion A.7 - Nauseous or felt sick in the stomach
+PAD.items$pad.panic_symptoms.NA<-with(PAD.items, 
+                                    ifelse(is.na(pad.nauseous_numeric), 
+                                           pad.panic_symptoms.NA + 1, pad.panic_symptoms.NA))
+#Criterion A.8 - Dizzy, unsteady, light-headed or faint
+PAD.items$pad.panic_symptoms.NA<-with(PAD.items,
+                                    ifelse(is.na(pad.dizzy_numeric),
+                                           pad.panic_symptoms.NA + 1, pad.panic_symptoms.NA))
+#Criterion A.9 - Felt hot or cold
+PAD.items$pad.panic_symptoms.NA<-with(PAD.items, 
+                                    ifelse(is.na(pad.hot_cold_numeric), 
+                                           pad.panic_symptoms.NA + 1, pad.panic_symptoms.NA))
+#Criterion A.10 - Felt numbness or tingling sensations
+PAD.items$pad.panic_symptoms.NA<-with(PAD.items, 
+                                    ifelse(is.na(pad.numbness_numeric), 
+                                           pad.panic_symptoms.NA + 1, pad.panic_symptoms.NA))
+#Criterion A.11 - Felt like things weren't real, or felt detached from self
+PAD.items$pad.panic_symptoms.NA<-with(PAD.items, 
+                                    ifelse(is.na(pad.detached_numeric), 
+                                           pad.panic_symptoms.NA + 1, pad.panic_symptoms.NA))
+#Criterion A.12 - Afraid going to lose control or go crazy
+PAD.items$pad.panic_symptoms.NA<-with(PAD.items, 
+                                    ifelse(is.na(pad.lose_control_numeric), 
+                                           pad.panic_symptoms.NA + 1, pad.panic_symptoms.NA))
+#Criterion A.13 - Afraid going to die
+PAD.items$pad.panic_symptoms.NA<-with(PAD.items, 
+                                    ifelse(is.na(pad.going_to_die_numeric), 
+                                           pad.panic_symptoms.NA + 1, pad.panic_symptoms.NA))
+
+summary(as.factor(PAD.items$pad.panic_symptoms.NA))
+
+```
+
+*Symptom missingness*
+Similarly, once participants pass the screeners, if any of the other core symptoms are NA then the participant might have received a diagnosis of panic disorder, but we won't know. 
+
+Future considerations: If a participant has an NA in this score but was far from meeting diagnostic criteria, then we may still want to keep them as a '0' for diagnosis.
+```{r variable for PAD criteria missingness}
+#Missing responses/no information on core symptoms
+PAD.items$no.info<-0
+#+1 to missingness score if criterion B is missing
+PAD.items$no.info <- with(PAD.items,
+                               ifelse(is.na(pad.criterion_B_numeric),
+                                      no.info + 1, 0
+                                                )
+                                      )
+#+1 to missingness if criterion C item is missing
+PAD.items$no.info <- with(PAD.items,
+                               ifelse(is.na(pad.physical_cause),
+                                      no.info + 1, 0
+                                                )
+                                      )
+#+1 to missingness if criterion D items are missing
+PAD.items$no.info <- with(PAD.items,
+                               ifelse(is.na(pad.heights) & is.na(pad.random),
+                                      no.info + 1, 0
+                                                )
+                                      )
+
+summary(as.factor(PAD.items$no.info))
+```
+
+# DSM-5 panic disorder algorithm
+
+```{r lifetime PAD diagnosis variable}
+#Code lifetime PAD as NA if any core symptoms were missed
+PAD.items <- PAD.items %>% 
+  mutate(pad.diagnosis_numeric =
+           case_when(
+             #Criterion A. Less than 4 symptoms of panic attacks endorsed
+             (pad.panic_symptoms_numeric < 4) |
+               #Criterion B. Duration of less than 1 month or no concern/worry
+               pad.criterion_B_numeric == 0 |
+               #Criterion C. Always the result of medical condition or drug use
+               (pad.physical_cause == "Yes, all of them") |
+               #Criterion D. Occurs only in phobic situations
+               (pad.heights == "Yes" | pad.random == "No") ~ 0,
+             #Criterion A. At least 4 symptoms of panic attacks endorsed
+             (pad.panic_symptoms_numeric > 3) &
+               #Criterion B. Duration of at least 1 month
+               (!is.na(pad.duration_numeric) & pad.duration_numeric > 1) &
+               #Criterion B. Persistent concern/worry or maladaptive behaviour change
+               (pad.anx_future_panic_attacks == "Yes" | pad.worried_future_panic_attacks == "Yes" |
+                  pad.avoid_situation_panic_attacks == "Yes") &
+               #Criterion C. Not the result of medical condition or drug use
+               (pad.physical_cause == "Yes, some of them" | pad.physical_cause == "No, never") &
+               #Criterion D. Doesn't occur only in phobic situations
+               (pad.heights == "No" | pad.random == "Yes") ~ 1,
+             pad.panic_symptoms.NA > 0 | (pad.panic_symptoms_numeric > 3 & no.info > 0) ~ NA_real_
+             )
+  )
+  
+summary(as.factor(PAD.items$pad.diagnosis_numeric))
+
+```
+
+# Recode calculated lifetime PAD diagnosis variable
+
+```{r pad.diagnosis factor}
+
+PAD.items$pad.diagnosis <- recode_factor(PAD.items$pad.diagnosis_numeric,
+                             "0" = "No panic disorder",
+                             "1" = "Panic disorder")
+#Summary of recoded variable
+freq(PAD.items$pad.diagnosis)
+```
+
+# Clean PAD dataset
+
+```{r clean PAD dataframe}
+
+PAD.clean <- PAD.items %>%
+  select(ID,
+        pad.heart_pounding,
+        pad.sweating,
+        pad.trembling,
+        pad.short_of_breath,
+        pad.choking,
+        pad.chest_pain,
+        pad.nauseous,
+        pad.dizzy,
+        pad.hot_cold,
+        pad.numbness,
+        pad.detached,
+        pad.lose_control,
+        pad.going_to_die,
+        pad.anx_future_panic_attacks,
+        pad.worried_future_panic_attacks,
+        pad.avoid_situation_panic_attacks,
+        pad.duration,
+        pad.physical_cause,
+        pad.heights,
+        pad.random,
+        pad.heart_pounding_numeric,
+        pad.sweating_numeric,
+        pad.trembling_numeric,
+        pad.short_of_breath_numeric,
+        pad.choking_numeric,
+        pad.chest_pain_numeric,
+        pad.nauseous_numeric,
+        pad.dizzy_numeric,
+        pad.hot_cold_numeric,
+        pad.numbness_numeric,
+        pad.detached_numeric,
+        pad.lose_control_numeric,
+        pad.going_to_die_numeric,
+        pad.anx_future_panic_attacks_numeric,
+        pad.worried_future_panic_attacks_numeric,
+        pad.avoid_situation_panic_attacks_numeric,
+        pad.duration_numeric,
+        pad.physical_cause_numeric,
+        pad.heights_numeric,
+        pad.random_numeric,
+        pad.panic_symptoms_numeric,
+        pad.diagnosis,
+        pad.diagnosis_numeric
+        )
+
+#Export into a rds file:
+saveRDS(object = PAD.clean, file = paste0(export_path, "PAD_cleaned.rds"))
+
+# Saves the R data including the recoding
+#save.image(file = "Datasets/Relabelled_cleaned/GLAD_PAD_clean.RData")
+```

@@ -1,0 +1,281 @@
+---
+title: "Lifetime DSM-5 social phobia: Diagnostic algorithm (GLAD Study data)"
+author: "Molly Davies"
+date: "23/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set up
+
+Clear workspace
+```{r clear workspace}
+#rm(list = ls())
+```
+
+```{r load packages}
+library(knitr)
+library(tidyverse)
+library(car)
+library(psych)
+library(lubridate)
+library(broom)
+library(ggfortify)
+library(summarytools)
+library(ggformula)
+library(data.table)
+```
+
+```{r source path for reading/saving data}
+#Source raw data directory (path) & clean data export directory (export_path)
+source("../GLAD_data_path.R")
+```
+
+```{r read in cleaned SOCP data}
+SOCP_file <- paste(path, "SOCP.rds", sep = "")
+
+SOCP.cc <- read_rds(SOCP_file)
+```
+
+```{r visualize data}
+head(SOCP.cc)
+```
+
+```{r create dataset of SOCP diagnostic variables}
+SOCP.items <- SOCP.cc %>%
+  select(ID,
+        socp.anx_social_situations,
+        socp.anx_being_observed,
+        socp.anx_others_think,
+        socp.anx_social_situation_frequency,
+        socp.avoid_social_situations,
+        socp.endure_social_situations,
+        socp.anx_irrational,
+        socp.age_first_episode_txt,
+        socp.age_last_episode_txt,
+        socp.longest_episode,
+        socp.interference_with_life)
+```
+
+```{r recode as NAs}
+#Change all prefer not to answers and don't knows to NA
+SOCP.items[SOCP.items == "Don't know"] <- NA
+SOCP.items[SOCP.items == "Prefer not to answer"] <- NA
+SOCP.items[SOCP.items == "Seen but not answered"] <- NA
+```
+
+# DSM-5 Social phobia diagnostic criteria
+
+A.   Marked fear or anxiety about one or more social situations in which the individual is exposed to possible scrutiny by others. Examples include social interactions (e.g., having a conversation, meeting unfamiliar people), being observed (e.g., eating or drink¬ing), and performing in front of others (e.g., giving a speech).
+
+B.  The individual fears that he or she will act in a way or show anxiety symptoms that will be negatively evaluated (i.e., will be humiliating or embarrassing: will lead to rejection or offend others).
+
+C.  The social situations almost always provoke fear or anxiety.
+
+D.  The social situations are avoided or endured with intense fear or anxiety.
+
+E.  The fear or anxiety is out of proportion to the actual threat posed by the social situation and to the sociocultural context.
+
+F.  The fear, anxiety, or avoidance is persistent, typically lasting for 6 months or more.
+
+G.  The fear, anxiety, or avoidance causes clinically significant distress* or impairment in social, occupational, or other important areas of functioning.
+
+H.  The fear, anxiety, or avoidance is not attributable to the physiological effects of a substance (e.g., a drug of abuse, a medication) or another medical condition.*
+
+I.    The fear, anxiety, or avoidance is not better explained by the symptoms of another mental disorder, such as panic disorder, body dysmorphic disorder, or autism spectrum disorder.*
+
+J.   If another medical condition (e.g., Parkinson’s disease, obesity, disfigurement from burns or injury) is present, the fear, anxiety, or avoidance is clearly unrelated or is excessive.*
+
+Specify if: 
+Performance only: If the fear is restricted to speaking or performing in public.
+
+*The questionnaire doesn't adequately assess clinically significant distress or criteria H-J.
+
+## Screening variables
+The specific phobia screening questions include:
+1) At least one phobia of social situations (criterion A) must be endorsed
+2) If at least one social situation phobia is endorsed, participants must report that frequency of these fears (criterion B) are almost always or always present when exposed to the phobia
+
+*How the screening questions work*
+If participants answer 'No' to all phobias in criterion A, then they are given a 0 for diagnosis and skip the remaining questions.
+
+If participants answer 'Yes' to any phobia in criterion A but report frequency of these fears as "Never", "Only one or two times ever", or "Some of the time", then they are given a 0 for diagnosis and skip the remaining questions.
+
+```{r social phobia criterion A combined variable}
+SOCP.items <- SOCP.items %>% 
+  mutate(socp.criterion_A.numeric =
+           case_when(
+             socp.anx_social_situations == "No" & socp.anx_being_observed == "No" ~ 0,
+             socp.anx_social_situations == "Yes" ~ 1,
+             socp.anx_being_observed == "Yes" ~ 1,
+             socp.anx_social_situations == "No" & is.na(socp.anx_being_observed) ~ NA_real_,
+             is.na(socp.anx_social_situations) & socp.anx_being_observed == "No" ~ NA_real_,
+             is.na(socp.anx_social_situations) & is.na(socp.anx_being_observed) ~ NA_real_
+           ))
+
+summary(as.factor(SOCP.items$socp.criterion_A.numeric))
+```
+
+```{r social phobia screener variable}
+#Questionnaire screening variable
+SOCP.items <- SOCP.items %>% 
+  mutate(socp.screener.numeric = 
+           case_when(
+             socp.criterion_A.numeric == 0 ~ 0,
+             !is.na(socp.anx_social_situation_frequency) & (socp.anx_social_situation_frequency == "Never" | socp.anx_social_situation_frequency == "Only one or two times ever" | socp.anx_social_situation_frequency == "Some of the time") ~ 0,
+             socp.criterion_A.numeric == 1 & (socp.anx_social_situation_frequency == "Almost always" | socp.anx_social_situation_frequency == "Always") ~ 1,
+             is.na(socp.criterion_A.numeric) | is.na(socp.anx_social_situation_frequency) ~ NA_real_
+           ))
+
+summary(as.factor(SOCP.items$socp.screener.numeric))
+```
+
+## DSM-5 social phobia algorithm
+Applying the diagnostic algorithm to questionnaire responses
+```{r diagnostic algorithm for social phobia}
+
+SOCP.items$socp.diagnosis.numeric <-
+  with(SOCP.items,
+  dplyr::case_when(
+## No social phobia
+    #Criterion A. Marked fear in social situations
+    (socp.criterion_A.numeric == 0) |
+    #Criterion B. Fear of negative evaluation
+      (socp.anx_others_think == "No") |
+      #Criterion C. Almost always provoke fear or anxiety
+      (socp.anx_social_situation_frequency == "Never" | socp.anx_social_situation_frequency == "Only one or two times ever" | socp.anx_social_situation_frequency == "Some of the time") |
+      #Criterion D. Avoided or endured with fear
+      (socp.avoid_social_situations == "No" & socp.endure_social_situations == "No") |
+      #Criterion E. Out of proportion to actual threat
+      (socp.anx_irrational == "No") |
+      #Criterion F. Lasted 6 months or more
+      (socp.longest_episode == "Less than 6 months") |
+      #Criterion G. Functional impairment
+      (socp.interference_with_life == "Not at all" | socp.interference_with_life == "A little")
+      #Code as 0 for no diagnosis
+      ~ 0,
+## Social phobia diagnosis
+    #Criterion A. Marked fear in social situations
+    (socp.criterion_A.numeric == 1) &
+    #Criterion B. Fear of negative evaluation
+      (socp.anx_others_think == "Yes") &
+      #Criterion C. Almost always provoke fear or anxiety
+      (socp.anx_social_situation_frequency == "Almost always" | socp.anx_social_situation_frequency == "Always") &
+      #Criterion D. Avoided or endured with fear
+      (socp.avoid_social_situations == "Yes" | socp.endure_social_situations == "Yes") &
+      #Criterion E. Out of proportion to actual threat
+      (socp.anx_irrational == "Yes") &
+      #Criterion F. Lasted 6 months or more
+      (socp.longest_episode == "6-12 months" | socp.longest_episode == "1-5 years" | socp.longest_episode == "5+ years" | socp.longest_episode == "All my life/as long as I can remember") &
+      #Criterion G. Functional impairment
+      (socp.interference_with_life == "Some" | socp.interference_with_life == "A lot")
+      #Code as 1 for socp diagnosis
+      ~ 1))
+
+freq(SOCP.items$socp.diagnosis.numeric)
+
+```
+
+## Missingness
+
+*Screening missingness variable:*
+If participants do not respond to one of the screening questions, then they are not shown the remaining questions and should autmatically have "NA" as their score. The screening variable calculated above accounts for this.
+
+*Symptom missingness variable:*
+Similarly, once participants pass the screeners, if any of the other core symptoms are NA then the participant might have received a diagnosis of social phobia, but we won't know. 
+
+If a participant has an NA in this score but was far from meeting diagnostic criteria, then we may still want to keep them as a '0' for diagnosis. This score is therefore counted separately to allow for this flexibility.
+```{r social phobia NA symptom count score}
+
+SOCP.items$socp.social_phobia_symptoms.calc.NA<-0
+#Criterion B (fear of negative evaluation) is NA
+SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items, 
+                                    ifelse(socp.screener.numeric %in% 1 & is.na(socp.anx_others_think), 
+                                           socp.social_phobia_symptoms.calc.NA + 1, socp.social_phobia_symptoms.calc.NA))
+#Criterion D (avoid or endure) are both NA OR one option was NA and the other was 0 (if one is endorsed, participant meets this criterion and shouldn't be recoded as NA)
+SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items, 
+                                    ifelse(
+                                      socp.screener.numeric %in% 1 &
+                                        (
+                                          (is.na(socp.avoid_social_situations) & socp.endure_social_situations == "No") |
+                                           (is.na(socp.endure_social_situations) & socp.avoid_social_situations == "No") |
+                                           (is.na(socp.avoid_social_situations) & is.na(socp.endure_social_situations))
+                                            ), 
+                                           socp.social_phobia_symptoms.calc.NA + 1, socp.social_phobia_symptoms.calc.NA))
+
+#Criterion E (out of proportion) is NA
+SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items, 
+                                    ifelse(socp.screener.numeric %in% 1 & is.na(socp.anx_irrational), 
+                                           socp.social_phobia_symptoms.calc.NA + 1, socp.social_phobia_symptoms.calc.NA))
+#Criterion F (lasted 6 months or more) is NA
+SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items,
+                                    ifelse(socp.screener.numeric %in% 1 & is.na(socp.longest_episode),
+                                           socp.social_phobia_symptoms.calc.NA + 1, socp.social_phobia_symptoms.calc.NA))
+#Criterion G (impairment) is NA
+SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items,
+                                    ifelse(socp.screener.numeric %in% 1 & is.na(socp.interference_with_life),
+                                           socp.social_phobia_symptoms.calc.NA + 1, socp.social_phobia_symptoms.calc.NA))
+
+summary(as.factor(SOCP.items$socp.social_phobia_symptoms.calc.NA))
+
+```
+
+Ppts are coded NA if they didn't respond to questions that could have met diagnostic criteria.
+```{r recode social phobia missingness as NA}
+#Frequencies before accounting for missingness
+freq(SOCP.items$socp.diagnosis.numeric )
+
+#Recode as NA for missingness
+SOCP.items$socp.diagnosis.numeric <- with(SOCP.items,
+                                       ifelse(
+                                         is.na(socp.screener.numeric) | 
+                                           socp.social_phobia_symptoms.calc.NA > 0,
+                                         NA, socp.diagnosis.numeric 
+                                       ))
+
+#Frequencies after accounting for missingness
+freq(SOCP.items$socp.diagnosis.numeric)
+
+```
+
+```{r socp.diagnosis (calculated) recode, results='asis'}
+summary(SOCP.items$socp.diagnosis.numeric)
+
+SOCP.items$socp.diagnosis <- recode_factor(SOCP.items$socp.diagnosis.numeric,
+                             "0" = "No social phobia",
+                             "1" = "Social phobia")
+
+# Check if the recoding worked
+summarytools::freq(SOCP.items$socp.diagnosis,
+                   style = "rmarkdown")
+```
+
+#Export data
+
+```{r export clean data}
+SOCP.clean <- SOCP.items %>%
+  select(ID,
+        socp.anx_social_situations,
+        socp.anx_being_observed,
+        socp.anx_others_think,
+        socp.anx_social_situation_frequency,
+        socp.avoid_social_situations,
+        socp.endure_social_situations,
+        socp.anx_irrational,
+        socp.age_first_episode_txt,
+        socp.age_last_episode_txt,
+        socp.longest_episode,
+        socp.interference_with_life,
+        socp.screener.numeric,
+        socp.diagnosis,
+        socp.diagnosis.numeric)
+
+#Eport data
+saveRDS(object = SOCP.clean, file = paste0(export_path, "SOCP_cleaned.rds"))
+
+# Saves the R data including the recoding
+#save.image(file = "../../../Datasets/Relabelled_cleaned/GLAD_SOCP_clean.RData")
+```

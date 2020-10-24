@@ -1,0 +1,496 @@
+---
+title: "CIDI Lifetime GAD: Diagnostic Algorithm (GLAD Study data)"
+author: "Molly Davies and Alicia Peel"
+date: "21/05/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set up
+
+Clear workspace
+```{r clear workspace}
+#rm(list = ls())
+```
+
+```{r load packages}
+library(knitr)
+library(tidyverse)
+library(car)
+library(psych)
+library(lubridate)
+library(broom)
+library(ggfortify)
+library(summarytools)
+library(ggformula)
+library(data.table)
+```
+
+```{r source path for reading/saving data}
+#Source raw data directory (path) & clean data export directory (export_path)
+source("../GLAD_data_path.R")
+```
+
+```{r read in cleaned CIDIA data}
+CIDIA_file <- paste(path, "CIDIA.rds", sep = "")
+
+CIDIA.cc <- read_rds(CIDIA_file)
+```
+
+```{r visualise CIDIA data}
+head(CIDIA.cc)
+```
+
+# Cleaning variables
+
+## Longest period of worry
+This variable was changed during GLAD data collection from categorical to continuous response.
+New variable cidia.longest_period_worry_categorical_combined created which recodes all continuous responses as 
+categorical, and allows for easy analysis of all participants together.
+
+### Longest period of worry - continuous (combined)
+The continuous variable consisted of months and years, which need to be added together.
+```{r longest_period_worry combine years and months}
+#Visualise data
+summary(CIDIA.cc$cidia.longest_period_worry_years)
+summary(CIDIA.cc$cidia.longest_period_worry_months)
+#Convert months to years
+CIDIA.cc$cidia.longest_period_worry_months.years <- CIDIA.cc$cidia.longest_period_worry_months/12
+#Combine month & year values for total time of longest period of worry
+CIDIA.cc$cidia.longest_period_worry_combined.unc <- rowSums(cbind(CIDIA.cc$cidia.longest_period_worry_months.years, CIDIA.cc$cidia.longest_period_worry_years))
+#Round the new variable
+CIDIA.cc$cidia.longest_period_worry_combined <- round(CIDIA.cc$cidia.longest_period_worry_combined.unc, digits = 2)
+summary(CIDIA.cc$cidia.longest_period_worry_combined)
+```
+
+### Longest period of worry categorical + continuous (all)
+Combine categorical and continuous variables into a single categorical variable.
+```{r create longest_period_worry_categorical.combined}
+#Create column
+CIDIA.cc$cidia.longest_period_worry_categorical_combined.unc <- NA
+#Combine columns into single categorical variable
+CIDIA.cc$cidia.longest_period_worry_categorical_combined.unc <- with(CIDIA.cc,
+                                                                     ifelse(is.na(cidia.longest_period_worry_categorical) 
+                                                                            & !is.na(cidia.longest_period_worry_combined),
+                                                                       (cut(cidia.longest_period_worry_combined,
+                                                                           breaks = c(0, 5.9, 12, 60, Inf),
+                                                                           labels = c(1, 2, 3, 5))),
+                                                                       cidia.longest_period_worry_categorical))
+
+```
+
+```{r recode longest_period_worry_categorical.combined}
+#Recode factor
+CIDIA.cc$cidia.longest_period_worry_categorical_combined <-
+  recode_factor(CIDIA.cc$cidia.longest_period_worry_categorical_combined.unc,
+                             "1" = "Less than 6 months",
+                             "2" = "Between 6 and 12 months",
+                             "3" = "Between 1 and 5 years", 
+                             "4" = "More than 5 years", 
+                             "5" = "All of my life/as long as I can remember", 
+                             "6" = "Prefer not to answer")
+```
+
+```{r longest_period_worry_categorical summary, results='asis'}
+summarytools::freq(CIDIA.cc$cidia.longest_period_worry_categorical_combined,
+                   style = "rmarkdown")
+```
+
+```{r compare total NA in combined variable to originals}
+#There should be fewer NAs in the categorical_combined variable than in the categorical and continuous variables alone
+sum(is.na(CIDIA.cc$cidia.longest_period_worry_categorical)) #Categorical
+sum(is.na(CIDIA.cc$cidia.longest_period_worry_combined)) #Continuous
+sum(is.na(CIDIA.cc$cidia.longest_period_worry_categorical_combined)) #Combined
+
+```
+
+# Lifetime GAD
+
+```{r create dataset of GAD diagnostic variables}
+
+#Create dataset of all variables needed for GAD diagnosis
+CIDI.anx.items <- CIDIA.cc[,c("ID",
+                              "cidia.felt_worried",
+                              "cidia.felt_worried_more",
+                              "cidia.worry_stronger_than_others",
+                              "cidia.longest_period_worry_categorical_combined",
+                              "cidia.most_days",
+                              "cidia.more_than_one_thing",
+                              "cidia.different_worries",
+                              "cidia.difficult_to_stop",
+                              "cidia.couldnt_stop",
+                              "cidia.difficult_to_control",
+                              "cidia.restless",
+                              "cidia.on_edge",
+                              "cidia.tired",
+                              "cidia.difficulty_concentrating",
+                              "cidia.irritable",
+                              "cidia.tense_muscles",
+                              "cidia.trouble_sleeping",
+                              "cidia.functioning"
+                              )]
+                             
+```
+
+```{r recode as NA's}
+#Change all prefer not to answers and don't knows to NA
+CIDI.anx.items[CIDI.anx.items == "Don't know"] <- NA
+CIDI.anx.items[CIDI.anx.items == "Prefer not to answer"] <- NA
+CIDI.anx.items[CIDI.anx.items == "Seen but not answered"] <- NA
+names(CIDI.anx.items)<-gsub("CIDIA.cc.", "", names(CIDI.anx.items))
+```
+
+# DSM-5 GAD Diagnostic Algorithm
+
+A.   Excessive  anxiety  and  worry  (apprehensive  expectation),  occurring  more  days  than not for at least 6 months, about a number of events or activities (such as work or school performance).
+
+B.  The  individual finds it difficult to control the worry.
+
+C.  The  anxiety and  worry are  associated  with  three  (or more)  of the following  six symptoms (with at least some symptoms having been present for more days than not for thepast 6 months)
+  1.   Restlessness or feeling  keyed up or on edge.
+  2.   Being easily fatigued.
+  3.   Difficulty concentrating or mind going  blank.
+  4.   Irritability.
+  5.   Muscle tension.
+  6.   Sleep  disturbance  (difficulty  falling  or  staying  asleep,  or  restless,  unsatisfyingsleep).
+
+D.  The anxiety, worry, or physical symptoms cause clinically significant distress*** or impairment in social,  occupational,  or other important areas of functioning.
+
+E.  The disturbance  is  not attributable to the  physiological  effects  of a substance  (e.g.,  adrug of abuse,  a medication) or another medical condition  (e.g.,  hyperthyroidism).***
+
+F.   The  disturbance  is  not  better  explained  by  another  mental  disorder***
+
+*The CIDIA does not measure these items
+
+```{r variable for missingness}
+#Missing responses/no information on any of the core symptoms of anxiety
+#(Later, if no.info > 1 overall, then lifetime GAD will be coded as NA)
+
+CIDI.anx.items$no.info<-0
+#+1 to missingness score if all 3 questions assessing criterion A excessive anxiety/worry are left unanswered
+CIDI.anx.items$no.info<-with(CIDI.anx.items,
+                             ifelse(is.na(cidia.felt_worried) & is.na(cidia.felt_worried_more) 
+                                    & is.na(cidia.worry_stronger_than_others), 1, 0
+                                    )
+                             )
+#+1 to missingness score if duration (criterion A), frequency (criterion A), or functioning (criterion D) are unanswered
+CIDI.anx.items$no.info <- with(CIDI.anx.items,
+                               ifelse(is.na(cidia.most_days) |
+                                        is.na(cidia.longest_period_worry_categorical_combined) |
+                                        is.na(cidia.functioning),
+                                      no.info + 1, 0
+                                                )
+                                      )
+#+1 to missingness score if both questions assessing number of worries (criterion A) are missed
+CIDI.anx.items$no.info <- with(CIDI.anx.items,
+                               ifelse(is.na(cidia.more_than_one_thing) &
+                                        is.na(cidia.different_worries),
+                                      no.info + 1, 0
+                                                )
+                                      )
+#+1 to missingness score if all 3 questions assessing difficulty in controlling worry (criterion B) are missed
+CIDI.anx.items$no.info <- with(CIDI.anx.items,
+                               ifelse(is.na(cidia.difficult_to_stop) &
+                                        is.na(cidia.couldnt_stop) &
+                                        is.na(cidia.difficult_to_control),
+                                      no.info + 1, 0
+                                                )
+                                      )
+
+summary(as.factor(CIDI.anx.items$no.info))
+```
+
+```{r variable for core GAD criteria}
+#Create variable for meeting all core DSM GAD criteria
+CIDI.anx.items$cidia.anxiety_screen.calc <- with(CIDI.anx.items,
+                                           ifelse(
+                                             #A. Excessive anxiety/worry
+                                             (cidia.felt_worried == "Yes" | cidia.felt_worried_more == "Yes" | cidia.worry_stronger_than_others == "Yes") &
+                                               #A. at least 6 months (duration)
+                                               (cidia.longest_period_worry_categorical_combined == "Between 6 and 12 months" |
+                                                  cidia.longest_period_worry_categorical_combined == "Between 1 and 5 years" |
+                                                  cidia.longest_period_worry_categorical_combined == "More than 5 years" |
+                                                  cidia.longest_period_worry_categorical_combined == "All of my life/as long as I can remember") &
+                                               #A. occurring  more  days  than not (frequency)
+                                               (cidia.most_days == "Yes") &
+                                               #A. about a number of events or activities (such as work or school performance)
+                                               (cidia.more_than_one_thing == "Yes" | cidia.different_worries == "Yes") & 
+                                               #B. The  individual finds it difficult to control the worry.
+                                               (cidia.difficult_to_stop == "Yes" | cidia.couldnt_stop == "Yes" | cidia.difficult_to_control == "Yes") &
+                                               #D. The anxiety, worry, or physical symptoms cause impairment in functioning.
+                                               (cidia.functioning == "A lot" | cidia.functioning == "Some"), #A lot (3) or some (2)
+                                             1, 0
+                                           )
+                                          )
+
+summary(as.factor(CIDI.anx.items$cidia.anxiety_screen.calc))
+
+```
+
+Worry and duration screen
+If the participant responds No (0) to both of these variables or doesn't report symptoms lasting 6 months or longer, they are scored 0 for lifetime_anxiety.
+
+```{r variable for worry & duration screener}
+CIDI.anx.items$cidia.worry_duration_screen <- with(CIDI.anx.items,
+                                                    ifelse(
+                                                      ((cidia.felt_worried == "Yes" | cidia.felt_worried_more == "Yes") & 
+                                                         (cidia.longest_period_worry_categorical_combined == "Between 6 and 12 months" |
+                                                  cidia.longest_period_worry_categorical_combined == "Between 1 and 5 years" |
+                                                  cidia.longest_period_worry_categorical_combined == "More than 5 years" |
+                                                  cidia.longest_period_worry_categorical_combined == "All of my life/as long as I can remember")),
+                                                      1, 0
+                                                    ))
+# Recode as NA if missing values in longest period of worry
+CIDI.anx.items$cidia.worry_duration_screen <- with(CIDI.anx.items,
+                                                   ifelse(is.na(cidia.longest_period_worry_categorical_combined),
+                                                   NA, cidia.longest_period_worry_categorical_combined))
+# Recode as NA if missing values in both felt_worried variables
+CIDI.anx.items$cidia.worry_duration_screen <- with(CIDI.anx.items,
+                                                   ifelse(is.na(cidia.felt_worried) & is.na(cidia.felt_worried_more),
+                                                   NA, cidia.longest_period_worry_categorical_combined))
+
+summary(as.factor(CIDI.anx.items$cidia.worry_duration_screen))
+
+```
+
+```{r variable for restless & keyed up/on edge}
+#Create variable for restlessness or keyed up/on edge (which is a single symptom criterion in the DSM for GAD)
+CIDI.anx.items$cidia.restless_on_edge <- NA
+CIDI.anx.items$cidia.restless_on_edge <- with(CIDI.anx.items,
+                                                    ifelse(
+                                                      (!is.na(cidia.restless) 
+                                                       & cidia.restless == "Yes") |
+                                                        (!is.na(cidia.on_edge) 
+                                                         & cidia.on_edge == "Yes"),
+                                                      1, 0
+                                                    ))
+
+CIDI.anx.items$cidia.restless_on_edge <- with(CIDI.anx.items,
+                                                    ifelse(is.na(cidia.restless) 
+                                                           & is.na(cidia.on_edge), 
+                                                    NA, cidia.restless_on_edge)
+                                                    )
+
+summary(as.factor(CIDI.anx.items$cidia.restless_on_edge))
+
+```
+
+Calculate anxiety symptoms 'score' (the number of criterion C symptoms endorsed)
+
+C.  The  anxiety and  worry are  associated  with  three  (or more)  of the following  six symptoms (with at least some symptoms having been present for more days than not for thepast 6 months)
+  1.   Restlessness or feeling  keyed up or on edge.
+  2.   Being easily fatigued.
+  3.   Difficulty concentrating or mind going  blank*.
+  4.   Irritability.
+  5.   Muscle tension.
+  6.   Sleep  disturbance  (difficulty  falling  or  staying  asleep,  or  restless,  unsatisfyingsleep).
+  
+*CIDIA doesn't measure mind going blank
+
+```{r anxiety symptom score}
+#Create score for anxiety symptoms 
+#Do NOT use 'is.na' for these as then you cannot +1 to it. Use the no.info item for NA. 
+CIDI.anx.items$cidia.lifetime_anxiety_total.calc<-0
+#Criterion C.1 - Restlessness or feeling keyed up or on edge
+CIDI.anx.items$cidia.lifetime_anxiety_total.calc<-with(CIDI.anx.items, 
+                                    ifelse(!is.na(cidia.restless_on_edge) 
+                                           & cidia.restless_on_edge > 0, 
+                                           cidia.lifetime_anxiety_total.calc + 1, cidia.lifetime_anxiety_total.calc))
+#Criterion C.2 - Being easily fatigued
+CIDI.anx.items$cidia.lifetime_anxiety_total.calc<-with(CIDI.anx.items,
+                                    ifelse(!is.na(cidia.tired) 
+                                           & cidia.tired =="Yes",
+                                           cidia.lifetime_anxiety_total.calc + 1, cidia.lifetime_anxiety_total.calc))
+#Criterion C.3 - Difficulty concentrating
+CIDI.anx.items$cidia.lifetime_anxiety_total.calc<-with(CIDI.anx.items,
+                                    ifelse(!is.na(cidia.difficulty_concentrating) 
+                                           & cidia.difficulty_concentrating == "Yes",
+                                           cidia.lifetime_anxiety_total.calc + 1, cidia.lifetime_anxiety_total.calc))
+#Criterion C.4 - Irritability
+CIDI.anx.items$cidia.lifetime_anxiety_total.calc<-with(CIDI.anx.items, 
+                                    ifelse(!is.na(cidia.irritable) &
+                                             cidia.irritable == "Yes", 
+                                           cidia.lifetime_anxiety_total.calc + 1, cidia.lifetime_anxiety_total.calc))
+#Criterion C.5 - Muscle tension
+CIDI.anx.items$cidia.lifetime_anxiety_total.calc<-with(CIDI.anx.items, 
+                                    ifelse(!is.na(cidia.tense_muscles) & cidia.tense_muscles == "Yes", 
+                                           cidia.lifetime_anxiety_total.calc + 1, cidia.lifetime_anxiety_total.calc))
+#Criterion C.6 - Sleep disturbance
+CIDI.anx.items$cidia.lifetime_anxiety_total.calc<-with(CIDI.anx.items, 
+                                    ifelse(!is.na(cidia.trouble_sleeping) 
+                                           & cidia.trouble_sleeping == "Yes", 
+                                           cidia.lifetime_anxiety_total.calc + 1, cidia.lifetime_anxiety_total.calc))
+
+summary(as.factor(CIDI.anx.items$cidia.lifetime_anxiety_total.calc))
+
+```
+
+```{r anxiety symptom NA count score}
+#Create score to calculate how many missing values are in the anxiety symptom scores
+
+CIDI.anx.items$cidia.lifetime_anxiety_total.calc.NA<-0
+
+CIDI.anx.items$cidia.lifetime_anxiety_total.calc.NA<-with(CIDI.anx.items, 
+                                    ifelse(is.na(cidia.restless_on_edge), 
+                                           cidia.lifetime_anxiety_total.calc.NA + 1, cidia.lifetime_anxiety_total.calc.NA))
+
+CIDI.anx.items$cidia.lifetime_anxiety_total.calc.NA<-with(CIDI.anx.items,
+                                    ifelse(is.na(cidia.tired),
+                                           cidia.lifetime_anxiety_total.calc.NA + 1, cidia.lifetime_anxiety_total.calc.NA))
+
+CIDI.anx.items$cidia.lifetime_anxiety_total.calc.NA<-with(CIDI.anx.items,
+                                    ifelse(is.na(cidia.difficulty_concentrating),
+                                           cidia.lifetime_anxiety_total.calc.NA + 1, cidia.lifetime_anxiety_total.calc.NA))
+
+CIDI.anx.items$cidia.lifetime_anxiety_total.calc.NA<-with(CIDI.anx.items, 
+                                    ifelse(is.na(cidia.irritable), 
+                                           cidia.lifetime_anxiety_total.calc.NA + 1, cidia.lifetime_anxiety_total.calc.NA))
+
+CIDI.anx.items$cidia.lifetime_anxiety_total.calc.NA<-with(CIDI.anx.items, 
+                                    ifelse(is.na(cidia.tense_muscles), 
+                                           cidia.lifetime_anxiety_total.calc.NA + 1, cidia.lifetime_anxiety_total.calc.NA))
+
+CIDI.anx.items$cidia.lifetime_anxiety_total.calc.NA<-with(CIDI.anx.items, 
+                                    ifelse(is.na(cidia.trouble_sleeping), 
+                                           cidia.lifetime_anxiety_total.calc.NA + 1, cidia.lifetime_anxiety_total.calc.NA))
+
+summary(as.factor(CIDI.anx.items$cidia.lifetime_anxiety_total.calc.NA))
+
+```
+
+```{r lifetime GAD variable}
+CIDI.anx.items$cidia.lifetime_anxiety.calc <- with(CIDI.anx.items,
+                                                      ifelse(
+                                                        no.info > 0, NA,
+                                                        ifelse((!is.na(cidia.lifetime_anxiety_total.calc) & cidia.lifetime_anxiety_total.calc > 2)
+                                                               & (!is.na(cidia.anxiety_screen.calc) & 
+                                                                    cidia.anxiety_screen.calc == 1), 1, 0
+                                                               )
+                                                        )
+                                                      )
+
+summary(as.factor(CIDI.anx.items$cidia.lifetime_anxiety.calc))
+```
+
+```{r recode as NA missingness in anxiety score}
+#Ppts are coded NA if they didn't respond to the number of questions that could have met diagnostic criteria 
+#(diagnostic criteria = 3 or more symptoms)
+#e.g. if the ppt endorsed 2 symptoms, but didn't respond to minimum 1 other question, then they are coded as NA
+
+CIDI.anx.items$cidia.lifetime_anxiety.calc <- with(CIDI.anx.items,
+                                                      ifelse(cidia.lifetime_anxiety_total.calc == 2 & cidia.lifetime_anxiety_total.calc.NA > 0,
+                                                             NA, cidia.lifetime_anxiety.calc))
+
+CIDI.anx.items$cidia.lifetime_anxiety.calc <- with(CIDI.anx.items,
+                                                      ifelse(cidia.lifetime_anxiety_total.calc == 1 & cidia.lifetime_anxiety_total.calc.NA > 1,
+                                                             NA, cidia.lifetime_anxiety.calc))
+
+CIDI.anx.items$cidia.lifetime_anxiety.calc <- with(CIDI.anx.items,
+                                                      ifelse(cidia.lifetime_anxiety_total.calc == 0 & cidia.lifetime_anxiety_total.calc.NA > 2,
+                                                             NA, cidia.lifetime_anxiety.calc))
+
+summary(as.factor(CIDI.anx.items$cidia.lifetime_anxiety.calc))
+
+```
+
+```{r recode as 0 if responded no to screeners}
+
+#If both screening Qs are 0, lifetime anxiety is coded as 0 (not NA)
+CIDI.anx.items$cidia.lifetime_anxiety.calc <- with(CIDI.anx.items,
+                                                      ifelse(
+                                                        is.na(cidia.lifetime_anxiety.calc), 
+                                                        ifelse(
+                                                        cidia.worry_duration_screen == 0, 
+                                                        0, cidia.lifetime_anxiety.calc), 
+                                                        cidia.lifetime_anxiety.calc
+                                                               )
+                                                        )
+
+summary(as.factor(CIDI.anx.items$cidia.lifetime_anxiety.calc))
+
+```
+
+```{r merge lifetime anxiety variable into dataset}
+
+CIDI.anx <- CIDI.anx.items[,c("ID", "cidia.anxiety_screen.calc", "cidia.restless_on_edge", "cidia.lifetime_anxiety_total.calc", "cidia.lifetime_anxiety_total.calc.NA", "cidia.lifetime_anxiety.calc")]
+
+CIDIA.cc <- left_join(CIDIA.cc, CIDI.anx, by = "ID")
+```
+
+##Recode calculated lifetime_anxiety variables
+
+```{r lifetime_anxiety_screen recode}
+summary(CIDIA.cc$cidia.anxiety_screen.calc)
+
+#Store old variable as unc
+CIDIA.cc$cidia.anxiety_screen.calc.unc <- NA
+CIDIA.cc$cidia.anxiety_screen.calc.unc <- CIDIA.cc$cidia.anxiety_screen.calc
+
+CIDIA.cc$cidia.anxiety_screen.calc <- recode_factor(CIDIA.cc$cidia.anxiety_screen.calc.unc,
+                             "0" = "No",
+                             "1" = "Yes")
+```
+
+```{r lifetime_anxiety_screen summary, results='asis'}
+summarytools::freq(CIDIA.cc$cidia.anxiety_screen.calc,
+                   style = "rmarkdown")
+```
+
+```{r lifetime_anxiety recode}
+summary(as.factor(CIDIA.cc$cidia.lifetime_anxiety.calc))
+
+#Rename variable and recode
+CIDIA.cc$cidia.diagnosis <- recode_factor(CIDIA.cc$cidia.lifetime_anxiety.calc,
+                             "0" = "No GAD diagnosis",
+                             "1" = "GAD diagnosis")
+#Create numeric diagnosis variable
+CIDIA.cc$cidia.diagnosis_numeric <- CIDIA.cc$cidia.lifetime_anxiety.calc
+```
+
+```{r lifetime_anxiety_screen summary, results='asis'}
+summarytools::freq(CIDIA.cc$cidia.diagnosis,
+                   style = "rmarkdown")
+```
+
+## Clean CIDIA dataset
+
+```{r clean CIDIA dataframe}
+
+CIDIA.clean <- CIDIA.cc %>%
+  select(ID,
+        cidia.felt_worried,
+        cidia.felt_worried_more,
+        cidia.longest_period_worry_years,
+        cidia.longest_period_worry_months,
+        cidia.longest_period_worry_categorical,
+        cidia.worry_stronger_than_others,
+        cidia.most_days,
+        cidia.more_than_one_thing,
+        cidia.difficult_to_stop,
+        cidia.different_worries,
+        cidia.couldnt_stop,
+        cidia.difficult_to_control,
+        cidia.restless,
+        cidia.on_edge,
+        cidia.tired,
+        cidia.difficulty_concentrating,
+        cidia.irritable,
+        cidia.tense_muscles,
+        cidia.trouble_sleeping,
+        cidia.functioning,
+        cidia.anxiety_screen.calc, 
+        cidia.restless_on_edge, 
+        cidia.lifetime_anxiety_total.calc,
+        cidia.lifetime_anxiety_total.calc.NA,
+        cidia.diagnosis,
+        cidia.diagnosis_numeric)
+
+#Export into a rds file:
+saveRDS(object = CIDIA.clean, file = paste0(export_path, "CIDIA_cleaned.rds"))
+
+# Saves the R data including the recoding
+#save.image(file = "../data/GLAD_CIDIA_clean.RData")
+```
