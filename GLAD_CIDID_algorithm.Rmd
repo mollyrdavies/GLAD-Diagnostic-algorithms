@@ -265,6 +265,13 @@ CIDID.items <- CIDID.items %>%
 
 # Missingness
 
+*Screening missingness:*
+If participants do not respond to the screening questions, then they are not shown the remaining questions and should autmatically have "NA" as their score. These NAs are already captured in the screening variable created above.
+
+*Symptom missingness:*
+Once participants pass the screeners, if any of the other core symptoms are NA then the participant might have received a diagnosis of MD, but we won't know. 
+
+Future considerations: If a participant has an NA in this score but was far from meeting diagnostic criteria, then we may still want to keep them as a '0' for diagnosis.
 ```{r variable for missingness}
 #Missing responses/no information on core symptoms
 CIDID.items$no.info<-0
