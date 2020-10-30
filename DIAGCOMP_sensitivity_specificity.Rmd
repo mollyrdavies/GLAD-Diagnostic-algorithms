@@ -1,0 +1,302 @@
+---
+title: "DIAGCOMP_sensitivity_specificity"
+author: "Molly Davies"
+date: "30/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set up
+```{r install packages}
+
+#install.packages("reshape2")
+#install.packages("tidyverse")
+#install.packages("knitr")
+#install.packages("kableExtra")
+#install.packages("descr")
+#install.packages("caret")
+#install.packages("irr")
+#install.packages("hablar")
+#install.packages("patchwork")
+#install.packages("car")
+#install.packages("ggpubr")
+
+```
+
+```{r import packages}
+library(caret)
+library(irr)
+library(ggpubr)
+library(descr)
+library(tidyverse)
+```
+
+```{r source file paths}
+source("../GLAD_data_path.R")
+```
+
+```{r read data}
+dat.cc <- read_rds(paste0(cleaned_path, "combined_cleaned.rds"))
+```
+
+# Variables
+Create new dataset with only crosstab variables of interest
+```{r select variables}
+cidi <- dat.cc %>%
+  select("ID",
+         "mhd.MDD_numeric",
+         "mhd.GAD_numeric",
+         "mhd.specific_phobia_numeric",
+         "mhd.social_anxiety_numeric",
+         "mhd.panic_attacks_numeric",
+         "mhd.panic_disorder_numeric",
+         "mhd.agoraphobia_numeric",
+         "ClinicianAnyAnx.n",
+         "cidid.diagnosis_numeric",
+         "cidia.diagnosis_numeric",
+         "spec.diagnosis_numeric",
+         "socp.diagnosis_numeric",
+         "pad.diagnosis_numeric",
+         "agp.diagnosis_numeric",
+         "LifetimeAnyAnx.n"
+         )
+```
+
+Ensure that all factor levels are the same for the variables, which is required to conduct the sensitivity/specificity analyses.
+```{r create new factor version of variables}
+
+cidi <- cidi %>% 
+  mutate(ClinicianMDD.f =
+           as.factor(case_when(
+             mhd.MDD_numeric == 0 ~ "No diagnosis",
+             mhd.MDD_numeric == 1 ~ "Diagnosis"
+           )),
+         ClinicianGAD.f =
+           as.factor(case_when(
+             mhd.GAD_numeric == 0 ~ "No diagnosis",
+             mhd.GAD_numeric == 1 ~ "Diagnosis"
+         )),
+         ClinicianSpecPhob.f = 
+           as.factor(case_when(
+             mhd.specific_phobia_numeric == 0 ~ "No diagnosis",
+             mhd.specific_phobia_numeric == 1 ~ "Diagnosis"
+           )),
+         ClinicianSocialPhob.f = 
+           as.factor(case_when(
+             mhd.social_anxiety_numeric == 0 ~ "No diagnosis",
+             mhd.social_anxiety_numeric == 1 ~ "Diagnosis"
+           )),
+         ClinicianPanicDis.f = 
+           as.factor(case_when(
+             mhd.panic_disorder_numeric == 0 ~ "No diagnosis",
+             mhd.panic_disorder_numeric == 1 ~ "Diagnosis"
+           )),
+         ClinicianPanicAttacks.f =
+           as.factor(case_when(
+             mhd.panic_attacks_numeric == 0 ~ "No diagnosis",
+             mhd.panic_attacks_numeric == 1 ~ "Diagnosis"
+           )),
+         ClinicianAgoraphobia.f = 
+           as.factor(case_when(
+             mhd.agoraphobia_numeric == 0 ~ "No diagnosis",
+             mhd.agoraphobia_numeric == 1 ~ "Diagnosis"
+           )),
+         ClinicianAnyAnx.f = 
+           as.factor(case_when(
+             ClinicianAnyAnx.n == 0 ~ "No diagnosis",
+             ClinicianAnyAnx.n == 1 ~ "Diagnosis"
+           )),
+         LifetimeMDD.f =
+           as.factor(case_when(
+             cidid.diagnosis_numeric == 0 ~ "No diagnosis",
+             cidid.diagnosis_numeric == 1 ~ "Diagnosis"
+           )),
+         LifetimeGAD.f =
+           as.factor(case_when(
+             cidia.diagnosis_numeric == 0 ~ "No diagnosis",
+             cidia.diagnosis_numeric == 1 ~ "Diagnosis"
+         )),
+         LifetimeSpecPhob.f = 
+           as.factor(case_when(
+             spec.diagnosis_numeric == 0 ~ "No diagnosis",
+             spec.diagnosis_numeric == 1 ~ "Diagnosis"
+           )),
+         LifetimeSocialPhob.f = 
+           as.factor(case_when(
+             socp.diagnosis_numeric == 0 ~ "No diagnosis",
+             socp.diagnosis_numeric == 1 ~ "Diagnosis"
+           )),
+         LifetimePanicDis.f = 
+           as.factor(case_when(
+             pad.diagnosis_numeric == 0 ~ "No diagnosis",
+             pad.diagnosis_numeric == 1 ~ "Diagnosis"
+           )),
+         LifetimeAgoraphobia.f = 
+           as.factor(case_when(
+             agp.diagnosis_numeric == 0 ~ "No diagnosis",
+             agp.diagnosis_numeric == 1 ~ "Diagnosis"
+           )),
+         LifetimeAnyAnx.f = 
+           as.factor(case_when(
+             LifetimeAnyAnx.n == 0 ~ "No diagnosis",
+             LifetimeAnyAnx.n == 1 ~ "Diagnosis"
+           ))
+         )
+      
+```
+
+# Cross Tabulations and Agreement
+Run agreement (accuracy), sensitivity, specificity, and Cohen's kappa analyses
+
+## Algorithm-based diagnosis as reference point
+
+Major depressive disorder
+```{r MDD SI-AB crosstabs and agreement}
+confusionMatrix(cidi$ClinicianMDD.f, 
+                cidi$LifetimeMDD.f, 
+                positive = "Diagnosis",
+                dnn = c("Single-item", "Algorithm-based"))
+
+```
+
+Generalised anxiety disorder
+```{r GAD SI-AB crosstabs and agreement}
+confusionMatrix(cidi$ClinicianGAD.f, 
+                cidi$LifetimeGAD.f, 
+                positive = "Diagnosis",
+                dnn = c("Single-item", "Algorithm-based"))
+```
+
+Specific phobia
+```{r Specific phobia SI-AB crosstabs and agreement}
+confusionMatrix(cidi$ClinicianSpecPhob.f, 
+                cidi$LifetimeSpecPhob.f, 
+                positive = "Diagnosis",
+                dnn = c("Single-item", "Algorithm-based"))
+
+```
+
+Social anxiety disorder
+```{r Social anxiety disorder SI-AB crosstabs and agreement}
+confusionMatrix(cidi$ClinicianSocialPhob.f, 
+                cidi$LifetimeSocialPhob.f, 
+                positive = "Diagnosis",
+                dnn = c("Single-item", "Algorithm-based"))
+
+```
+
+Panic attacks
+```{r Panic disorder SI-AB crosstabs and agreement}
+confusionMatrix(cidi$ClinicianPanicDis.f, 
+                cidi$LifetimePanicDis.f, 
+                positive = "Diagnosis",
+                dnn = c("Single-item", "Algorithm-based"))
+
+```
+
+Panic attacks
+The single-item panic attack variable here is being compared to lifetime panic disorder.
+```{r Panic Attacks SI-AB crosstabs and agreement for Panic Disorder}
+confusionMatrix(cidi$ClinicianPanicAttacks.f, 
+                cidi$LifetimePanicDis.f, 
+                positive = "Diagnosis",
+                dnn = c("Single-item", "Algorithm-based"))
+
+```
+
+Agoraphobia
+```{r Agoraphobia SI-AB crosstabs and agreement}
+confusionMatrix(cidi$ClinicianAgoraphobia.f, 
+                cidi$LifetimeAgoraphobia.f, 
+                positive = "Diagnosis",
+                dnn = c("Single-item", "Algorithm-based"))
+
+```
+
+Any anxiety
+```{r Any Anxiety SI-AB crosstabs and agreement}
+confusionMatrix(cidi$ClinicianAnyAnx.f, 
+                cidi$LifetimeAnyAnx.f, 
+                positive = "Diagnosis",
+                dnn = c("Single-item", "Algorithm-based"))
+
+```
+
+
+##Single-item diagnosis as reference point
+
+Major depressive disorder
+```{r MDD AB-SI crosstabs and agreement}
+confusionMatrix(cidi$LifetimeMDD.f,
+                cidi$ClinicianMDD.f, 
+                positive = "Diagnosis",
+                dnn = c("Algorithm-based", "Single-item"))
+```
+
+Generalised anxiety disorder
+```{r GAD AB-SI crosstabs and agreement}
+confusionMatrix(cidi$LifetimeGAD.f,
+                cidi$ClinicianGAD.f, 
+                positive = "Diagnosis",
+                dnn = c("Algorithm-based", "Single-item"))
+
+```
+
+Specific phobia
+```{r Specific phobia AB-SI crosstabs and agreement}
+confusionMatrix(cidi$LifetimeSpecPhob.f,
+                cidi$ClinicianSpecPhob.f, 
+                positive = "Diagnosis",
+                dnn = c("Algorithm-based", "Single-item"))
+
+```
+
+Social anxiety disorder
+```{r Social anxiety disorder AB-SI crosstabs and agreement}
+confusionMatrix(cidi$LifetimeSocialPhob.f,
+                cidi$ClinicianSocialPhob.f, 
+                positive = "Diagnosis",
+                dnn = c("Algorithm-based", "Single-item"))
+
+```
+
+Panic disorder
+```{r Panic disorder AB-SI crosstabs and agreement}
+confusionMatrix(cidi$LifetimePanicDis.f,
+                cidi$ClinicianPanicDis.f, 
+                positive = "Diagnosis",
+                dnn = c("Algorithm-based", "Single-item"))
+```
+
+Panic attacks
+Algorithm-based panic disorder is being compared with single-item panic attacks.
+```{r Panic Attacks AB-SI crosstabs and agreement with Panic Disorder, echo=FALSE}
+confusionMatrix(cidi$LifetimePanicDis.f, 
+                cidi$ClinicianPanicAttacks.f, 
+                positive = "Diagnosis",
+                dnn = c("Algorithm-based", "Single-item"))
+
+
+```
+
+Agoraphobia
+```{r Agoraphobia AB-SI crosstabs and agreement}
+confusionMatrix(cidi$LifetimeAgoraphobia.f, 
+                cidi$ClinicianAgoraphobia.f, 
+                positive = "Diagnosis",
+                dnn = c("Algorithm-based", "Single-item"))
+
+```
+
+Any anxiety
+```{r Any Anxiety AB-SI crosstabs and agreement}
+confusionMatrix(cidi$LifetimeAnyAnx.f,
+                cidi$ClinicianAnyAnx.f, 
+                positive = "Diagnosis",
+                dnn = c("Algorithm-based", "Single-item"))
+
+```
+
