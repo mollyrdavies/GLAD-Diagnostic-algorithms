@@ -111,8 +111,18 @@ summary(CIDIA.items$cidia.longest_period_worry_years)
 summary(CIDIA.items$cidia.longest_period_worry_months)
 #Convert months to years
 CIDIA.items$cidia.longest_period_worry_months.years <- CIDIA.items$cidia.longest_period_worry_months/12
+#Set value for months or years variable to zero if the other contains a value
+CIDIA.months.years<-data.frame(cbind(CIDIA.items$cidia.longest_period_worry_months.years, CIDIA.items$cidia.longest_period_worry_years))
+names(CIDIA.months.years)<-c("cidia.longest_period_worry_months.years", "cidia.longest_period_worry_years")
+CIDIA.months.years<-CIDIA.months.years%>%
+  mutate(cidia.longest_period_worry_months.years =
+           if_else(is.na(cidia.longest_period_worry_months.years) & is.na(cidia.longest_period_worry_years), NA_real_,
+                   if_else(is.na(cidia.longest_period_worry_months.years) & !is.na(cidia.longest_period_worry_years), 0, cidia.longest_period_worry_months.years)),
+         cidia.longest_period_worry_years = 
+           if_else(is.na(cidia.longest_period_worry_years) & is.na(cidia.longest_period_worry_months.years), NA_real_,
+                   if_else(is.na(cidia.longest_period_worry_years) & !is.na(cidia.longest_period_worry_months.years), 0, cidia.longest_period_worry_years)))
 #Combine month & year values for total time of longest period of worry
-CIDIA.items$cidia.longest_period_worry_combined.unc <- rowSums(cbind(CIDIA.items$cidia.longest_period_worry_months.years, CIDIA.items$cidia.longest_period_worry_years))
+CIDIA.items$cidia.longest_period_worry_combined.unc <- rowSums(cbind(CIDIA.months.years$cidia.longest_period_worry_months.years, CIDIA.months.years$cidia.longest_period_worry_years))
 #Round the new variable
 CIDIA.items$cidia.longest_period_worry_combined <- round(CIDIA.items$cidia.longest_period_worry_combined.unc, digits = 2)
 summary(CIDIA.items$cidia.longest_period_worry_combined)
@@ -128,7 +138,7 @@ CIDIA.items$cidia.longest_period_worry_categorical_combined.unc <- with(CIDIA.it
                                                                      ifelse(is.na(cidia.longest_period_worry_categorical) 
                                                                             & !is.na(cidia.longest_period_worry_combined),
                                                                        (cut(cidia.longest_period_worry_combined,
-                                                                           breaks = c(0, 5.9, 12, 60, Inf),
+                                                                           breaks = c(0, 0.49, 1, 5, Inf),
                                                                            labels = c(1, 2, 3, 5))),
                                                                        cidia.longest_period_worry_categorical))
 
@@ -198,7 +208,7 @@ If the participant reports either anxiety or worry but doesn't report symptoms l
 Create variable for worry and duration screen
 ```{r variable for worry and duration screener}
 CIDIA.items <- CIDIA.items %>% 
-  mutate(cidia.screener_numeric_test = 
+  mutate(cidia.screener_numeric = 
            case_when(
              cidia.felt_worried == "No" & cidia.felt_worried_more == "No" 
              ~ 0,
