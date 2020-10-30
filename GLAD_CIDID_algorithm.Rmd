@@ -119,7 +119,7 @@ The major depressive disorder screening questions include:
 If the participant responds No (0) to both low mood and anhedonia variables, they are scored 0 for diagnosis and skip the rest of the MDD section.
 
 
-Create combined low mood & anhedonia screening variable.
+Create combined low mood & anhedonia screening variable. If one of these screening variables is "No" and the other is NA, the screener is coded NA.
 ```{r variable for low mood & anhedonia screener}
 #A. at least one of the symptoms is either (1) depressed mood or (2)  loss of interest or pleasure.
 CIDID.items <- CIDID.items %>% 
@@ -339,7 +339,7 @@ summary(as.factor(CIDID.items$cidid.criterion_A_score_numeric.NA))
 CIDID.items <- CIDID.items %>% 
   mutate(cidid.diagnosis_numeric =
            case_when(
-          #Ppts are coded NA if they didn't respond to the screening questions
+          #Ppts are coded NA if they didn't respond to the screening questions, or had "No" in one screening question and NA in the other
              is.na(cidid.screener_numeric) ~ NA_real_,
           #Ppts are coded NA if they didn't respond to symptom questions that may have met diagnostic criteria 
              cidid.criterion_A_score_numeric == 4 & cidid.criterion_A_score_numeric.NA > 0 ~ NA_real_,
