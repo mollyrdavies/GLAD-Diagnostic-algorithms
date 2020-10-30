@@ -139,6 +139,11 @@ CIDIA.items$cidia.longest_period_worry_combined <- round(CIDIA.items$cidia.longe
 
 #Summarise new variable
 summary(CIDIA.items$cidia.longest_period_worry_combined)
+
+sum(with(CIDIA.items,
+         ifelse(!is.na(cidia.longest_period_worry_combined) & cidia.longest_period_worry_combined > 50, 1, 0)
+         )
+)
 ```
 
 ### Longest period of worry categorical + continuous (all)
@@ -265,11 +270,11 @@ CIDIA.items <- CIDIA.items %>%
   mutate(cidia.criterion_A_numeric =
            case_when(
              cidia.most_days == "No" ~ 0,
-             (cidia.more_than_one_thing == "No" & cidia.different_worries == "No") ~ 0,
+             (cidia.more_than_one_thing == "One thing" & cidia.different_worries == "No") ~ 0,
                #A. occurring  more  days  than not (frequency)
                cidia.most_days == "Yes" &
                #A. about a number of events or activities
-               (cidia.more_than_one_thing == "Yes" | cidia.different_worries == "Yes") ~ 1
+               (cidia.more_than_one_thing == "More than one thing" | cidia.different_worries == "Yes") ~ 1
          ))
 
 freq(CIDIA.items$cidia.criterion_A_numeric)
@@ -515,6 +520,7 @@ CIDIA.clean <- CIDIA.items %>%
         cidia.tense_muscles_numeric,
         cidia.trouble_sleeping_numeric,
         cidia.functioning_numeric, 
+        cidia.longest_period_worry_combined,
         cidia.criterion_A_numeric,
         cidia.criterion_B_numeric,
         cidia.criterion_C_score_numeric,
