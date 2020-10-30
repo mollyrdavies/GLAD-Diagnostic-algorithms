@@ -32,7 +32,7 @@ date = Sys.Date()
 
 
 Load packages
-```{r}
+```{r load packages}
 library(tidyverse)
 library(skimr)
 ```
@@ -56,14 +56,14 @@ PAD_name <- "PAD_cleaned.rds"
 AGP_name <- "AGP_cleaned.rds"
 
 #Files
-dem_filename <- paste(datpath, dem_name, sep = "")
-mhd_filename <- paste(datpath, mhd_name, sep = "")
-CIDID_filename <- paste(datpath, CIDID_name, sep = "")
-CIDIA_filename <- paste(datpath, CIDIA_name, sep = "")
-SPEC_filename <- paste(datpath, SPEC_name, sep = "")
-SOCP_filename <- paste(datpath, SOCP_name, sep = "")
-PAD_filename <- paste(datpath, PAD_name, sep = "")
-AGP_filename <- paste(datpath, AGP_name, sep = "")
+dem_filename <- paste(cleaned_path, dem_name, sep = "")
+mhd_filename <- paste(cleaned_path, mhd_name, sep = "")
+CIDID_filename <- paste(cleaned_path, CIDID_name, sep = "")
+CIDIA_filename <- paste(cleaned_path, CIDIA_name, sep = "")
+SPEC_filename <- paste(cleaned_path, SPEC_name, sep = "")
+SOCP_filename <- paste(cleaned_path, SOCP_name, sep = "")
+PAD_filename <- paste(cleaned_path, PAD_name, sep = "")
+AGP_filename <- paste(cleaned_path, AGP_name, sep = "")
 
 ```
 
@@ -94,18 +94,17 @@ AGP <- read_rds(AGP_filename)
 dim(AGP)
 ```
 
-glad/edgi data frame list
-```{r glad/edgi data frame list}
-dat <- bind_rows(
-  dem,
-  mhd,
-  CIDID,
-  CIDIA,
-  SPEC,
-  SOCP,
-  PAD,
-  AGP
-)
+Merge the datasets by ID.
+```{r merge datasets}
+dat <- list(dem,
+            mhd,
+            CIDID,
+            CIDIA,
+            SPEC,
+            SOCP,
+            PAD,
+            AGP) %>% 
+  reduce(left_join, by = "ID")
 ```
 
 ```{r Skim data}
@@ -114,6 +113,6 @@ skimr::skim(dat)
 ```
 
 ```{r Save four cohorts as rds file}
-saveRDS(object = dat, file = paste0(data_path, "combined_cleaned.rds"))
+saveRDS(object = dat, file = paste0(cleaned_path, "combined_cleaned.rds"))
 ```
 

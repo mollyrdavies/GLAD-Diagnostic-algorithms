@@ -1,5 +1,5 @@
 #Ignore all RData files
 *.RData
 
-#Ignore all Rhistory files
+#Ignore all Rhistory files
 *.Rhistory
