@@ -1,0 +1,368 @@
+---
+title: "DIAGCOMP_DEM_cleaning"
+author: "Molly Davies"
+date: "30/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set up
+
+Clear workspace
+```{r clear workspace}
+#rm(list = ls())
+```
+
+```{r load packages}
+library(tidyverse)
+#library(car)
+library(psych)
+#library(lubridate)
+#library(broom)
+#library(ggfortify)
+library(summarytools)
+#library(ggformula)
+#library(data.table)
+```
+
+```{r source path for reading/saving data}
+#Source raw data directory (raw_path) & clean data export directory (cleaned_path)
+source("../GLAD_data_path.R")
+```
+
+```{r read in cleaned SOCP data}
+DEM_file <- paste(raw_path, "DEM.rds", sep = "")
+
+DEM.cc <- read_rds(DEM_file)
+```
+
+```{r select variables}
+DEM.items <- DEM.cc %>% 
+  select(ID,
+         age,
+         sex,
+         dem.university_numeric,
+         dem.alevels_numeric,
+         dem.gcse_numeric,
+         dem.cse_numeric,
+         dem.NVQ_numeric,
+         dem.education_other_numeric,
+         dem.NVQ,
+         dem.education_other,
+         dem.ethnicity_numeric,
+         dem.employment,
+         dem.employment_numeric
+         )
+```
+
+```{r recode as NAs}
+#Change all prefer not to answers and don't knows to NA
+DEM.items[DEM.items == -77] <- NA
+DEM.items[DEM.items == -88] <- NA
+DEM.items[DEM.items == -99] <- NA
+DEM.items[DEM.items == "Don't know"] <- NA
+DEM.items[DEM.items == "Prefer not to answer"] <- NA
+DEM.items[DEM.items == "Seen but not answered"] <- NA
+```
+
+```{r add unc to column names}
+colnames(DEM.items) <- paste(colnames(DEM.items), "unc", sep = ".")
+```
+
+```{r visualise demographics data}
+head(DEM.items)
+```
+
+# Age
+
+## Average age (in text, Sample Descriptors section)
+
+```{r checking outliers: density plot Age}
+##Get summary to see range
+summary(DEM.items$age.unc)
+
+## Create a variable for the mean to add the mean line in the graph
+age.clean <- DEM.items$age.unc
+m <- mean(age.clean, na.rm = TRUE)
+
+## Create version of dataset with only unique column names (to fix an error with ggplot)
+DEM.items.plot <- DEM.items
+colnames(DEM.items.plot) <- make.unique(names(DEM.items.plot))
+
+## Create a density plot of Age, with a mean line
+
+adens <- ggplot(data = DEM.items.plot, aes(x=age.unc, color="variable")) +
+  geom_density() +
+  scale_x_continuous(limits = c(0.00, 105)) +
+  geom_vline(xintercept=mean(m),
+             color="blue", size=1) +
+  scale_color_manual(values = "#E69F00")
+
+adens
+
+## Alternatively, you can just tell R that the dataset contains NA so it can properly calculate the mean
+## You can also add lines around the SD
+
+adens.imp <- ggplot(DEM.items.plot, aes(x=age.unc, color="variable")) +
+  geom_density() +
+  scale_color_manual(values = "#E69F00") +
+  scale_x_continuous(limits = c(0.00, 105)) +
+  geom_vline(xintercept = mean(DEM.items.plot$age.unc, na.rm = T), 
+             color = "blue") +  
+  geom_vline(xintercept = mean(DEM.items.plot$age.unc, na.rm = T) + sd(DEM.items.plot$age.unc, na.rm = T),
+             color = "blue",
+             linetype = "dashed") +
+  geom_vline(xintercept = mean(DEM.items.plot$age.unc, na.rm = T) - sd(DEM.items.plot$age.unc, na.rm = T),
+             color = "blue",
+             linetype = "dashed")
+
+print(adens.imp)
+```
+
+```{r checking outliers: Scatterplot}
+
+ggplot(data = subset(DEM.items.plot, !is.na(age.unc)),
+       aes(x = seq_along(age.unc), y = age.unc)) +
+       geom_point(color="grey") +
+  labs(x = "Index",
+       y = "Age",
+       title = "Age (self-report, sex-combined, uncleaned)",
+       subtitle = paste("Dashed line represents mean and dotted lines represent ± 1 standard deviation\n",
+                        "n = ", sum(!is.na(DEM.items.plot$age.unc)),
+                        "; NA = ", sum(is.na(DEM.items.plot$age.unc)),
+                        "; n(total) = ", length(DEM.items.plot$age.unc), sep = ""),       
+       color = "black") +
+  theme(panel.grid.major.y = element_line(size = 0.5,
+                                        linetype = 'dashed',
+                                        colour = "gray"),
+        axis.title.y = element_blank(),
+        axis.text.x = element_text(colour="black", size = 12),
+        axis.text.y = element_text(colour="black", size = 12),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.background = element_blank()) +
+  geom_hline(data = DEM.items.plot, aes(yintercept = mean(age.unc, na.rm = T)), size = 0.5, linetype = "dashed") +
+  geom_hline(data = DEM.items.plot, aes(yintercept = mean(age.unc, na.rm = T) + sd(age.unc, na.rm = T)), size = 0.5, linetype = "dotted") +
+  geom_hline(data = DEM.items.plot, aes(yintercept = mean(age.unc, na.rm = T) - sd(age.unc, na.rm = T)), size = 0.5, linetype = "dotted")
+
+```
+
+```{r set Age limits}
+
+# Set upper limit for age (no lower limit, as all are >= 16)
+
+age.m_upper = 100
+
+# Check how many participants have outlier values in height
+
+age.n_upper <- which(DEM.items$age.unc > age.m_upper)
+
+length(age.n_upper)
+
+```
+
+```{r remove Age outliers}
+
+if(length(age.n_upper)>0){
+  
+# Remove outliers
+
+DEM.items$age <- with(data = DEM.items, ifelse(age.unc > age.m_upper, NA, age.unc))
+
+# Overwrite dataset with clean data, make col names unique for plotting
+DEM.items.plot <- DEM.items
+colnames(DEM.items.plot) <- make.unique(names(DEM.items.plot))
+
+# Point plot without outliers
+
+ggplot(data = subset(DEM.items.plot, !is.na(age)),
+       aes(x = seq_along(age), y = age)) +
+       geom_point(color="grey") +
+  labs(x = "Index",
+       y = "Age",
+       title = "Age (self-report, sex-combined, cleaned)",
+       subtitle = paste("Dashed line represents mean and dotted lines represent ± 1 standard deviation\n",
+                        "n = ", sum(!is.na(DEM.items.plot$age)),
+                        "; NA = ", sum(is.na(DEM.items.plot$age)),
+                        "; n(total) = ", length(DEM.items.plot$age),
+                        "; n(outlier) removed = ", length(age.n_upper), sep = ""),
+       color = "black") +
+  theme(panel.grid.major.y = element_line(size = 0.5,
+                                        linetype = 'dashed',
+                                        colour = "gray"),
+        axis.title.y = element_blank(),
+        axis.text.x = element_text(colour="black", size = 12),
+        axis.text.y = element_text(colour="black", size = 12),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.background = element_blank()) +
+  geom_hline(data = DEM.items.plot, aes(yintercept = mean(age, na.rm = T)),
+             size = 1, linetype = "dashed", colour = "deepskyblue4") +
+  geom_hline(data = DEM.items.plot, aes(yintercept = mean(age, na.rm = T) + sd(age, na.rm = T)),
+             size = 1, linetype = "dotted", colour = "deepskyblue3") +
+  geom_hline(data = DEM.items.plot, aes(yintercept = mean(age, na.rm = T) - sd(age, na.rm = T)),
+             size = 1, linetype = "dotted", colour = "deepskyblue3") +
+  geom_hline(data = DEM.items.plot, aes(yintercept = mean(age, na.rm = T) + 3.5*sd(age, na.rm = T)),
+             size = 1, linetype = "dotted", colour = "firebrick") +
+  geom_hline(data = DEM.items.plot, aes(yintercept = mean(age, na.rm = T) - 3.5*sd(age, na.rm = T)),
+             size = 1, linetype = "dotted", colour = "firebrick")
+}
+
+
+```
+
+```{r mean age}
+#Get mean of cleaned age variable
+mean(DEM.items$age, na.rm = T)
+
+```
+
+# Sex
+
+Sex variable is pre-cleaned. Rename to remove .unc.
+```{r rename sex}
+DEM.items$sex <- DEM.items$sex.unc
+freq(DEM.items$sex)
+```
+
+# Highest education
+
+## Highest Education frequencies
+
+First, define highest education:
+
+Proceed along qualifications fields
+If field is not blank, take that as highest qual
+If field is blank, check next field
+If all fields are blank, NA
+Assumes Degree > A level > O level > CSE
+NVQ and other professional are disregarded
+
+```{r code education as characters}
+
+#Recode as factors to add text, then change class to character
+DEM.items$College <- as.character(recode_factor(DEM.items$dem.university_numeric.unc,
+                              "1" = "College or university degree",
+                              "0" = "No",
+                              "-77" = NULL,
+                              .missing = NULL))
+
+DEM.items$A_levels <-as.character(recode_factor(DEM.items$dem.alevels_numeric.unc,
+                              "1" = "A levels/AS levels or equivalent",
+                              "0" = "No",
+                              "-77" = NULL,
+                              .missing = NULL))
+
+DEM.items$GCSE_edu <- as.character(recode_factor(DEM.items$dem.gcse_numeric.unc,
+                                  "1" = "O levels/GCSEs or equivalent",
+                                  "0" = "No",
+                                  "-77" = NULL,
+                                  .missing = NULL))
+
+DEM.items$CSE <- as.character(recode_factor(DEM.items$dem.cse_numeric.unc,
+                          "1" = "CSEs or equivalent",
+                          "0" = "No",
+                          "-77" = NULL,
+                          .missing = NULL))
+
+```
+
+```{r define highest education}
+DEM.items$Highest.Education<-NA
+DEM.items$Highest.Education<-ordered(case_when(DEM.items$College=="College or university degree" ~ DEM.items$College,
+                                          DEM.items$A_levels=="A levels/AS levels or equivalent" ~ DEM.items$A_levels,
+                                          DEM.items$GCSE_edu == "O levels/GCSEs or equivalent" ~ DEM.items$GCSE_edu,
+                                          DEM.items$CSE== "CSEs or equivalent" ~ DEM.items$CSE,
+                                          TRUE ~ as.character(NA)),
+                                          c("College or university degree","A levels/AS levels or equivalent","O levels/GCSEs or equivalent", "CSEs or equivalent"))
+
+DEM.items$Degree<-ifelse(!is.na(DEM.items$Highest.Education) & DEM.items$Highest.Education == "College or university degree", "Degree", "No degree")
+
+DEM.items$GCSE<-ifelse((!is.na(DEM.items$Highest.Education) & DEM.items$Highest.Education == "CSEs or equivalent") | is.na(DEM.items$Highest.Education), "No GCSE equivalent", "At least GCSE equivalent")
+
+head(DEM.items$Highest.Education)
+
+```
+
+
+```{r run checks for new variable}
+table(DEM.items$Highest.Education, DEM.items$College, useNA = "a")
+table(DEM.items$Highest.Education, DEM.items$A_levels, useNA = "a")
+table(DEM.items$Highest.Education, DEM.items$GCSE_edu, useNA = "a")
+table(DEM.items$Highest.Education, DEM.items$CSE, useNA = "a")
+#NVD or HND or NHC or equivalent
+table(DEM.items$Highest.Education, DEM.items$dem.NVQ.unc, useNA = "a")
+#Other professional qualification
+table(DEM.items$Highest.Education, DEM.items$dem.education_other.unc, useNA = "a")
+```
+
+```{r higher education freq}
+#Get frequencies of higher education
+freq(DEM.items$Highest.Education)
+```
+
+# Ethnicity
+
+```{r recode ethnicity}
+#Recode as factor
+DEM.items$Ethnicity <- recode_factor(DEM.items$dem.ethnicity_numeric.unc,
+                                "1" = "White",
+                                "2" = "Mixed",
+                                "3" = "Asian or Asian British",
+                                "4" = "Black or Black British",
+                                "5" = "Arab",
+                                "6" = "Other")
+#Get frequencies
+freq(DEM.items$Ethnicity)
+
+```
+
+# Employment
+
+```{r recode employment}
+
+DEM.items <- DEM.items %>% 
+  mutate(Employment = 
+           case_when(
+             dem.employment_numeric.unc == 1 ~ "In paid employment or self-employed",
+             dem.employment_numeric.unc == 2 ~ "Retired",
+             dem.employment_numeric.unc == 3 ~ "Looking after home and/or family",
+             dem.employment_numeric.unc == 4 ~ "Unable to work because of sickness or disability",
+             dem.employment_numeric.unc == 5 ~ "Unemployed",
+             dem.employment_numeric.unc == 6 ~ "Doing unpaid or voluntary work",
+             dem.employment_numeric.unc == 7 ~ "Full or part-time student",
+             dem.employment_numeric.unc == 8 ~ "Other",
+             dem.employment_numeric.unc == -99 | is.na(dem.employment_numeric.unc) ~ NA_character_
+           ))
+         
+DEM.items$Employment <- factor(DEM.items$Employment, ordered = T,
+                               levels = c("In paid employment or self-employed","Retired","Looking after home and/or family", "Unable to work because of sickness or disability", "Unemployed", "Doing unpaid or voluntary work", "Full or part-time student", "Other"))
+freq(DEM.items$dem.employment.unc)
+freq(DEM.items$Employment)
+```
+
+# Clean DEM dataset
+
+```{r clean DEM dataframe}
+#Rename ID column
+DEM.items$ID <- DEM.items$ID.unc
+
+#Select variables
+DEM.clean <- DEM.items %>%
+  select(ID,
+        age,
+        sex,
+        Highest.Education,
+        Ethnicity,
+        Employment
+        )
+
+#Export into a rds file:
+saveRDS(object = DEM.clean, file = paste0(cleaned_path, "DEM_cleaned.rds"))
+
+# Saves the R data including the recoding
+#save.image(file = paste0(cleaned_path, "GLAD_DEM_clean.RData")
+```
