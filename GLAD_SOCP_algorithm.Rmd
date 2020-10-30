@@ -269,6 +269,7 @@ SOCP.clean <- SOCP.items %>%
         socp.age_last_episode_txt,
         socp.longest_episode,
         socp.interference_with_life,
+        socp.criterion_A_numeric,
         socp.screener_numeric,
         socp.diagnosis,
         socp.diagnosis_numeric)
