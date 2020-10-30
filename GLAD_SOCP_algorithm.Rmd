@@ -57,7 +57,7 @@ SOCP.items <- SOCP.cc %>%
         socp.age_first_episode_txt,
         socp.age_last_episode_txt,
         socp.longest_episode,
-        socp.interference_with_life_numeric,
+        socp.interference_with_life,
         socp.anx_social_situations_numeric,
         socp.anx_being_observed_numeric,
         socp.anx_others_think_numeric,
