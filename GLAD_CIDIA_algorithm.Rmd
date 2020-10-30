@@ -266,8 +266,6 @@ CIDIA.items <- CIDIA.items %>%
            case_when(
              cidia.most_days == "No" ~ 0,
              (cidia.more_than_one_thing == "No" & cidia.different_worries == "No") ~ 0,
-             #A. Excessive  anxiety  and  worry
-             (cidia.felt_worried == "Yes" | cidia.felt_worried_more == "Yes" | cidia.worry_stronger_than_others == "Yes") &
                #A. occurring  more  days  than not (frequency)
                cidia.most_days == "Yes" &
                #A. about a number of events or activities
