@@ -5,7 +5,7 @@ date: "30/10/2020"
 output: html_document
 ---
 
-Demographics (DEM) cleaning script for the GLAD Study data utilised in Davies et al (in prep).
+Demographics (DEM) cleaning script for the GLAD Study data utilised in "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" Davies et al (in prep).
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Clear workspace
 ```{r clear workspace}
-#rm(list = ls())
+rm(list = ls())
 ```
 
 ```{r load packages}

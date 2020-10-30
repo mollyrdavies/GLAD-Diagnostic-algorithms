@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Clear workspace
 ```{r clear workspace}
-#rm(list = ls())
+rm(list = ls())
 ```
 
 ```{r create GLAD color palette}
@@ -208,30 +208,39 @@ summary(dat.cc$ClinicianAgoraphobia)
 ## Create any anxiety variables (clinician and lifetime)
 
 ```{r create any anxiety variables}
-#Create clinician any anxiety variable
-dat.cc$ClinicianAnyAnx.n <- if_else(dat.cc$ClinicianGAD == "GAD diagnosis" | dat.cc$ClinicianSpecPhob == "Specific phobia diagnosis" | dat.cc$ClinicianSocialPhob == "Social phobia diagnosis" | dat.cc$ClinicianPanicDis == "Panic disorder diagnosis" | dat.cc$ClinicianAgoraphobia == "Agoraphobia diagnosis", 1, 0)
+#Create clinician and lifetime any anxiety variables
+dat.cc <- dat.cc %>% 
+  mutate(ClinicianAnyAnx.n =
+           case_when(
+             mhd.GAD_numeric == 0 & mhd.specific_phobia_numeric == 0 & mhd.social_anxiety_numeric == 0 &
+               mhd.panic_disorder_numeric == 0 & mhd.agoraphobia_numeric == 0 ~ 0,
+             mhd.GAD_numeric == 1 & mhd.specific_phobia_numeric == 1 & mhd.social_anxiety_numeric == 1 &
+               mhd.panic_disorder_numeric == 1 & mhd.agoraphobia_numeric == 1 ~ 1
+           ),
+         LifetimeAnyAnx.n = 
+           case_when(
+             cidia.diagnosis_numeric == 0 & spec.diagnosis_numeric == 0 & socp.diagnosis_numeric == 0 &
+               pad.diagnosis_numeric == 0 & agp.diagnosis_numeric == 0 ~ 0,
+             cidia.diagnosis_numeric == 1 & spec.diagnosis_numeric == 1 & socp.diagnosis_numeric == 1 &
+               pad.diagnosis_numeric == 1 & agp.diagnosis_numeric == 1 ~ 1
+           ))
 
-#Recode clinician any anxiety as factor
+#Recode as factors
 dat.cc$ClinicianAnyAnx <- recode_factor(dat.cc$ClinicianAnyAnx.n,
                                         "0" = "No anxiety diagnosis",
                                         "1" = "Any anxiety diagnosis",
                                         .missing = NULL)
 
-#Check it worked (NOTE: NA are people with no other self-reported anxiety disorders, and an NA in self-reported panic disorder)
-summary(dat.cc$ClinicianAnyAnx)
-
-#Create lifetime any anxiety variable
-dat.cc$LifetimeAnyAnx.n <- if_else_(dat.cc$LifetimeGAD == "Lifetime GAD" | dat.cc$SpecificPhobia == "Lifetime specific phobia" | dat.cc$SocialPhobia == "Lifetime social phobia" | dat.cc$PanicDisorder == "Lifetime panic disorder" | dat.cc$Agoraphobia == "Lifetime agoraphobia", 1, 0)
-
-#Recode lifetime any anxiety as factor
 dat.cc$LifetimeAnyAnx <- recode_factor(dat.cc$LifetimeAnyAnx.n,
                                         "0" = "Never had anxiety",
                                         "1" = "Lifetime any anxiety")
 
-#Check it worked
-summary(dat.cc$LifetimeAnyAnx)
-
+#Get frequencies
+freq(dat.cc$ClinicianAnyAnx)
+freq(dat.cc$LifetimeAnyAnx)
 ```
 
-
+```{r Save combined dataset as rds file}
+saveRDS(object = dat.cc, file = paste0(cleaned_path, "combined_cleaned_new_variables.rds"))
+```
 

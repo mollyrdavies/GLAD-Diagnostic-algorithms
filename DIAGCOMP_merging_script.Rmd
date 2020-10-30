@@ -112,7 +112,7 @@ dat <- list(dem,
 skimr::skim(dat)
 ```
 
-```{r Save four cohorts as rds file}
+```{r Save combined dataset as rds file}
 saveRDS(object = dat, file = paste0(cleaned_path, "combined_cleaned.rds"))
 ```
 
