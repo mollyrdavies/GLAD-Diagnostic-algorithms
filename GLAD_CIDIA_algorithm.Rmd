@@ -300,7 +300,15 @@ CIDIA.items <- CIDIA.items %>%
 
 summary(as.factor(CIDIA.items$cidia.restless_on_edge_numeric))
 
+# Recode as factor
+CIDIA.items <- CIDIA.items %>% 
+  mutate(cidia.restless_on_edge = 
+           recode_factor(cidia.restless_on_edge_numeric,
+                         "0" = "No",
+                         "1" = "Yes")
+         )
 ```
+
 
 Calculate anxiety symptoms 'score' (the number of criterion C symptoms endorsed)
 
@@ -464,13 +472,6 @@ summarytools::freq(CIDIA.items$cidia.diagnosis,
                    style = "rmarkdown")
 ```
 
-# Recode created variables as factors
-```{r recode restless/keyed up variable}
-CIDIA.items <- CIDIA.items %>% 
-  cidia.restless_on_edge_numeric
-```
-
-
 # Clean CIDIA dataset
 
 ```{r clean CIDIA dataframe}
@@ -519,6 +520,8 @@ CIDIA.clean <- CIDIA.items %>%
         cidia.criterion_C_score_numeric,
         cidia.criterion_C_score_numeric.NA,
         cidia.criterion_D_numeric,
+        cidia.restless_on_edge,
+        cidia.restless_on_edge_numeric,
         cidia.diagnosis,
         cidia.diagnosis_numeric)
 
