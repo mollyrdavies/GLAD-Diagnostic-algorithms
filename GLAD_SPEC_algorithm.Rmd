@@ -123,7 +123,7 @@ summary(as.factor(SPEC.items$specific_phobia_screener_numeric_noNA))
 Applying the diagnostic algorithm to questionnaire responses
 ```{r diagnostic algorithm for specific phobia}
 SPEC.items <- SPEC.items %>% 
-  mutate(specific_phobia_any_numeric <-
+  mutate(specific_phobia_any_numeric =
            case_when(
 #No phobia
         #Criterion A (not met)
@@ -331,6 +331,7 @@ SPEC.items <- SPEC.items %>%
                          "0" = "No other phobia",
                          "1" = "Other phobia"))
 ```
+## NOTE: need to rename the following variables to have spec. infront of them for consistency environment_phobia_diagnosis_numeric, environment_phobia_diagnosis, animal_phobia_diagnosis_numeric, animal_phobia_diagnosis, blood_injection_phobia_diagnosis_numeric, blood_injection_phobia_diagnosis, other_phobia_diagnosis_numeric, other_phobia_diagnosis
 
 # Clean SPEC dataset
 ```{r clean SPEC dataframe}
@@ -362,6 +363,8 @@ SPEC.clean <- SPEC.items %>%
         spec.other_phobia_diagnosis,
         spec.diagnosis,
         spec.diagnosis_numeric)
+
+#from environment_phobia_diagnosis_numeric onwards missing .spec in front of them 
 
 #Export data
 saveRDS(object = SPEC.clean, file = paste0(cleaned_path, "SPEC_cleaned.rds"))
