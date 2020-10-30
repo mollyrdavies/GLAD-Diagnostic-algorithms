@@ -266,8 +266,6 @@ CIDIA.items <- CIDIA.items %>%
            case_when(
              cidia.most_days == "No" ~ 0,
              (cidia.more_than_one_thing == "No" & cidia.different_worries == "No") ~ 0,
-             #A. Excessive  anxiety  and  worry
-             (cidia.felt_worried == "Yes" | cidia.felt_worried_more == "Yes" | cidia.worry_stronger_than_others == "Yes") &
                #A. occurring  more  days  than not (frequency)
                cidia.most_days == "Yes" &
                #A. about a number of events or activities
@@ -294,15 +292,23 @@ freq(CIDIA.items$cidia.criterion_B_numeric)
 Create variable for restlessness or keyed up/on edge (which is a single symptom criterion in the DSM for GAD)
 ```{r variable for restless & keyed up/on edge (criterion C)}
 CIDIA.items <- CIDIA.items %>% 
-  mutate(cidia.restless_on_edge =
+  mutate(cidia.restless_on_edge_numeric =
            case_when(
              cidia.restless == "No" & cidia.on_edge == "No" ~ 0,
              cidia.restless == "Yes" | cidia.on_edge == "Yes" ~ 1
            ))
 
-summary(as.factor(CIDIA.items$cidia.restless_on_edge))
+summary(as.factor(CIDIA.items$cidia.restless_on_edge_numeric))
 
+# Recode as factor
+CIDIA.items <- CIDIA.items %>% 
+  mutate(cidia.restless_on_edge = 
+           recode_factor(cidia.restless_on_edge_numeric,
+                         "0" = "No",
+                         "1" = "Yes")
+         )
 ```
+
 
 Calculate anxiety symptoms 'score' (the number of criterion C symptoms endorsed)
 
@@ -321,8 +327,8 @@ C.  The  anxiety and  worry are  associated  with  three  (or more)  of the foll
 CIDIA.items$cidia.criterion_C_score_numeric<-0
 #Criterion C.1 - Restlessness or feeling keyed up or on edge
 CIDIA.items$cidia.criterion_C_score_numeric<-with(CIDIA.items, 
-                                    ifelse(!is.na(cidia.restless_on_edge) 
-                                           & cidia.restless_on_edge > 0, 
+                                    ifelse(!is.na(cidia.restless_on_edge_numeric) 
+                                           & cidia.restless_on_edge_numeric > 0, 
                                            cidia.criterion_C_score_numeric + 1, cidia.criterion_C_score_numeric))
 #Criterion C.2 - Being easily fatigued
 CIDIA.items$cidia.criterion_C_score_numeric<-with(CIDIA.items,
@@ -395,7 +401,7 @@ summary(as.factor(CIDIA.items$no.info))
 CIDIA.items$cidia.criterion_C_score_numeric.NA<-0
 
 CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items, 
-                                    ifelse(is.na(cidia.restless_on_edge), 
+                                    ifelse(is.na(cidia.restless_on_edge_numeric), 
                                            cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
 CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items,
@@ -453,7 +459,6 @@ freq(CIDIA.items$cidia.diagnosis_numeric)
 
 ```
 
-
 ```{r cidia.diagnosis recode}
 #Rename variable and recode
 CIDIA.items$cidia.diagnosis <- recode_factor(CIDIA.items$cidia.diagnosis_numeric,
@@ -467,7 +472,7 @@ summarytools::freq(CIDIA.items$cidia.diagnosis,
                    style = "rmarkdown")
 ```
 
-## Clean CIDIA dataset
+# Clean CIDIA dataset
 
 ```{r clean CIDIA dataframe}
 
@@ -515,6 +520,8 @@ CIDIA.clean <- CIDIA.items %>%
         cidia.criterion_C_score_numeric,
         cidia.criterion_C_score_numeric.NA,
         cidia.criterion_D_numeric,
+        cidia.restless_on_edge,
+        cidia.restless_on_edge_numeric,
         cidia.diagnosis,
         cidia.diagnosis_numeric)
 
