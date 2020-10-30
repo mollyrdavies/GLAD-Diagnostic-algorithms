@@ -109,22 +109,35 @@ The continuous variable consisted of months and years, which need to be added to
 #Visualise data
 summary(CIDIA.items$cidia.longest_period_worry_years)
 summary(CIDIA.items$cidia.longest_period_worry_months)
+
 #Convert months to years
 CIDIA.items$cidia.longest_period_worry_months.years <- CIDIA.items$cidia.longest_period_worry_months/12
-#Set value for months or years variable to zero if the other contains a value
+
+#Set value for 'months as years' variable to zero if the other contains a value
 CIDIA.months.years<-data.frame(cbind(CIDIA.items$cidia.longest_period_worry_months.years, CIDIA.items$cidia.longest_period_worry_years))
 names(CIDIA.months.years)<-c("cidia.longest_period_worry_months.years", "cidia.longest_period_worry_years")
-CIDIA.months.years<-CIDIA.months.years%>%
+
+#Recode 'months as years' variable to 0 if years variable has a value 
+CIDIA.months.years<-CIDIA.months.years %>%
   mutate(cidia.longest_period_worry_months.years =
-           if_else(is.na(cidia.longest_period_worry_months.years) & is.na(cidia.longest_period_worry_years), NA_real_,
-                   if_else(is.na(cidia.longest_period_worry_months.years) & !is.na(cidia.longest_period_worry_years), 0, cidia.longest_period_worry_months.years)),
+           case_when(
+             is.na(cidia.longest_period_worry_months.years) & is.na(cidia.longest_period_worry_years) ~ NA_real_,
+             is.na(cidia.longest_period_worry_months.years) & !is.na(cidia.longest_period_worry_years) ~ 0,
+             !is.na(cidia.longest_period_worry_months.years) ~ cidia.longest_period_worry_months.years
+           ),
          cidia.longest_period_worry_years = 
-           if_else(is.na(cidia.longest_period_worry_years) & is.na(cidia.longest_period_worry_months.years), NA_real_,
-                   if_else(is.na(cidia.longest_period_worry_years) & !is.na(cidia.longest_period_worry_months.years), 0, cidia.longest_period_worry_years)))
+           case_when(
+             is.na(cidia.longest_period_worry_years) & is.na(cidia.longest_period_worry_months.years) ~ NA_real_,
+             is.na(cidia.longest_period_worry_years) & !is.na(cidia.longest_period_worry_months.years) ~ 0, 
+             !is.na(cidia.longest_period_worry_years) ~ cidia.longest_period_worry_years))
+         
 #Combine month & year values for total time of longest period of worry
 CIDIA.items$cidia.longest_period_worry_combined.unc <- rowSums(cbind(CIDIA.months.years$cidia.longest_period_worry_months.years, CIDIA.months.years$cidia.longest_period_worry_years))
+
 #Round the new variable
 CIDIA.items$cidia.longest_period_worry_combined <- round(CIDIA.items$cidia.longest_period_worry_combined.unc, digits = 2)
+
+#Summarise new variable
 summary(CIDIA.items$cidia.longest_period_worry_combined)
 ```
 
@@ -497,8 +510,11 @@ CIDIA.clean <- CIDIA.items %>%
         cidia.tense_muscles_numeric,
         cidia.trouble_sleeping_numeric,
         cidia.functioning_numeric, 
-        cidia.criterion_A_score_numeric,
-        cidia.criterion_A_score_numeric.NA,
+        cidia.criterion_A_numeric,
+        cidia.criterion_B_numeric,
+        cidia.criterion_C_score_numeric,
+        cidia.criterion_C_score_numeric.NA,
+        cidia.criterion_D_numeric,
         cidia.diagnosis,
         cidia.diagnosis_numeric)
 
