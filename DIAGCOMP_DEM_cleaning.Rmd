@@ -5,6 +5,8 @@ date: "30/10/2020"
 output: html_document
 ---
 
+Demographics (DEM) cleaning script for the GLAD Study data utilised in Davies et al (in prep).
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -18,14 +20,8 @@ Clear workspace
 
 ```{r load packages}
 library(tidyverse)
-#library(car)
 library(psych)
-#library(lubridate)
-#library(broom)
-#library(ggfortify)
 library(summarytools)
-#library(ggformula)
-#library(data.table)
 ```
 
 ```{r source path for reading/saving data}
