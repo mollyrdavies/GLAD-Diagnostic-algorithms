@@ -54,7 +54,7 @@ CIDID.items <- CIDID.cc %>%
          cidid.trouble_concentrating, 
          cidid.thoughts_of_death, 
          cidid.functioning, 
-         cidid.adverse_life_event,
+         cidid.adverse_life_event, #Not used in algorithm
          cidid.low_mood_numeric,
          cidid.anhedonia_numeric,
          cidid.how_long_numeric, 
@@ -67,7 +67,7 @@ CIDID.items <- CIDID.cc %>%
          cidid.trouble_concentrating_numeric, 
          cidid.thoughts_of_death_numeric, 
          cidid.functioning_numeric, 
-         cidid.adverse_life_event_numeric
+         cidid.adverse_life_event_numeric #Not used in algorithm
          )
 ```
 
