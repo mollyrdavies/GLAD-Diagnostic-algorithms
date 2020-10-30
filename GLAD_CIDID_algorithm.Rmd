@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Clear workspace
 ```{r clear workspace}
-rm(list = ls())
+#rm(list = ls())
 ```
 
 ```{r load packages}
@@ -275,14 +275,19 @@ Future considerations: If a participant has an NA in this score but was far from
 ```{r variable for missingness}
 #Missing responses/no information on core symptoms
 CIDID.items$no.info<-0
-#+1 to missingness score if either duration, frequency, or functioning criteria have missing values
+#+1 to missingness score if duration has missing value
 CIDID.items$no.info <- with(CIDID.items,
-                               ifelse(is.na(cidid.how_long) |
-                                        is.na(cidid.how_often) |
-                                        is.na(cidid.functioning),
-                                      no.info + 1, 0
-                                                )
-                                      )
+                               ifelse(is.na(cidid.how_long),
+                                      no.info + 1, no.info))
+#+1 to missingness score if frequency has missing value
+CIDID.items$no.info <- with(CIDID.items,
+                               ifelse(is.na(cidid.how_often),
+                                      no.info + 1, no.info))
+#+1 to missingness score if functioning criteria has missing value
+CIDID.items$no.info <- with(CIDID.items,
+                               ifelse(is.na(cidid.functioning),
+                                      no.info + 1, no.info))
+
 summary(as.factor(CIDID.items$no.info))
 ```
 
@@ -343,7 +348,7 @@ CIDID.items <- CIDID.items %>%
              cidid.criterion_A_score_numeric == 1 & cidid.criterion_A_score_numeric.NA > 3 ~ NA_real_,
              cidid.screener_numeric == 1 & cidid.criterion_A_score_numeric == 0 & cidid.criterion_A_score_numeric.NA > 4 ~ NA_real_,
           #Ppts are coded NA if they met screening criteria but didn't respond to at least one of the other criteria
-             cidid.screener_numeric == 1 & no.info >0 ~ NA_real_,
+             cidid.screener_numeric == 1 & no.info > 0 ~ NA_real_,
           #Ppts are coded 0 if they don't meet screening criteria
              cidid.screener_numeric == 0 ~ 0,
           #Ppts are coded 0 if they meet screening criteria but don't meet at least one of the other criteria
