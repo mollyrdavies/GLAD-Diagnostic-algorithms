@@ -123,7 +123,7 @@ summary(as.factor(SPEC.items$specific_phobia_screener_numeric_noNA))
 Applying the diagnostic algorithm to questionnaire responses
 ```{r diagnostic algorithm for specific phobia}
 SPEC.items <- SPEC.items %>% 
-  mutate(specific_phobia_any_numeric <-
+  mutate(specific_phobia_any_numeric =
            case_when(
 #No phobia
         #Criterion A (not met)
@@ -252,7 +252,7 @@ SPEC.items$spec.diagnosis_numeric <- SPEC.items$specific_phobia_any_numeric
 ```{r individual specific phobia variables}
 #Environmental phobia
 SPEC.items <- SPEC.items %>% 
-  mutate(environment_phobia_diagnosis_numeric = 
+  mutate(spec.environment_phobia_diagnosis_numeric = 
            case_when(
              spec.environment_phobia == "Yes" & spec.diagnosis_numeric == 1 ~ 0,
              spec.environment_phobia == "No" & spec.diagnosis_numeric == 1 ~ 0,
@@ -262,13 +262,13 @@ SPEC.items <- SPEC.items %>%
            ))
 ## Recode factor
 SPEC.items <- SPEC.items %>% 
-  mutate(environment_phobia_diagnosis =
-           recode_factor(environment_phobia_diagnosis_numeric,
+  mutate(spec.environment_phobia_diagnosis =
+           recode_factor(spec.environment_phobia_diagnosis_numeric,
                          "0" = "No environment phobia",
                          "1" = "Environment phobia"))
 #Situational phobia
 SPEC.items <- SPEC.items %>% 
-  mutate(situation_phobia_diagnosis_numeric = 
+  mutate(spec.situation_phobia_diagnosis_numeric = 
            case_when(
              spec.situation_phobia == "Yes" & spec.diagnosis_numeric == 1 ~ 0,
              spec.situation_phobia == "No" & spec.diagnosis_numeric == 1 ~ 0,
@@ -278,13 +278,13 @@ SPEC.items <- SPEC.items %>%
            ))
 ## Recode factor
 SPEC.items <- SPEC.items %>% 
-  mutate(situation_phobia_diagnosis =
-           recode_factor(situation_phobia_diagnosis_numeric,
+  mutate(spec.situation_phobia_diagnosis =
+           recode_factor(spec.situation_phobia_diagnosis_numeric,
                          "0" = "No situation phobia",
                          "1" = "Situation phobia"))
 #Animal phobia
 SPEC.items <- SPEC.items %>% 
-  mutate(animal_phobia_diagnosis_numeric = 
+  mutate(spec.animal_phobia_diagnosis_numeric = 
            case_when(
              spec.animal_phobia == "Yes" & spec.diagnosis_numeric == 1 ~ 0,
              spec.animal_phobia == "No" & spec.diagnosis_numeric == 1 ~ 0,
@@ -294,13 +294,13 @@ SPEC.items <- SPEC.items %>%
            ))
 ## Recode factor
 SPEC.items <- SPEC.items %>% 
-  mutate(animal_phobia_diagnosis =
-           recode_factor(animal_phobia_diagnosis_numeric,
+  mutate(spec.animal_phobia_diagnosis =
+           recode_factor(spec.animal_phobia_diagnosis_numeric,
                          "0" = "No animal phobia",
                          "1" = "Animal phobia"))
 #Blood injection phobia
 SPEC.items <- SPEC.items %>% 
-  mutate(blood_injection_phobia_diagnosis_numeric = 
+  mutate(spec.blood_injection_phobia_diagnosis_numeric = 
            case_when(
              spec.blood_injection_phobia == "Yes" & spec.diagnosis_numeric == 1 ~ 0,
              spec.blood_injection_phobia == "No" & spec.diagnosis_numeric == 1 ~ 0,
@@ -310,13 +310,13 @@ SPEC.items <- SPEC.items %>%
            ))
 ## Recode factor
 SPEC.items <- SPEC.items %>% 
-  mutate(blood_injection_phobia_diagnosis =
-           recode_factor(blood_injection_phobia_diagnosis_numeric,
+  mutate(spec.blood_injection_phobia_diagnosis =
+           recode_factor(spec.blood_injection_phobia_diagnosis_numeric,
                          "0" = "No blood or injection phobia",
                          "1" = "Blood or injection phobia"))
 #Other phobia
 SPEC.items <- SPEC.items %>% 
-  mutate(other_phobia_diagnosis_numeric = 
+  mutate(spec.other_phobia_diagnosis_numeric = 
            case_when(
              spec.other_phobia == "Yes" & spec.diagnosis_numeric == 1 ~ 0,
              spec.other_phobia == "No" & spec.diagnosis_numeric == 1 ~ 0,
@@ -326,8 +326,8 @@ SPEC.items <- SPEC.items %>%
            ))
 ## Recode factor
 SPEC.items <- SPEC.items %>% 
-  mutate(other_phobia_diagnosis =
-           recode_factor(other_phobia_diagnosis_numeric,
+  mutate(spec.other_phobia_diagnosis =
+           recode_factor(spec.other_phobia_diagnosis_numeric,
                          "0" = "No other phobia",
                          "1" = "Other phobia"))
 ```
