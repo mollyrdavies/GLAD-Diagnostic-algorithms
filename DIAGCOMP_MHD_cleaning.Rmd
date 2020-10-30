@@ -14,6 +14,20 @@ The MHD dataset includes all single-item diagnoses.
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Set up
+
+Clear workspace
+```{r clear workspace}
+#rm(list = ls())
+```
+
+```{r load packages}
+library(tidyverse)
+library(psych)
+library(summarytools)
+```
+
+# Load data
 
 ```{r source path for reading/saving data}
 #Source raw data directory (raw_path) & clean data export directory (cleaned_path)
@@ -28,6 +42,8 @@ MHD.cc <- read_rds(MHD_file)
 #Visualise
 head(MHD.cc)
 ```
+
+# Clean data
 
 ```{r select MHD variables}
 #Select variables
@@ -64,6 +80,7 @@ MHD.items[MHD.items == "Prefer not to answer"] <- NA
 MHD.items[MHD.items == "Seen but not answered"] <- NA
 ```
 
+# Export clean dataset
 
 ```{r select MHD variables}
 #Select variables
