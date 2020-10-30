@@ -198,7 +198,7 @@ If the participant reports either anxiety or worry but doesn't report symptoms l
 Create variable for worry and duration screen
 ```{r variable for worry and duration screener}
 CIDIA.items <- CIDIA.items %>% 
-  mutate(cidia.screener_numeric_test = 
+  mutate(cidia.screener_numeric = 
            case_when(
              cidia.felt_worried == "No" & cidia.felt_worried_more == "No" 
              ~ 0,
@@ -445,7 +445,7 @@ summarytools::freq(CIDIA.items$cidia.diagnosis,
 ```
 
 ## Clean CIDIA dataset
-
+## NOTE: variables cidia.criterion_A_score_numeric and cidia.criterion_A_score_numeric.NA were not created and are missing. There is cidia.criterion_A_numeric? But not NA variable 
 ```{r clean CIDIA dataframe}
 
 CIDIA.clean <- CIDIA.items %>%
