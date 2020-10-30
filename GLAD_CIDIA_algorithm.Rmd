@@ -451,10 +451,12 @@ CIDIA.items <- CIDIA.items %>%
              cidia.screener_numeric == 1 & (cidia.criterion_C_score_numeric == 0 & cidia.criterion_C_score_numeric.NA > 2) ~ NA_real_,
              #Ppts are coded NA if they met screening criteria but didn't respond to at least one of the other criteria
              cidia.screener_numeric == 1 & no.info > 0 ~ NA_real_,
+             #Ppts are coded 0 if they don't meet one of the core criteria
              cidia.criterion_A_numeric == 0 |
                cidia.criterion_B_numeric == 0 |
                cidia.criterion_C_score_numeric < 3 |
                cidia.criterion_D_numeric == 0 ~ 0,
+             #Ppts are coded 1 if they meet all DSM-5 GAD criteria
              cidia.screener_numeric == 1 &
                cidia.criterion_A_numeric == 1 &
                cidia.criterion_B_numeric == 1 &
