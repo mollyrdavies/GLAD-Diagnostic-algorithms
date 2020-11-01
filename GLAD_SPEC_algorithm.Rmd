@@ -100,7 +100,8 @@ If participants answer 'No' to all phobias in criterion A, then they are given a
 
 If participants answer 'Yes' to any phobia in criterion A but report frequency of these fears as "Never", "Only one or two times ever", or "Some of the time", then they are given a 0 for diagnosis and skip the remaining questions.
 
-Calculate specific phobias count 'score' (the number of phobias endorsed)
+
+Criterion A. Calculate specific phobias count 'score' (the number of phobias endorsed)
 ```{r phobias count score screener}
 #Create score for number of phobias endorsed
 #Do NOT use 'is.na' for these as then you cannot +1 to it. Use the no.info item for NA (below).
@@ -135,16 +136,17 @@ SPEC.items$spec.phobias_count_numeric<-with(SPEC.items,
 freq(SPEC.items$spec.phobias_count_numeric)
 ```
 
+Criterion A and B screener variable.
 ```{r specific phobia screener}
 #Criterion A screening variable
 SPEC.items <- SPEC.items %>% 
   mutate(specific_phobia_screener_numeric = 
            case_when(
-             spec.environment_phobia == "No" & spec.situation_phobia == "No" & spec.animal_phobia == "No" & spec.blood_injection_phobia == "No" & spec.other_phobia == "No" ~ 0,
-             !is.na(spec.phobia_frequency) & (spec.phobia_frequency == "Never" | spec.phobia_frequency == "Only one or two times ever" | spec.phobia_frequency == "Some of the time") ~ 0,
-             spec.environment_phobia == "Yes" | spec.situation_phobia == "Yes" | spec.animal_phobia == "Yes" | spec.blood_injection_phobia == "Yes" | spec.other_phobia == "Yes" & (spec.phobia_frequency == "Almost always" | spec.phobia_frequency == "Always") ~ 1,
+             spec.phobias_count_numeric == 0 ~ 0,
+             spec.phobias_count_numeric > 0 & (spec.phobia_frequency == "Never" | spec.phobia_frequency == "Only one or two times ever" | spec.phobia_frequency == "Some of the time") ~ 0,
+             spec.phobias_count_numeric > 0 & (spec.phobia_frequency == "Almost always" | spec.phobia_frequency == "Always") ~ 1,
              is.na(spec.environment_phobia) & is.na(spec.situation_phobia) & is.na(spec.animal_phobia) & is.na(spec.blood_injection_phobia) & is.na(spec.other_phobia) ~ NA_real_,
-             (spec.environment_phobia == "Yes" | spec.situation_phobia == "Yes" | spec.animal_phobia == "Yes" | spec.blood_injection_phobia == "Yes" | spec.other_phobia == "Yes") | is.na(spec.phobia_frequency) ~ NA_real_
+             spec.phobias_count_numeric > 0 & is.na(spec.phobia_frequency) ~ NA_real_
            ))
 
 #Criterion A screening variable (NA coded as 0)
