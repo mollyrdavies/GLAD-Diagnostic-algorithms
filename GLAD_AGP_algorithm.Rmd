@@ -83,7 +83,6 @@ AGP.items[AGP.items == "Seen but not answered"] <- NA
 AGP.items[AGP.items == -88] <- NA
 AGP.items[AGP.items == -99] <- NA
 AGP.items[AGP.items == -77] <- NA
-names(AGP.items)<-gsub("AGP.cc.", "", names(AGP.items))
 ```
 
 ## DSM-5 Agoraphobia diagnostic criteria
@@ -279,9 +278,10 @@ summary(as.factor(AGP.items$no.info))
 AGP.items <- AGP.items %>% 
   mutate(agp.diagnosis_numeric = 
            case_when(
-             #Code as NA for missingness
+             #Code as NA for missingness in screener that may have affected diagnosis
              agp.feared_situations == 1 & agp.feared_situations.NA == 1 ~ NA_real_,
              agp.feared_situations < 2 & agp.feared_situations.NA >= 2 ~ NA_real_,
+             #Code as NA for missingness in core symptoms if screeners were met (screeners already accounted for in no.info variable)
              no.info > 0 ~ NA_real_,
              #If participant wouldn't have met screener despite NA, code diagnosis as 0
              agp.feared_situations == 0 & agp.feared_situations.NA == 1 ~ 0,
