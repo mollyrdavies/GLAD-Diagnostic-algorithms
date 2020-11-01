@@ -277,39 +277,6 @@ SPEC.items <- SPEC.items %>%
 freq(SPEC.items$specific_phobia_any_numeric)
 ```
 
-Ppts are coded NA if they didn't respond to questions that could have met diagnostic criteria.
-```{r recode any phobia missingness as NA}
-#Frequencies before accounting for missingness
-freq(SPEC.items$specific_phobia_any_numeric)
-
-#Recode as NA for missingness
-SPEC.items$specific_phobia_any_numeric <- with(SPEC.items,
-                                       ifelse(
-                                         spec.specific_phobia_screen.calc.NA == 1 | 
-                                           spec.specific_phobia_symptoms.calc.NA > 0,
-                                         NA, specific_phobia_any_numeric
-                                       ))
-
-#Frequencies after accounting for missingness
-freq(SPEC.items$specific_phobia_any_numeric)
-
-```
-
-An extra check is completed below to ensure that no participants that didn't meet screening criteria were coded as NA.
-```{r recode any phobia as 0 if didn't meet screening criteria}
-SPEC.items$specific_phobia_any_numeric <- with(SPEC.items,
-                                    ifelse((!is.na(spec.environment_phobia) & spec.environment_phobia == "No" & 
-                                             !is.na(spec.situation_phobia) & spec.situation_phobia == "No" & 
-                                             !is.na(spec.animal_phobia) & spec.animal_phobia == "No" &
-                                             !is.na(spec.blood_injection_phobia) & spec.blood_injection_phobia == "No" & 
-                                             !is.na(spec.other_phobia) & spec.other_phobia == "No"), 0, specific_phobia_any_numeric))
-
-
-#Get frequencies
-freq(SPEC.items$specific_phobia_any_numeric)
-
-```
-
 ```{r recode any phobia as a factor}
 #Recode any phobia variable and change variable name
 SPEC.items$spec.diagnosis <- recode_factor(SPEC.items$specific_phobia_any_numeric,
