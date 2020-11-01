@@ -110,27 +110,27 @@ SPEC.items$spec.phobias_count_numeric <- 0
 #Environmental phobia
 SPEC.items$spec.phobias_count_numeric<-with(SPEC.items,
                                                     ifelse(
-                                                      spec.environment_phobia == "Yes", 
+                                                      spec.environment_phobia %in% "Yes", 
                                                       spec.phobias_count_numeric + 1, spec.phobias_count_numeric))
 #Situation phobia
 SPEC.items$spec.phobias_count_numeric<-with(SPEC.items,
                                                     ifelse(
-                                                      spec.situation_phobia == "Yes", 
+                                                      spec.situation_phobia %in% "Yes", 
                                                       spec.phobias_count_numeric + 1, spec.phobias_count_numeric))
 #Animal phobia
 SPEC.items$spec.phobias_count_numeric<-with(SPEC.items,
                                                     ifelse(
-                                                      spec.animal_phobia == "Yes", 
+                                                      spec.animal_phobia %in% "Yes", 
                                                       spec.phobias_count_numeric + 1, spec.phobias_count_numeric))
 #Blood or injection phobia
 SPEC.items$spec.phobias_count_numeric<-with(SPEC.items,
                                                     ifelse(
-                                                      spec.blood_injection_phobia == "Yes", 
+                                                      spec.blood_injection_phobia %in% "Yes", 
                                                       spec.phobias_count_numeric + 1, spec.phobias_count_numeric))
 #Other phobia
 SPEC.items$spec.phobias_count_numeric<-with(SPEC.items,
                                                     ifelse(
-                                                      spec.other_phobia == "Yes", 
+                                                      spec.other_phobia %in% "Yes", 
                                                       spec.phobias_count_numeric + 1, spec.phobias_count_numeric))
 
 freq(SPEC.items$spec.phobias_count_numeric)
@@ -149,13 +149,7 @@ SPEC.items <- SPEC.items %>%
              spec.phobias_count_numeric > 0 & is.na(spec.phobia_frequency) ~ NA_real_
            ))
 
-#Criterion A screening variable (NA coded as 0)
-## This variable is created to remove NAs solely for the purpose of coding the variable in the following chunk (spec.specific_phobia_screen.calc.NA)
-SPEC.items$specific_phobia_screener_numeric_noNA <- with(SPEC.items,
-                                        ifelse(is.na(specific_phobia_screener_numeric), 0, specific_phobia_screener_numeric))
-
 summary(as.factor(SPEC.items$specific_phobia_screener_numeric))
-summary(as.factor(SPEC.items$specific_phobia_screener_numeric_noNA))
 ```
 
 ## Missingness
@@ -203,15 +197,14 @@ freq(SPEC.items$spec.phobias_NA_count_numeric)
 
 ```{r specific phobia screeners NA count score}
 SPEC.items$spec.specific_phobia_screen.calc.NA<-0
-#If any criterion A (screening criteria) are NA (and diagnostic status is 0)
+#+1 if criterion A (number of phobias) is 0 and has more than one NA
 SPEC.items$spec.specific_phobia_screen.calc.NA<-with(SPEC.items, 
                                     ifelse(
-                                      (specific_phobia_any_numeric == 0 | is.na(specific_phobia_any_numeric)) & 
-                                        (is.na(spec.environment_phobia) | is.na(spec.situation_phobia) | is.na(spec.animal_phobia) | is.na(spec.blood_injection_phobia) | is.na(spec.other_phobia)), 
+                                      (spec.phobias_count_numeric == 0 & spec.phobias_NA_count_numeric > 0), 
                                            spec.specific_phobia_screen.calc.NA + 1, spec.specific_phobia_screen.calc.NA))
 #If criterian B (almost always provoking fear) is NA, but criterion A was met
 SPEC.items$spec.specific_phobia_screen.calc.NA<-with(SPEC.items,
-                                    ifelse(specific_phobia_screener_numeric_noNA == 1 & is.na(spec.phobia_frequency),
+                                    ifelse(spec.phobias_count_numeric > 0 & is.na(spec.phobia_frequency),
                                            spec.specific_phobia_screen.calc.NA + 1, spec.specific_phobia_screen.calc.NA))
 
 summary(as.factor(SPEC.items$spec.specific_phobia_screen.calc.NA))
@@ -226,16 +219,16 @@ Future considerations: If a participant has an NA in this score but was far from
 SPEC.items$spec.specific_phobia_symptoms.calc.NA<-0
 #If criterion D is NA
 SPEC.items$spec.specific_phobia_symptoms.calc.NA<-with(SPEC.items, 
-                                    ifelse(specific_phobia_screener_numeric_noNA == 1 & is.na(spec.phobia_out_of_proportion), 
+                                    ifelse(specific_phobia_screener_numeric %in% 1 & is.na(spec.phobia_out_of_proportion), 
                                            spec.specific_phobia_symptoms.calc.NA + 1, spec.specific_phobia_symptoms.calc.NA))
 
 #If criterion F (functional impairment) is NA
 SPEC.items$spec.specific_phobia_symptoms.calc.NA<-with(SPEC.items,
-                                    ifelse(specific_phobia_screener_numeric_noNA == 1 & is.na(spec.phobia_interfered),
+                                    ifelse(specific_phobia_screener_numeric %in% 1 & is.na(spec.phobia_interfered),
                                            spec.specific_phobia_symptoms.calc.NA + 1, spec.specific_phobia_symptoms.calc.NA))
 #If both items for criterion C (avoid or endure) are NA
 SPEC.items$spec.specific_phobia_symptoms.calc.NA<-with(SPEC.items, 
-                                    ifelse(specific_phobia_screener_numeric_noNA == 1 & is.na(spec.avoid_phobias) & is.na(spec.endure_phobias_with_anxiety), 
+                                    ifelse(specific_phobia_screener_numeric %in% 1 & is.na(spec.avoid_phobias) & is.na(spec.endure_phobias_with_anxiety), 
                                            spec.specific_phobia_symptoms.calc.NA + 1, spec.specific_phobia_symptoms.calc.NA))
 
 summary(as.factor(SPEC.items$spec.specific_phobia_symptoms.calc.NA))
@@ -248,26 +241,30 @@ Applying the diagnostic algorithm to questionnaire responses
 SPEC.items <- SPEC.items %>% 
   mutate(specific_phobia_any_numeric =
            case_when(
+#Ppts are coded NA if they didn't respond to the screening questions, or had "No" in one screening question and NA in the other
+             spec.specific_phobia_screen.calc.NA > 0 ~ NA_real_,
+#Ppts are coded NA if they didn't respond to symptom questions that may have met diagnostic criteria
+             specific_phobia_screener_numeric > 0 & spec.specific_phobia_symptoms.calc.NA > 0 ~ NA_real_,
 #No phobia
         #Criterion A (not met)
-             (spec.environment_phobia == "No" & spec.situation_phobia == "No" & spec.animal_phobia == "No" & spec.blood_injection_phobia == "No" & spec.other_phobia == "No") |
+             spec.phobias_count_numeric == 0 |
         #Criterion E. Frequency (not met)
-          (spec.phobia_frequency == "Never" | spec.phobia_frequency == "Only one or two times ever" | spec.phobia_frequency == "Some of the time") |
+             (spec.phobia_frequency == "Never" | spec.phobia_frequency == "Only one or two times ever" | spec.phobia_frequency == "Some of the time") |
         #Criterion D. Out of proportion (not met)
-          spec.phobia_out_of_proportion == "No" | 
+             spec.phobia_out_of_proportion == "No" | 
         #Criterion E. Duration (not met)
-          (spec.phobia_lasted == "Less than 6 months") | 
+             (spec.phobia_lasted == "Less than 6 months") | 
         #Criterion F. Functional impairment (not met)
-          (spec.phobia_interfered == "Not at all" | spec.phobia_interfered == "A little") | 
+             (spec.phobia_interfered == "Not at all" | spec.phobia_interfered == "A little") | 
         #Criterion C. Avoid or endure (not met)
-          (spec.avoid_phobias == "No" & spec.endure_phobias_with_anxiety == "No") ~ 0, 
+             (spec.avoid_phobias == "No" & spec.endure_phobias_with_anxiety == "No") ~ 0, 
 #Any phobia
         #Criterion A
-             (spec.environment_phobia == "Yes" | spec.situation_phobia == "Yes" | spec.animal_phobia == "Yes" | spec.blood_injection_phobia == "Yes" | spec.other_phobia == "Yes") &
+                (spec.environment_phobia == "Yes" | spec.situation_phobia == "Yes" | spec.animal_phobia == "Yes" | spec.blood_injection_phobia == "Yes" | spec.other_phobia == "Yes") &
         #Criterion E. Frequency
-          (spec.phobia_frequency == "Almost always" | spec.phobia_frequency == "Always") & 
+             (spec.phobia_frequency == "Almost always" | spec.phobia_frequency == "Always") & 
         #Criterion D. Out of proportion
-          spec.phobia_out_of_proportion == "Yes" &
+             spec.phobia_out_of_proportion == "Yes" &
         #Criterion E. Duration
       (spec.phobia_lasted == "6 - 12 months" | spec.phobia_lasted == "1 - 5 years" | spec.phobia_lasted == "5+ years" 
        | spec.phobia_lasted == "All my life") & 
