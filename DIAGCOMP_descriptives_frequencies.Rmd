@@ -1,0 +1,362 @@
+---
+title: "DIAGCOMP_descriptives_frequencies"
+author: "Molly Davies"
+date: "30/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set up
+```{r install packages}
+
+#install.packages("reshape2")
+#install.packages("tidyverse")
+#install.packages("knitr")
+#install.packages("kableExtra")
+#install.packages("descr")
+#install.packages("caret")
+#install.packages("irr")
+#install.packages("hablar")
+#install.packages("patchwork")
+#install.packages("car")
+#install.packages("ggpubr")
+
+```
+
+```{r import packages}
+library(descr)
+library(summarytools)
+library(tidyverse)
+```
+
+```{r source file paths}
+source("../GLAD_data_path.R")
+```
+
+```{r read data}
+dat.cc <- read_rds(paste0(cleaned_path, "combined_cleaned_new_variables.rds"))
+```
+
+```{r visualise dataset}
+dim(dat.cc)
+head(dat.cc)
+```
+
+# Demographics of GLAD sample
+
+## Mean age
+
+```{r mean age}                        
+mean(dat.cc$age, na.rm = T)
+```
+
+## Sex frequencies
+
+```{r sex freq}                        
+freq(dat.cc$sex)
+```
+
+## Ethnicity frequencies
+
+```{r ethnicity freq}
+freq(dat.cc$Ethnicity)
+```
+
+## Highest Education frequencies
+
+```{r higher education freq}
+freq(dat.cc$Highest.Education)
+```
+
+# Diagnosis: Frequencies and proportions
+Frequencies of diagnoses calculated for participants with values in BOTH single-item and algorithm-based diagnosis per disorder.
+Participants with NAs for one measure were excluded for that diagnosis.
+
+# Get frequencies for each diagnosis, excluding NAs per disorder
+
+```{r MDD frequencies}
+#Algorithm-based MDD frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.MDD) & !is.na(cidid.diagnosis)) %>%
+  summarytools::freq(cidid.diagnosis, report.NAs = T) 
+
+#Single-item MDD frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.MDD) & !is.na(cidid.diagnosis)) %>%
+  summarytools::freq(mhd.MDD)
+
+```
+
+```{r Any Anxiety frequencies}
+#Algorithm-based any anxiety frequencies
+dat.cc %>% 
+  filter(!is.na(LifetimeAnyAnx) & !is.na(ClinicianAnyAnx)) %>%
+  summarytools::freq(LifetimeAnyAnx)
+
+#Single-item any anxiety frequencies
+dat.cc %>% 
+  filter(!is.na(LifetimeAnyAnx) & !is.na(ClinicianAnyAnx)) %>%
+  summarytools::freq(ClinicianAnyAnx)
+
+```
+
+```{r GAD frequencies}
+#Algorithm-based GAD frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.GAD) & !is.na(cidia.diagnosis)) %>%
+  summarytools::freq(cidia.diagnosis)
+
+#Single-item GAD frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.GAD) & !is.na(cidia.diagnosis)) %>%
+  summarytools::freq(mhd.GAD)
+
+```
+
+```{r Specific phobia frequencies}
+#Algorithm-based specific phobia frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.specific_phobia) & !is.na(spec.diagnosis)) %>%
+  summarytools::freq(spec.diagnosis)
+
+#Single-item specific phobia frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.specific_phobia) & !is.na(spec.diagnosis)) %>%
+  summarytools::freq(mhd.specific_phobia)
+```
+
+```{r Social anxiety disorder frequencies}
+#Algorithm-based social anxiety frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.social_anxiety) & !is.na(socp.diagnosis)) %>%
+  summarytools::freq(socp.diagnosis)
+
+#Single-item social anxiety frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.social_anxiety) & !is.na(socp.diagnosis)) %>%
+  summarytools::freq(mhd.social_anxiety)
+
+```
+
+```{r Panic disorder frequencies}
+#Algorithm-based panic disorder frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.panic_disorder) & !is.na(pad.diagnosis)) %>%
+  summarytools::freq(pad.diagnosis)
+
+#Single-item panic disorder frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.panic_disorder) & !is.na(pad.diagnosis)) %>%
+  summarytools::freq(mhd.panic_disorder)
+
+```
+
+```{r Panic Attacks vs Lifetime Panic disorder frequencies}
+#Single-item panic attacks frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.panic_attacks) & !is.na(mhd.panic_disorder) & !is.na(pad.diagnosis)) %>%
+  summarytools::freq(mhd.panic_attacks)
+
+```
+
+```{r Agoraphobia frequencies}
+#Algorithm-based agoraphobia frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.agoraphobia) & !is.na(agp.diagnosis)) %>%
+  summarytools::freq(agp.diagnosis)
+
+#Single-item agoraphobia frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.agoraphobia) & !is.na(agp.diagnosis)) %>%
+  summarytools::freq(mhd.agoraphobia)
+```
+
+
+# Number of diagnoses/comorbidities in sample
+Check the number of diagnoses in the sample to see:
+- N ppts with 0 diagnoses
+- N ppts with 1 diagnosis
+- N ppts with 2+ diagnoses
+
+## Single-item diagnoses (MDD + ANX)
+Note: Single-item panic disorder was added partway through data collection. The single-item count variable is therefore not coded as NA for panic disorder missingness to avoid excessive data loss.
+```{r create variable of N single-item diagnoses}
+#Sum all clinical diagnoses and remove NAs (except panic disorder, as this variable was included partway through data collection)
+cidi$selfreport_noPanic <- rowSums(cidi[,c("mhd.MDD_numeric", 
+                                           "mhd.GAD_numeric", 
+                                           "mhd.specific_phobia_numeric", 
+                                           "mhd.social_anxiety_numeric", 
+                                           "mhd.agoraphobia_numeric")], na.rm=FALSE)
+
+#Add panic only for particpants without NA in above variable
+cidi$selfreport.n <- with(cidi,
+                          ifelse(
+                            is.na(selfreport_noPanic), 
+                            NA, 
+                            rowSums(cidi[,c("selfreport_noPanic", 
+                                            "mhd.panic_disorder_numeric")], na.rm = TRUE)
+                                 )
+                          )
+freq(cidi$selfreport_noPanic)
+freq(cidi$selfreport.n)
+```
+
+```{r get N with 1+ or 2+ single-item diagnosis}
+#N with 1+ SR diagnosis
+table(cidi[,c("selfreport.n")]>0)
+
+#N with 2+ SR diagnoses
+table(cidi[,c("selfreport.n")]>1)
+
+```
+
+```{r get mean single-item diagnoses}
+
+mean(cidi$selfreport.n, na.rm = T)
+
+```
+
+# N anxiety diagnoses
+
+```{r get N with 1+ or 2+ single-item anxiety diagnosis}
+#N with 1+ SR diagnosis
+table(cidi[,c("anx_selfreport.n")]>0)
+
+#N with 2+ SR diagnoses
+table(cidi[,c("anx_selfreport.n")]>1)
+
+```
+
+```{r get mean single-item anxiety diagnoses}
+
+mean(cidi$anx_selfreport.n, na.rm = T)
+
+```
+
+## Lifetime diagnoses
+
+```{r create variable of N measure-based (lifetime) diagnoses}
+#Sum all lifetime diagnoses and include NAs (coded as 0)
+cidi$algorithm_based_count_numeric <- rowSums(cidi[,c("LifetimeDepression.n", "LifetimeGAD.n", "SpecificPhobia.n", "SocialPhobia.n", "PanicDisorder.n", "Agoraphobia.n")], na.rm=TRUE)
+
+#Check what it would be if the NAs were excluded
+cidi$lifetime_noNA.n <- rowSums(cidi[,c("LifetimeDepression.n", "LifetimeGAD.n", "SpecificPhobia.n", "SocialPhobia.n", "PanicDisorder.n", "Agoraphobia.n")], na.rm=FALSE)
+
+#Summarise
+summary(as.factor(cidi$algorithm_based_count_numeric))
+summary(as.factor(cidi$lifetime_noNA.n))
+
+```
+
+```{r NAs in measure-based outcomes}
+
+#Do NOT use 'is.na' for these as then you cannot +1 to it. Use the no.info item for NA (below). 
+cidi$lifetime_NA.n<-0
+
+#MDD
+cidi$lifetime_NA.n<-with(cidi, 
+                         ifelse(is.na(LifetimeDepression.n),
+                                lifetime_NA.n + 1, lifetime_NA.n))
+#GAD
+cidi$lifetime_NA.n<-with(cidi, 
+                         ifelse(is.na(LifetimeGAD.n),
+                                lifetime_NA.n + 1, lifetime_NA.n))
+#Specific phobia
+cidi$lifetime_NA.n<-with(cidi, 
+                         ifelse(is.na(SpecificPhobia.n),
+                                lifetime_NA.n + 1, lifetime_NA.n))
+#Social phobia
+cidi$lifetime_NA.n<-with(cidi, 
+                         ifelse(is.na(SocialPhobia.n),
+                                lifetime_NA.n + 1, lifetime_NA.n))
+#Panic disorder
+cidi$lifetime_NA.n<-with(cidi, 
+                         ifelse(is.na(PanicDisorder.n),
+                                lifetime_NA.n + 1, lifetime_NA.n))
+#Agoraphobia
+cidi$lifetime_NA.n<-with(cidi, 
+                         ifelse(is.na(Agoraphobia.n),
+                                lifetime_NA.n + 1, lifetime_NA.n))
+#Check distribution of scores
+summary(as.factor(cidi$lifetime_NA.n))
+
+
+```
+
+```{r get N with 1+ or 2+ lifetime diagnosis}
+
+#N with 1+ lifetime diagnosis
+table(cidi[,c("algorithm_based_count_numeric")]>0)
+
+#N with 2+ lifetime diagnoses
+table(cidi[,c("algorithm_based_count_numeric")]>1)
+
+```
+
+```{r get mean lifetime diagnoses}
+
+mean(cidi$algorithm_based_count_numeric, na.rm = T)
+
+```
+
+## Look at N lifetime diagnoses in participants with >=1 single-item diagnoses
+
+```{r subset participants with 1+ single-item diagnosis}
+#Subset
+selfreport_n1 <- subset(cidi, selfreport.n > 0)
+#Check correct number of participants
+nrow(selfreport_n1)
+
+
+```
+
+```{r get subset N with 0, 1 or 2+ lifetime diagnosis}
+
+#N with no lifetime diagnosis
+table(selfreport_n1[,c("lifetime_noNA.n")]==0)
+
+#N with 1 lifetime diagnosis
+table(selfreport_n1[,c("algorithm_based_count_numeric")]==1)
+
+#N with 2+ lifetime diagnoses
+table(selfreport_n1[,c("algorithm_based_count_numeric")]>1)
+
+```
+
+```{r get mean subset lifetime diagnoses}
+
+mean(selfreport_n1$algorithm_based_count_numeric, na.rm = T)
+
+```
+
+## Look at N single-item diagnoses in participants with >=1 lifetime diagnoses
+
+```{r subset participants with 1+ lifetime diagnosis}
+#Subset
+lifetime_n1 <- subset(cidi, algorithm_based_count_numeric > 0)
+#Check correct number of participants
+nrow(lifetime_n1)
+
+```
+
+```{r get subset N with 0, 1 or 2+ single-item diagnosis}
+
+#N with no lifetime diagnosis
+table(lifetime_n1[,c("selfreport.n")]==0)
+
+#N with 1 lifetime diagnosis
+table(lifetime_n1[,c("selfreport.n")]==1)
+
+#N with 2+ lifetime diagnoses
+table(lifetime_n1[,c("selfreport.n")]>1)
+
+```
+
+```{r get mean subset single-item diagnoses}
+
+mean(lifetime_n1$selfreport.n, na.rm = T)
+
+```
