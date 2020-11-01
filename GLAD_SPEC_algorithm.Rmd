@@ -165,20 +165,39 @@ If participants do not respond to one of the screening questions, then they are 
 
 For criterion B, NA is only counted if criterion A is 1 (since otherwise the question was not displayed).
 
-```{r specific phobias NA count score}
-SPEC.items$spec.specific_phobia_screen.calc.NA<-0
-#If any criterion A (screening criteria) are NA (and diagnostic status is 0)
-SPEC.items$spec.specific_phobia_screen.calc.NA<-with(SPEC.items, 
-                                    ifelse(
-                                      (specific_phobia_any_numeric == 0 | is.na(specific_phobia_any_numeric)) & 
-                                        (is.na(spec.environment_phobia) | is.na(spec.situation_phobia) | is.na(spec.animal_phobia) | is.na(spec.blood_injection_phobia) | is.na(spec.other_phobia)), 
-                                           spec.specific_phobia_screen.calc.NA + 1, spec.specific_phobia_screen.calc.NA))
-#If criterian B (almost always provoking fear) is NA, but criterion A was met
-SPEC.items$spec.specific_phobia_screen.calc.NA<-with(SPEC.items,
-                                    ifelse(specific_phobia_screener_numeric_noNA == 1 & is.na(spec.phobia_frequency),
-                                           spec.specific_phobia_screen.calc.NA + 1, spec.specific_phobia_screen.calc.NA))
 
-summary(as.factor(SPEC.items$spec.specific_phobia_screen.calc.NA))
+Criterion A missingness variable
+```{r phobias NA count score}
+#Missing responses/no information on phobias
+SPEC.items$spec.phobias_NA_count_numeric <- 0
+
+#Environmental phobia NA
+SPEC.items$spec.phobias_NA_count_numeric<-with(SPEC.items,
+                                                    ifelse(
+                                                      is.na(spec.environment_phobia), 
+                                                      spec.phobias_NA_count_numeric + 1, spec.phobias_NA_count_numeric))
+#Situation phobia
+SPEC.items$spec.phobias_NA_count_numeric<-with(SPEC.items,
+                                                    ifelse(
+                                                      is.na(spec.situation_phobia), 
+                                                      spec.phobias_NA_count_numeric + 1, spec.phobias_NA_count_numeric))
+#Animal phobia
+SPEC.items$spec.phobias_NA_count_numeric<-with(SPEC.items,
+                                                    ifelse(
+                                                      is.na(spec.animal_phobia), 
+                                                      spec.phobias_NA_count_numeric + 1, spec.phobias_NA_count_numeric))
+#Blood or injection phobia
+SPEC.items$spec.phobias_NA_count_numeric<-with(SPEC.items,
+                                                    ifelse(
+                                                      is.na(spec.blood_injection_phobia), 
+                                                      spec.phobias_NA_count_numeric + 1, spec.phobias_NA_count_numeric))
+#Other phobia
+SPEC.items$spec.phobias_NA_count_numeric<-with(SPEC.items,
+                                                    ifelse(
+                                                      is.na(spec.other_phobia), 
+                                                      spec.phobias_NA_count_numeric + 1, spec.phobias_NA_count_numeric))
+
+freq(SPEC.items$spec.phobias_NA_count_numeric)
 ```
 
 
