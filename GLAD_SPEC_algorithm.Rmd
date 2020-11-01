@@ -239,7 +239,7 @@ summary(as.factor(SPEC.items$spec.specific_phobia_symptoms.calc.NA))
 Applying the diagnostic algorithm to questionnaire responses
 ```{r diagnostic algorithm for specific phobia}
 SPEC.items <- SPEC.items %>% 
-  mutate(specific_phobia_any_numeric =
+  mutate(spec.diagnosis_numeric =
            case_when(
 #Ppts are coded NA if they didn't respond to the screening questions, or had "No" in one screening question and NA in the other
              spec.specific_phobia_screen.calc.NA > 0 ~ NA_real_,
@@ -274,17 +274,15 @@ SPEC.items <- SPEC.items %>%
         (spec.avoid_phobias == "Yes" | spec.endure_phobias_with_anxiety == "Yes") ~ 1)) #Criterion C. Avoid or endure
 
 #Get frequencies
-freq(SPEC.items$specific_phobia_any_numeric)
+freq(SPEC.items$spec.diagnosis_numeric)
 ```
 
 ```{r recode any phobia as a factor}
 #Recode any phobia variable and change variable name
-SPEC.items$spec.diagnosis <- recode_factor(SPEC.items$specific_phobia_any_numeric,
+SPEC.items$spec.diagnosis <- recode_factor(SPEC.items$spec.diagnosis_numeric      ,
                              "0" = "No phobia",
                              "1" = "Any specific phobia"
                              )
-#Rename numeric variable
-SPEC.items$spec.diagnosis_numeric <- SPEC.items$specific_phobia_any_numeric
 ```
 
 # Create individual specific phobia variables
