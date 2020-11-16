@@ -147,7 +147,8 @@ SOCP.items$socp.diagnosis_numeric <-
   dplyr::case_when(
 ## No social phobia
     #Criterion A. Marked fear in social situations
-    (socp.criterion_A_numeric == 0) |
+    (
+      (socp.criterion_A_numeric == 0) |
     #Criterion B. Fear of negative evaluation
       (socp.anx_others_think == "No") |
       #Criterion C. Almost always provoke fear or anxiety
@@ -161,10 +162,12 @@ SOCP.items$socp.diagnosis_numeric <-
       #Criterion G. Functional impairment
       (socp.interference_with_life == "Not at all" | socp.interference_with_life == "A little")
       #Code as 0 for no diagnosis
-      ~ 0,
+      ~ 0
+    ),
 ## Social phobia diagnosis
     #Criterion A. Marked fear in social situations
-    (socp.criterion_A_numeric == 1) &
+    (
+      (socp.criterion_A_numeric == 1) &
     #Criterion B. Fear of negative evaluation
       (socp.anx_others_think == "Yes") &
       #Criterion C. Almost always provoke fear or anxiety
@@ -178,7 +181,10 @@ SOCP.items$socp.diagnosis_numeric <-
       #Criterion G. Functional impairment
       (socp.interference_with_life == "Some" | socp.interference_with_life == "A lot")
       #Code as 1 for socp diagnosis
-      ~ 1))
+      ~ 1
+    ),
+)
+)
 
 freq(SOCP.items$socp.diagnosis_numeric)
 
