@@ -93,12 +93,12 @@ PAD.items <- PAD.cc %>%
 
 ```{r recode as NAs}
 #Change all prefer not to answers and don't knows to NA
-PAD.items[PAD.items == "Don't know"] <- NA
-PAD.items[PAD.items == "Prefer not to answer"] <- NA
-PAD.items[PAD.items == "Seen but not answered"] <- NA
-PAD.items[PAD.items == -88] <- NA
-PAD.items[PAD.items == -99] <- NA
-PAD.items[PAD.items == -77] <- NA
+PAD.items[PAD.items == "Don't know"] <- NA_real_
+PAD.items[PAD.items == "Prefer not to answer"] <- NA_real_
+PAD.items[PAD.items == "Seen but not answered"] <- NA_real_
+PAD.items[PAD.items == -88] <- NA_real_
+PAD.items[PAD.items == -99] <- NA_real_
+PAD.items[PAD.items == -77] <- NA_real_
 ```
 
 # DSM-5 panic disorder diagnostic criteria
