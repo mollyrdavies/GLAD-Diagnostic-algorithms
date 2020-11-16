@@ -23,13 +23,21 @@ library(tidyverse)
 
 ```{r source path for reading/saving data}
 #Source raw data directory (raw_path) & clean data export directory (cleaned_path)
-source("../GLAD_data_path.R")
+source("./GLAD_data_path.R")
 ```
 
-```{r read in cleaned PAD data}
-PAD_file <- paste(raw_path, "PAD.rds", sep = "")
+```{r}
+#Helena - reading in data
 
-PAD.cc <- read_rds(PAD_file)
+PAD.cc <- read_csv("/Users/helenadavies/Desktop/DATA_diagnostics/PAD_dataset.csv")
+
+```
+
+
+```{r read in cleaned PAD data}
+#PAD_file <- paste(raw_path, "PAD.rds", sep = "")
+
+#PAD.cc <- read_rds(PAD_file)
 ```
 
 ```{r visualise PAD data}
@@ -93,12 +101,12 @@ PAD.items <- PAD.cc %>%
 
 ```{r recode as NAs}
 #Change all prefer not to answers and don't knows to NA
-PAD.items[PAD.items == "Don't know"] <- NA
-PAD.items[PAD.items == "Prefer not to answer"] <- NA
-PAD.items[PAD.items == "Seen but not answered"] <- NA
-PAD.items[PAD.items == -88] <- NA
-PAD.items[PAD.items == -99] <- NA
-PAD.items[PAD.items == -77] <- NA
+PAD.items[PAD.items == "Don't know"] <- NA_real_
+PAD.items[PAD.items == "Prefer not to answer"] <- NA_real_
+PAD.items[PAD.items == "Seen but not answered"] <- NA_real_
+PAD.items[PAD.items == -88] <- NA_real_
+PAD.items[PAD.items == -99] <- NA_real_
+PAD.items[PAD.items == -77] <- NA_real_
 ```
 
 # DSM-5 panic disorder diagnostic criteria
@@ -344,16 +352,19 @@ PAD.items <- PAD.items %>%
              (pad.panic_symptoms_numeric > 3 & no.info > 0) ~ NA_real_,
         #Diagnosis is 0 if ppt didn't meet criteria
              #Criterion A. Less than 4 symptoms of panic attacks endorsed
-             (pad.panic_symptoms_numeric < 4) |
+             (
+               (pad.panic_symptoms_numeric < 4) |
                #Criterion B. Duration of less than 1 month or no concern/worry
                pad.criterion_B_numeric == 0 |
                #Criterion C. Always the result of medical condition or drug use
                (pad.physical_cause == "Yes, all of them") |
                #Criterion D. Occurs only in phobic situations
-               (pad.heights == "Yes" | pad.random == "No") ~ 0,
+               (pad.heights == "Yes" | pad.random == "No") ~ 0
+               ),
         #Diagnosis is 1 if ppt met criteria
              #Criterion A. At least 4 symptoms of panic attacks endorsed
-             (pad.panic_symptoms_numeric > 3) &
+             (
+               (pad.panic_symptoms_numeric > 3) &
                #Criterion B. Duration of at least 1 month
                (!is.na(pad.duration_numeric) & pad.duration_numeric > 1) &
                #Criterion B. Persistent concern/worry or maladaptive behaviour change
@@ -363,6 +374,7 @@ PAD.items <- PAD.items %>%
                (pad.physical_cause == "Yes, some of them" | pad.physical_cause == "No, never") &
                #Criterion D. Doesn't occur only in phobic situations
                (pad.heights == "No" | pad.random == "Yes") ~ 1
+             )
              )
   )
   
