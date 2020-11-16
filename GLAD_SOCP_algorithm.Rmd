@@ -64,12 +64,12 @@ SOCP.items <- SOCP.cc %>%
 
 ```{r recode as NAs}
 #Change all prefer not to answers and don't knows to NA
-SOCP.items[SOCP.items == "-77"] <- NA
-SOCP.items[SOCP.items == "-88"] <- NA
-SOCP.items[SOCP.items == "-99"] <- NA
-SOCP.items[SOCP.items == "Don't know"] <- NA
-SOCP.items[SOCP.items == "Prefer not to answer"] <- NA
-SOCP.items[SOCP.items == "Seen but not answered"] <- NA
+SOCP.items[SOCP.items == "-77"] <- NA_real_
+SOCP.items[SOCP.items == "-88"] <- NA_real_
+SOCP.items[SOCP.items == "-99"] <- NA_real_
+SOCP.items[SOCP.items == "Don't know"] <- NA_real_
+SOCP.items[SOCP.items == "Prefer not to answer"] <- NA_real_
+SOCP.items[SOCP.items == "Seen but not answered"] <- NA_real_
 ```
 
 # DSM-5 Social phobia diagnostic criteria
