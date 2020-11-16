@@ -64,12 +64,12 @@ SOCP.items <- SOCP.cc %>%
 
 ```{r recode as NAs}
 #Change all prefer not to answers and don't knows to NA
-SOCP.items[SOCP.items == "-77"] <- NA
-SOCP.items[SOCP.items == "-88"] <- NA
-SOCP.items[SOCP.items == "-99"] <- NA
-SOCP.items[SOCP.items == "Don't know"] <- NA
-SOCP.items[SOCP.items == "Prefer not to answer"] <- NA
-SOCP.items[SOCP.items == "Seen but not answered"] <- NA
+SOCP.items[SOCP.items == "-77"] <- NA_real_
+SOCP.items[SOCP.items == "-88"] <- NA_real_
+SOCP.items[SOCP.items == "-99"] <- NA_real_
+SOCP.items[SOCP.items == "Don't know"] <- NA_real_
+SOCP.items[SOCP.items == "Prefer not to answer"] <- NA_real_
+SOCP.items[SOCP.items == "Seen but not answered"] <- NA_real_
 ```
 
 # DSM-5 Social phobia diagnostic criteria
@@ -147,7 +147,8 @@ SOCP.items$socp.diagnosis_numeric <-
   dplyr::case_when(
 ## No social phobia
     #Criterion A. Marked fear in social situations
-    (socp.criterion_A_numeric == 0) |
+    (
+      (socp.criterion_A_numeric == 0) |
     #Criterion B. Fear of negative evaluation
       (socp.anx_others_think == "No") |
       #Criterion C. Almost always provoke fear or anxiety
@@ -161,10 +162,12 @@ SOCP.items$socp.diagnosis_numeric <-
       #Criterion G. Functional impairment
       (socp.interference_with_life == "Not at all" | socp.interference_with_life == "A little")
       #Code as 0 for no diagnosis
-      ~ 0,
+      ~ 0
+    ),
 ## Social phobia diagnosis
     #Criterion A. Marked fear in social situations
-    (socp.criterion_A_numeric == 1) &
+    (
+      (socp.criterion_A_numeric == 1) &
     #Criterion B. Fear of negative evaluation
       (socp.anx_others_think == "Yes") &
       #Criterion C. Almost always provoke fear or anxiety
@@ -179,6 +182,7 @@ SOCP.items$socp.diagnosis_numeric <-
       (socp.interference_with_life == "Some" | socp.interference_with_life == "A lot")
       #Code as 1 for socp diagnosis
       ~ 1))
+)
 
 freq(SOCP.items$socp.diagnosis_numeric)
 
@@ -238,7 +242,7 @@ SOCP.items$socp.diagnosis_numeric <- with(SOCP.items,
                                        ifelse(
                                          is.na(socp.screener_numeric) | 
                                            socp.social_phobia_symptoms.calc.NA > 0,
-                                         NA, socp.diagnosis_numeric 
+                                         NA_real_, socp.diagnosis_numeric 
                                        ))
 
 #Frequencies after accounting for missingness
