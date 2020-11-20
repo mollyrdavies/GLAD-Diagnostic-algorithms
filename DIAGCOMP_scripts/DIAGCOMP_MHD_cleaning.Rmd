@@ -1,14 +1,16 @@
 ---
 title: "DIAGCOMP_MHD_cleaning"
-author: "Molly Davies"
+author: "Molly R. Davies"
 date: "30/10/2020"
 output: html_document
 ---
 
-Cleaning script for the mental health diagnoses (MHD) section of the GLAD Study data for the paper:
-"Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" Davies et al (in prep)
+This is the script to clean the mental health diagnoses (MHD) variables of the GLAD Study data for the paper "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
 
 The MHD dataset includes all single-item diagnoses.
+
+Script written by M. R. Davies.
+Email:  molly.davies@kcl.ac.uk
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
