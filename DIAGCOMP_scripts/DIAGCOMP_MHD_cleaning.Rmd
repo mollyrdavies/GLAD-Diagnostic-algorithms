@@ -12,6 +12,9 @@ The MHD dataset includes all single-item diagnoses.
 Script written by M. R. Davies.
 Email:  molly.davies@kcl.ac.uk
 
+All scripts for the paper can be accessed at:
+https://github.com/mollyrdavies/GLAD-Diagnostic-algorithms.git
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```

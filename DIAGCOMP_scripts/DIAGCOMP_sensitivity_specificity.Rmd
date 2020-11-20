@@ -12,6 +12,9 @@ Results are reported in the paper "Comparison of algorithm-based versus single-i
 Script written by M. R. Davies.
 Email:  molly.davies@kcl.ac.uk
 
+All scripts for the paper can be accessed at:
+https://github.com/mollyrdavies/GLAD-Diagnostic-algorithms.git
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
