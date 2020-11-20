@@ -1,9 +1,14 @@
 ---
-title: "Merge lifetime diagnoses datasets"
-author: "Molly Davies"
+title: "DIAGCOMP_merging_script"
+author: "Molly R. Davies"
 date: "18/10/2020"
 output: html_document
 ---
+
+This script merges cleaned datasets for the purpose of analyses included in the paper titled "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
+
+Script written by M. R. Davies.
+Email:  molly.davies@kcl.ac.uk
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
