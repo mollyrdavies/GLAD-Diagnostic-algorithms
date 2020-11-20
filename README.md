@@ -1,4 +1,4 @@
-# GLAD DIAGCOMP - comparing algorithm-based and single-item phenotyping measures of major depression and anxiety disorders
+# Comparing algorithm-based and single-item phenotyping measures of major depression and anxiety disorders
 
 ## Summary
 Code repository for Davies et al (in prep) "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort"
@@ -20,6 +20,13 @@ Details on each disorder DSM-5 criteria mapped to questions/responses included i
 ***Aim***
 
 Assess the comparability of two commonly used phenotyping methods for depression and anxiety disorders.
+
+## Folder structure
+***algorithm_scripts*** - Algorithm scripts to ascertain likely lifetime diagnoses of DSM-5 depression and anxiety disorders
+
+***DIAGCOMP_scripts*** - Cleaning and analyses scripts specific to the Davies et al (in prep) manuscript
+
+***outputs*** - Rmarkdown knits in HTML format for DIAGCOMP results.
 
 ## Project details
 
