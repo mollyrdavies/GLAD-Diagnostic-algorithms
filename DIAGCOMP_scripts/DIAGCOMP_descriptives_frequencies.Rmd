@@ -1,6 +1,6 @@
 ---
 title: "DIAGCOMP_descriptives_frequencies"
-author: "Molly Davies"
+author: "Molly R. Davies"
 date: "30/10/2020"
 output: html_document
 ---
