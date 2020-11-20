@@ -15,6 +15,7 @@ These scripts contain algorithms for assessing likely lifetime DSM-5 diagnosis o
 5) Panic disorder
 6) Agoraphobia
 
+Details on each disorder DSM-5 criteria mapped to questions/responses included in the algorithms can be found within this folder (GLAD_DSM5_diagnostic_algorithms.docx).
 
 ***Aim***
 
