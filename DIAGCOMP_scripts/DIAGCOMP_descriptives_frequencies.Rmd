@@ -1,8 +1,22 @@
 ---
 title: "DIAGCOMP_descriptives_frequencies"
 author: "Molly R. Davies"
-date: "30/10/2020"
-output: html_document
+date: 30/10/2020
+output:  
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+    number_sections: false
+    highlight: monochrome
+    theme: cerulean
+code_folding: show
+
+html_notebook:
+  theme: cerulean
+toc: yes
 ---
 
 This is the script to run demographic descriptives and frequencies of the single-item/algorithm-based diagnoses of the GLAD Study sample. Results are reported in the paper titled "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
@@ -31,7 +45,7 @@ library(tidyverse)
 ```
 
 ```{r source file paths}
-source("../GLAD_data_path.R")
+source("../../GLAD_data_path.R")
 ```
 
 ```{r read data}
