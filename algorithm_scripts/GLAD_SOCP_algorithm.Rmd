@@ -1,9 +1,19 @@
 ---
 title: "Lifetime DSM-5 social phobia: Diagnostic algorithm (GLAD Study data)"
-author: "Molly Davies"
+author: "Molly R. Davies"
 date: "23/10/2020"
 output: html_document
 ---
+
+This script runs an algorithm based on DSM-5 diagnostic criteria, to ascertain likely lifetime diagnosis of social anxiety disorder (previously social phobia) using the GLAD Study data.
+
+Algorithm developed for the paper "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
+
+Full description of the algorithms and scripts written for the paper can be accessed at:
+https://github.com/mollyrdavies/GLAD-Diagnostic-algorithms.git
+
+Script written by M. R. Davies.
+Email:  molly.davies@kcl.ac.uk
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
