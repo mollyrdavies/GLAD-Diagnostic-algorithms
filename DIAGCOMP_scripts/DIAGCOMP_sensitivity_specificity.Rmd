@@ -1,9 +1,16 @@
 ---
 title: "DIAGCOMP_sensitivity_specificity"
-author: "Molly Davies"
+author: "Molly R. Davies"
 date: "30/10/2020"
 output: html_document
 ---
+
+This script runs sensitivity and specificity analyses for single-item and algorithm-based major depression and anxiety disorder diagnoses variables on the GLAD Study data. 
+
+Results are reported in the paper "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
+
+Script written by M. R. Davies.
+Email:  molly.davies@kcl.ac.uk
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
