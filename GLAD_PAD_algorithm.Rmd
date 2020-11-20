@@ -347,7 +347,8 @@ PAD.items <- PAD.items %>%
   mutate(pad.diagnosis_numeric =
            case_when(
         #Diagnosis is NA if screener is skipped
-             pad.panic_symptoms.NA > 0 ~ NA_real_,
+             (
+               pad.panic_symptoms.NA > 0 ~ NA_real_,
         #Diagnosis is NA if ppt met screening criteria and are missing one of the other core symptoms
              (pad.panic_symptoms_numeric > 3 & no.info > 0) ~ NA_real_,
         #Diagnosis is 0 if ppt didn't meet criteria
@@ -360,7 +361,7 @@ PAD.items <- PAD.items %>%
                (pad.physical_cause == "Yes, all of them") |
                #Criterion D. Occurs only in phobic situations
                (pad.heights == "Yes" | pad.random == "No") ~ 0
-               ),
+          ),
         #Diagnosis is 1 if ppt met criteria
              #Criterion A. At least 4 symptoms of panic attacks endorsed
              (
@@ -374,6 +375,7 @@ PAD.items <- PAD.items %>%
                (pad.physical_cause == "Yes, some of them" | pad.physical_cause == "No, never") &
                #Criterion D. Doesn't occur only in phobic situations
                (pad.heights == "No" | pad.random == "Yes") ~ 1
+               )
              )
              )
   )

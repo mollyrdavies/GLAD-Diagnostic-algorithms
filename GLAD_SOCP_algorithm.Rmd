@@ -181,7 +181,9 @@ SOCP.items$socp.diagnosis_numeric <-
       #Criterion G. Functional impairment
       (socp.interference_with_life == "Some" | socp.interference_with_life == "A lot")
       #Code as 1 for socp diagnosis
-      ~ 1))
+      ~ 1
+    ),
+)
 )
 
 freq(SOCP.items$socp.diagnosis_numeric)
