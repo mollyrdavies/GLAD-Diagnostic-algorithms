@@ -244,7 +244,7 @@ SOCP.items$socp.diagnosis_numeric <- with(SOCP.items,
                                        ifelse(
                                          is.na(socp.screener_numeric) | 
                                            socp.social_phobia_symptoms.calc.NA > 0,
-                                         NA, socp.diagnosis_numeric 
+                                         NA_real_, socp.diagnosis_numeric 
                                        ))
 
 #Frequencies after accounting for missingness

@@ -23,13 +23,21 @@ library(tidyverse)
 
 ```{r source path for reading/saving data}
 #Source raw data directory (raw_path) & clean data export directory (cleaned_path)
-source("../GLAD_data_path.R")
+source("./GLAD_data_path.R")
 ```
 
-```{r read in cleaned PAD data}
-PAD_file <- paste(raw_path, "PAD.rds", sep = "")
+```{r}
+#Helena - reading in data
 
-PAD.cc <- read_rds(PAD_file)
+PAD.cc <- read_csv("/Users/helenadavies/Desktop/DATA_diagnostics/PAD_dataset.csv")
+
+```
+
+
+```{r read in cleaned PAD data}
+#PAD_file <- paste(raw_path, "PAD.rds", sep = "")
+
+#PAD.cc <- read_rds(PAD_file)
 ```
 
 ```{r visualise PAD data}
@@ -345,14 +353,15 @@ PAD.items <- PAD.items %>%
              (pad.panic_symptoms_numeric > 3 & no.info > 0) ~ NA_real_,
         #Diagnosis is 0 if ppt didn't meet criteria
              #Criterion A. Less than 4 symptoms of panic attacks endorsed
-             (pad.panic_symptoms_numeric < 4) |
+             (
+               (pad.panic_symptoms_numeric < 4) |
                #Criterion B. Duration of less than 1 month or no concern/worry
                pad.criterion_B_numeric == 0 |
                #Criterion C. Always the result of medical condition or drug use
                (pad.physical_cause == "Yes, all of them") |
                #Criterion D. Occurs only in phobic situations
                (pad.heights == "Yes" | pad.random == "No") ~ 0
-        ),
+          ),
         #Diagnosis is 1 if ppt met criteria
              #Criterion A. At least 4 symptoms of panic attacks endorsed
              (
@@ -367,6 +376,7 @@ PAD.items <- PAD.items %>%
                #Criterion D. Doesn't occur only in phobic situations
                (pad.heights == "No" | pad.random == "Yes") ~ 1
                )
+             )
              )
   )
   
