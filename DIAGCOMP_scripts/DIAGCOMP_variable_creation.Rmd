@@ -1,9 +1,14 @@
 ---
 title: "DIAGCOMP_variable_creation"
-author: "Molly Davies"
+author: "Molly R. Davies"
 date: "30/10/2020"
 output: html_document
 ---
+
+This recodes/creates new variables utilised in analyses for the paper "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
+
+Script written by M. R. Davies.
+Email:  molly.davies@kcl.ac.uk
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
