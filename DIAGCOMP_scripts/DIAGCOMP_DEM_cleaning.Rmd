@@ -1,11 +1,17 @@
 ---
 title: "DIAGCOMP_DEM_cleaning"
-author: "Molly Davies"
+author: "Molly R. Davies"
 date: "30/10/2020"
 output: html_document
 ---
 
-Demographics (DEM) cleaning script for the GLAD Study data utilised in "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" Davies et al (in prep).
+This is the cleaning script for the demographic (DEM) variables of the GLAD Study sample for the paper titled "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
+
+Script written by M. R. Davies.
+Email:  molly.davies@kcl.ac.uk
+
+All scripts for the paper can be accessed at:
+https://github.com/mollyrdavies/GLAD-Diagnostic-algorithms.git
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)

@@ -1,9 +1,33 @@
 ---
 title: "DIAGCOMP_sensitivity_specificity"
-author: "Molly Davies"
-date: "30/10/2020"
-output: html_document
+author: "Molly R. Davies"
+date: 30/10/2020
+output:  
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+    number_sections: false
+    highlight: monochrome
+    theme: cerulean
+code_folding: show
+
+html_notebook:
+  theme: cerulean
+toc: yes
 ---
+
+This script runs sensitivity and specificity analyses for single-item and algorithm-based major depression and anxiety disorder diagnoses variables on the GLAD Study data. 
+
+Results are reported in the paper "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
+
+Script written by M. R. Davies.
+Email:  molly.davies@kcl.ac.uk
+
+All scripts for the paper can be accessed at:
+https://github.com/mollyrdavies/GLAD-Diagnostic-algorithms.git
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -35,11 +59,11 @@ library(tidyverse)
 ```
 
 ```{r source file paths}
-source("../GLAD_data_path.R")
+source("../../GLAD_data_path.R")
 ```
 
 ```{r read data}
-dat.cc <- read_rds(paste0(cleaned_path, "combined_cleaned.rds"))
+dat.cc <- read_rds(paste0(cleaned_path, "combined_cleaned_new_variables.rds"))
 ```
 
 # Variables
