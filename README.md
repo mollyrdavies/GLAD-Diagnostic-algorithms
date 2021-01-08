@@ -46,4 +46,4 @@ Yuhao Lin, Henry C. Rogers, Christopher Hübel
 Gerome Breen, Thalia C. Eley
 
 ***Data access***
-Data stored on secure server. Anonymised data specific to this project available on request after publication. Details for how to request data will shortly be available on the GLAD Study website.
+Data stored on secure server. Anonymised data specific to this project available on request after publication. Details for how to request data will shortly be available on the [GLAD Study website](https://gladstudy.org.uk/).
