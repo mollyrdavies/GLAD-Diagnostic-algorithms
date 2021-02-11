@@ -220,17 +220,21 @@ summary(dat.cc$ClinicianAgoraphobia)
 dat.cc <- dat.cc %>% 
   mutate(ClinicianAnyAnx.n =
            case_when(
-             mhd.GAD_numeric == 0 & mhd.specific_phobia_numeric == 0 & mhd.social_anxiety_numeric == 0 &
+             mhd.GAD_numeric == 0 & 
+               mhd.specific_phobia_numeric == 0 & mhd.social_anxiety_numeric == 0 &
                mhd.panic_disorder_numeric == 0 & mhd.agoraphobia_numeric == 0 ~ 0,
-             mhd.GAD_numeric == 1 & mhd.specific_phobia_numeric == 1 & mhd.social_anxiety_numeric == 1 &
-               mhd.panic_disorder_numeric == 1 & mhd.agoraphobia_numeric == 1 ~ 1
+             mhd.GAD_numeric == 1 | mhd.specific_phobia_numeric == 1 | 
+               mhd.social_anxiety_numeric == 1 |
+               mhd.panic_disorder_numeric == 1 | mhd.agoraphobia_numeric == 1 ~ 1
            ),
          LifetimeAnyAnx.n = 
            case_when(
-             cidia.diagnosis_numeric == 0 & spec.diagnosis_numeric == 0 & socp.diagnosis_numeric == 0 &
+             cidia.diagnosis_numeric == 0 & spec.diagnosis_numeric == 0 & 
+               socp.diagnosis_numeric == 0 &
                pad.diagnosis_numeric == 0 & agp.diagnosis_numeric == 0 ~ 0,
-             cidia.diagnosis_numeric == 1 & spec.diagnosis_numeric == 1 & socp.diagnosis_numeric == 1 &
-               pad.diagnosis_numeric == 1 & agp.diagnosis_numeric == 1 ~ 1
+             cidia.diagnosis_numeric == 1 | spec.diagnosis_numeric == 1 |
+               socp.diagnosis_numeric == 1 |
+               pad.diagnosis_numeric == 1 | agp.diagnosis_numeric == 1 ~ 1
            ))
 
 #Recode as factors
