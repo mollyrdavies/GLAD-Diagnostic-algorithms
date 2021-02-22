@@ -36,18 +36,10 @@ library(tidyverse)
 source("./GLAD_data_path.R")
 ```
 
-```{r}
-#Helena - reading in data
-
-PAD.cc <- read_csv("/Users/helenadavies/Desktop/DATA_diagnostics/PAD_dataset.csv")
-
-```
-
-
 ```{r read in cleaned PAD data}
-#PAD_file <- paste(raw_path, "PAD.rds", sep = "")
+PAD_file <- paste(raw_path, "PAD.rds", sep = "")
 
-#PAD.cc <- read_rds(PAD_file)
+PAD.cc <- read_rds(PAD_file)
 ```
 
 ```{r visualise PAD data}
@@ -59,26 +51,6 @@ head(PAD.cc)
 #Create dataset of all variables needed for PAD diagnosis
 PAD.items <- PAD.cc %>%
   select(ID,
-         pad.heart_pounding,
-         pad.sweating,
-         pad.trembling,
-         pad.short_of_breath,
-         pad.choking,
-         pad.chest_pain,
-         pad.nauseous,
-         pad.dizzy,
-         pad.hot_cold,
-         pad.numbness,
-         pad.detached,
-         pad.lose_control,
-         pad.going_to_die,
-         pad.anx_future_panic_attacks,
-         pad.worried_future_panic_attacks,
-         pad.avoid_situation_panic_attacks,
-         pad.duration,
-         pad.physical_cause,
-         pad.heights,
-         pad.random,
          pad.heart_pounding_numeric,
          pad.sweating_numeric,
          pad.trembling_numeric,
@@ -99,13 +71,11 @@ PAD.items <- PAD.cc %>%
          pad.physical_cause_numeric,
          pad.heights_numeric,
          pad.random_numeric,
-         pad.anx_future_panic_attacks,
-         pad.worried_future_panic_attacks,
-         pad.avoid_situation_panic_attacks,
-         pad.duration,
-         pad.physical_cause,
-         pad.heights,
-         pad.random
+         pad.anx_future_panic_attacks_numeric,
+         pad.worried_future_panic_attacks_numeric,
+         pad.avoid_situation_panic_attacks_numeric,
+         pad.duration_numeric,
+         pad.physical_cause_numeric
          )
 ```
 
@@ -238,15 +208,17 @@ In the questionnaire, the duration question is not displayed if the participant 
 ```{r panic disorder criterion B}
 PAD.items <- PAD.items %>% 
   mutate(pad.criterion_B_numeric =
-    case_when(pad.anx_future_panic_attacks == "No" & pad.worried_future_panic_attacks == "No" & pad.avoid_situation_panic_attacks == "No" ~ 0,
+    case_when(pad.anx_future_panic_attacks_numeric == 0 & 
+                pad.worried_future_panic_attacks_numeric == 0 & 
+                pad.avoid_situation_panic_attacks_numeric == 0 ~ 0,
               pad.duration_numeric == 1 ~ 0,
-              pad.anx_future_panic_attacks == "Yes" & pad.duration_numeric > 1 ~ 1, 
-              pad.worried_future_panic_attacks == "Yes" & pad.duration_numeric > 1 ~ 1, 
-              pad.avoid_situation_panic_attacks == "Yes" & pad.duration_numeric > 1 ~ 1,
-              is.na(pad.anx_future_panic_attacks) ~ NA_real_,
-              is.na(pad.worried_future_panic_attacks) ~ NA_real_,
-              is.na(pad.avoid_situation_panic_attacks) ~ NA_real_,
-              (pad.anx_future_panic_attacks == "Yes" | pad.worried_future_panic_attacks == "Yes" | pad.worried_future_panic_attacks == "Yes") & is.na(pad.duration_numeric) ~ NA_real_
+              pad.anx_future_panic_attacks_numeric == 1 & pad.duration_numeric > 1 ~ 1, 
+              pad.worried_future_panic_attacks_numeric == 1 & pad.duration_numeric > 1 ~ 1, 
+              pad.avoid_situation_panic_attacks_numeric == 1 & pad.duration_numeric > 1 ~ 1,
+              is.na(pad.anx_future_panic_attacks_numeric) ~ NA_real_,
+              is.na(pad.worried_future_panic_attacks_numeric) ~ NA_real_,
+              is.na(pad.avoid_situation_panic_attacks_numeric) ~ NA_real_,
+              (pad.anx_future_panic_attacks_numeric == 1 | pad.worried_future_panic_attacks_numeric == 1 | pad.worried_future_panic_attacks_numeric == 1) & is.na(pad.duration_numeric) ~ NA_real_
               )
   )
 
@@ -335,13 +307,13 @@ PAD.items$no.info <- with(PAD.items,
                                       )
 #+1 to missingness if criterion C item is missing
 PAD.items$no.info <- with(PAD.items,
-                               ifelse(is.na(pad.physical_cause),
+                               ifelse(is.na(pad.physical_cause_numeric),
                                       no.info + 1, no.info
                                                 )
                                       )
 #+1 to missingness if criterion D items are missing
 PAD.items$no.info <- with(PAD.items,
-                               ifelse(is.na(pad.heights) & is.na(pad.random),
+                               ifelse(is.na(pad.heights_numeric) & is.na(pad.random_numeric),
                                       no.info + 1, no.info
                                                 )
                                       )
@@ -357,7 +329,6 @@ PAD.items <- PAD.items %>%
   mutate(pad.diagnosis_numeric =
            case_when(
         #Diagnosis is NA if screener is skipped
-             (
                pad.panic_symptoms.NA > 0 ~ NA_real_,
         #Diagnosis is NA if ppt met screening criteria and are missing one of the other core symptoms
              (pad.panic_symptoms_numeric > 3 & no.info > 0) ~ NA_real_,
@@ -368,10 +339,9 @@ PAD.items <- PAD.items %>%
                #Criterion B. Duration of less than 1 month or no concern/worry
                pad.criterion_B_numeric == 0 |
                #Criterion C. Always the result of medical condition or drug use
-               (pad.physical_cause == "Yes, all of them") |
+               (pad.physical_cause_numeric == 2) |
                #Criterion D. Occurs only in phobic situations
-               (pad.heights == "Yes" | pad.random == "No") ~ 0
-          ),
+               (pad.heights_numeric == 1 & pad.random_numeric == 0)) ~ 0,
         #Diagnosis is 1 if ppt met criteria
              #Criterion A. At least 4 symptoms of panic attacks endorsed
              (
@@ -379,16 +349,14 @@ PAD.items <- PAD.items %>%
                #Criterion B. Duration of at least 1 month
                (!is.na(pad.duration_numeric) & pad.duration_numeric > 1) &
                #Criterion B. Persistent concern/worry or maladaptive behaviour change
-               (pad.anx_future_panic_attacks == "Yes" | pad.worried_future_panic_attacks == "Yes" |
-                  pad.avoid_situation_panic_attacks == "Yes") &
+               (pad.anx_future_panic_attacks_numeric == 1 | pad.worried_future_panic_attacks_numeric == 1 |
+                  pad.avoid_situation_panic_attacks_numeric == 1) &
                #Criterion C. Not the result of medical condition or drug use
-               (pad.physical_cause == "Yes, some of them" | pad.physical_cause == "No, never") &
+               (pad.physical_cause_numeric == 0 | pad.physical_cause_numeric == 1) &
                #Criterion D. Doesn't occur only in phobic situations
-               (pad.heights == "No" | pad.random == "Yes") ~ 1
-               )
+               (pad.heights_numeric == 0 | pad.random_numeric == 1)) ~ 1
              )
              )
-  )
   
 summary(as.factor(PAD.items$pad.diagnosis_numeric))
 
@@ -411,26 +379,6 @@ freq(PAD.items$pad.diagnosis)
 
 PAD.clean <- PAD.items %>%
   select(ID,
-        pad.heart_pounding,
-        pad.sweating,
-        pad.trembling,
-        pad.short_of_breath,
-        pad.choking,
-        pad.chest_pain,
-        pad.nauseous,
-        pad.dizzy,
-        pad.hot_cold,
-        pad.numbness,
-        pad.detached,
-        pad.lose_control,
-        pad.going_to_die,
-        pad.anx_future_panic_attacks,
-        pad.worried_future_panic_attacks,
-        pad.avoid_situation_panic_attacks,
-        pad.duration,
-        pad.physical_cause,
-        pad.heights,
-        pad.random,
         pad.heart_pounding_numeric,
         pad.sweating_numeric,
         pad.trembling_numeric,
@@ -457,7 +405,7 @@ PAD.clean <- PAD.items %>%
         )
 
 #Export into a rds file:
-saveRDS(object = PAD.clean, file = paste0(cleaned_path, "PAD_cleaned.rds"))
+#saveRDS(object = PAD.clean, file = paste0(cleaned_path, "PAD_cleaned.rds"))
 
 # Saves the R data including the recoding
 #save.image(file = paste0(cleaned_path, "GLAD_PAD_clean.RData"))
