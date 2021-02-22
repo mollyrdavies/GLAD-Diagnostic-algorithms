@@ -147,13 +147,13 @@ These variables were separated in the CIDID but fulfil a single criterion in the
 CIDID.items <- CIDID.items %>% 
   mutate(cidid.weight_appetite_change_numeric = 
            case_when(
-             cidid.appetite_change == "No changes in appetite" & cidid.weight_change == "Stayed about the same or was on a diet" ~ 0,
-             cidid.appetite_change == "Increased appetite" ~ 1,
-             cidid.appetite_change == "Decreased appetite" ~ 1,
-             cidid.appetite_change == "Experienced both increased an decreased appetite during the same depression episode" ~ 1,
-             cidid.weight_change == "Lost weight" ~ 1,
-             cidid.weight_change == "Gained weight" ~ 1,
-             cidid.weight_change == "Both gained weight and lost some weight during the episode" ~ 1
+             cidid.appetite_change_numeric == 0 & cidid.weight_change_numeric == 0 ~ 0,
+             cidid.appetite_change_numeric == 1 ~ 1,
+             cidid.appetite_change_numeric == 2 ~ 1,
+             cidid.appetite_change_numeric == 3 ~ 1,
+             cidid.weight_change_numeric == 1 ~ 1,
+             cidid.weight_change_numeric == 2 ~ 1,
+             cidid.weight_change_numeric == 3 ~ 1
            ))
 
 summary(as.factor(CIDID.items$cidid.weight_appetite_change_numeric))
@@ -184,13 +184,13 @@ CIDID.items$cidid.criterion_A_score_numeric<-0
 
 #Criterion A.1 - low mood
 CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
-                                    ifelse(!is.na(cidid.low_mood) 
-                                           & cidid.low_mood == "Yes", 
+                                    ifelse(!is.na(cidid.low_mood_numeric) 
+                                           & cidid.low_mood_numeric == 1, 
                                            cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
 #Criterion A.2 - anhedonia
 CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items,
-                                    ifelse(!is.na(cidid.anhedonia) 
-                                           & cidid.anhedonia == "Yes",
+                                    ifelse(!is.na(cidid.anhedonia_numeric) 
+                                           & cidid.anhedonia_numeric == 1,
                                            cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
 #Criterion A.3 - weight &/or appetite change
 CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items,
@@ -199,27 +199,27 @@ CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items,
                                            cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
 #Criterion A.4 - sleep change (insomnia or hypersomnia)
 CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
-                                    ifelse(!is.na(cidid.sleep_change) &
-                                             cidid.sleep_change == "Yes", 
+                                    ifelse(!is.na(cidid.sleep_change_numeric) &
+                                             cidid.sleep_change_numeric == 1, 
                                            cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
 #Criterion A.6 - fatigue or loss of energy
 CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
-                                    ifelse(!is.na(cidid.fatigue) & cidid.fatigue == "Yes", 
+                                    ifelse(!is.na(cidid.fatigue_numeric) & cidid.fatigue_numeric == 1, 
                                            cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
 #Criterion A.7 - Feelings of worthlesness
 CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
-                                    ifelse(!is.na(cidid.worthlessness) 
-                                           & cidid.worthlessness == "Yes", 
+                                    ifelse(!is.na(cidid.worthlessness_numeric) 
+                                           & cidid.worthlessness_numeric == 1, 
                                            cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
 #Criterion A.8 - Diminished ability to concentrate
 CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items,
-                                    ifelse(!is.na(cidid.trouble_concentrating) 
-                                           & cidid.trouble_concentrating == "Yes",
+                                    ifelse(!is.na(cidid.trouble_concentrating_numeric) 
+                                           & cidid.trouble_concentrating_numeric == 1,
                                            cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
 #Criterion A.9 - Recurrent thoughts of death or suicidal ideation
 CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
-                                    ifelse(!is.na(cidid.thoughts_of_death) 
-                                           & cidid.thoughts_of_death == "Yes", 
+                                    ifelse(!is.na(cidid.thoughts_of_death_numeric) 
+                                           & cidid.thoughts_of_death_numeric == 1, 
                                            cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
 #Check distribution of scores (range should be 0-8)
 summary(as.factor(CIDID.items$cidid.criterion_A_score_numeric))
@@ -232,28 +232,28 @@ summary(as.factor(CIDID.items$cidid.criterion_A_score_numeric))
 
 #If "Every day" is less frequently endorsed than "Less often", cidid.how_often is recoded.
 if (
-  sum(ifelse(CIDID.items$cidid.how_often %in% "Less often", 1, 0)) > sum(ifelse(CIDID.items$cidid.how_often %in% "Every day", 1, 0))
+  sum(ifelse(CIDID.items$cidid.how_often_numeric %in% 1, 1, 0)) > sum(ifelse(CIDID.items$cidid.how_often_numeric %in% 3, 1, 0))
   ) 
     {
       CIDID.items <- CIDID.items %>% 
         mutate(cidid.how_often = 
          case_when(
-           cidid.how_often == "Every day" ~ "Less often",
-           cidid.how_often == "Almost every day" ~ "Almost every day",
-           cidid.how_often == "Less often" ~ "Every day"
+           cidid.how_often_numeric == 3 ~ 1,
+           cidid.how_often_numeric == 2 ~ 2,
+           cidid.how_often_numeric == 1 ~ 3
          ))
 }
 #If "All day long" is less frequently endorsed than "Less than half of the day", cidid.how_long is recoded.
 if (
-  sum(ifelse(CIDID.items$cidid.how_long %in% "Less than half of the day", 1, 0)) > sum(ifelse(CIDID.items$cidid.how_long %in% "All day long", 1, 0))
+  sum(ifelse(CIDID.items$cidid.how_long_numeric %in% 1, 1, 0)) > sum(ifelse(CIDID.items$cidid.how_long_numeric %in% 4, 1, 0))
   ) {
 CIDID.items <- CIDID.items %>% 
-  mutate(cidid.how_long = 
+  mutate(cidid.how_long_numeric = 
          case_when(
-           cidid.how_long == "Less than half of the day" ~ "All day long",
-           cidid.how_long == "About half of the day" ~ "Most of the day",
-           cidid.how_long == "Most of the day" ~ "About half of the day",
-           cidid.how_long == "All day long" ~ "Less than half of the day"
+           cidid.how_long_numeric == 1 ~ 4,
+           cidid.how_long_numeric == 2 ~ 3,
+           cidid.how_long_numeric == 3 ~ 2,
+           cidid.how_long_numeric == 4 ~ 1
          ))
 }
 
@@ -273,15 +273,15 @@ Future considerations: If a participant has an NA in this score but was far from
 CIDID.items$no.info<-0
 #+1 to missingness score if duration has missing value
 CIDID.items$no.info <- with(CIDID.items,
-                               ifelse(is.na(cidid.how_long),
+                               ifelse(is.na(cidid.how_long_numeric),
                                       no.info + 1, no.info))
 #+1 to missingness score if frequency has missing value
 CIDID.items$no.info <- with(CIDID.items,
-                               ifelse(is.na(cidid.how_often),
+                               ifelse(is.na(cidid.how_often_numeric),
                                       no.info + 1, no.info))
 #+1 to missingness score if functioning criteria has missing value
 CIDID.items$no.info <- with(CIDID.items,
-                               ifelse(is.na(cidid.functioning),
+                               ifelse(is.na(cidid.functioning_numeric),
                                       no.info + 1, no.info))
 
 summary(as.factor(CIDID.items$no.info))
@@ -293,11 +293,11 @@ summary(as.factor(CIDID.items$no.info))
 CIDID.items$cidid.criterion_A_score_numeric.NA<-0
 
 CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
-                                    ifelse(is.na(cidid.low_mood), 
+                                    ifelse(is.na(cidid.low_mood_numeric), 
                                            cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
 CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items,
-                                    ifelse(is.na(cidid.anhedonia),
+                                    ifelse(is.na(cidid.anhedonia_numeric),
                                            cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
 CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items,
@@ -305,23 +305,23 @@ CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items,
                                            cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
 CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
-                                    ifelse(is.na(cidid.sleep_change), 
+                                    ifelse(is.na(cidid.sleep_change_numeric), 
                                            cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
 CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
-                                    ifelse(is.na(cidid.fatigue), 
+                                    ifelse(is.na(cidid.fatigue_numeric), 
                                            cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
 CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
-                                    ifelse(is.na(cidid.worthlessness), 
+                                    ifelse(is.na(cidid.worthlessness_numeric), 
                                            cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
 CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items,
-                                    ifelse(is.na(cidid.trouble_concentrating),
+                                    ifelse(is.na(cidid.trouble_concentrating_numeric),
                                            cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
 CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
-                                    ifelse(is.na(cidid.thoughts_of_death), 
+                                    ifelse(is.na(cidid.thoughts_of_death_numeric), 
                                            cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
 summary(as.factor(CIDID.items$cidid.criterion_A_score_numeric.NA))
@@ -350,9 +350,9 @@ CIDID.items <- CIDID.items %>%
           #Ppts are coded 0 if they meet screening criteria but don't meet at least one of the other criteria
                cidid.screener_numeric == 1 & 
                (cidid.criterion_A_score_numeric < 5 |
-               (cidid.how_long == "About half of the day" | cidid.how_long == "Less than half of the day") | 
-               cidid.how_often == "Less often" |
-               (cidid.functioning == "Not at all" | cidid.functioning == "A little")) 
+               (cidid.how_long_numeric == 1 | cidid.how_long_numeric == 2) | 
+               cidid.how_often_numeric == 1 |
+               (cidid.functioning_numeric == 0 | cidid.functioning_numeric == 1)) 
              ~ 0,
           #Ppts are coded as 1 if the meet all criteria
              #A. at least one of the symptoms is either (1) depressed mood or (2)  loss of interest or pleasure
@@ -360,11 +360,11 @@ CIDID.items <- CIDID.items %>%
                #A. at least 5 symptoms
                cidid.criterion_A_score_numeric >= 5 &
                #A. most of the day
-               (cidid.how_long == "All day long" | cidid.how_long == "Most of the day") & 
+               (cidid.how_long_numeric == 3 | cidid.how_long_numeric == 4) & 
                #A. nearly every day
-               (cidid.how_often == "Every day" | cidid.how_often == "Almost every day") &
+               (cidid.how_often_numeric == 2 | cidid.how_often_numeric == 3) &
                #B. functional  impairment
-               (cidid.functioning == "A lot" | cidid.functioning == "Some") 
+               (cidid.functioning_numeric == 2 | cidid.functioning_numeric == 3) 
              ~ 1
            ))
          
@@ -386,20 +386,7 @@ summary(CIDID.items$cidid.diagnosis)
 ```{r clean CIDID dataframe}
 
 CIDID.clean <- CIDID.items %>%
-  select(ID, 
-         cidid.low_mood,
-         cidid.anhedonia,
-         cidid.how_long, 
-         cidid.how_often,
-         cidid.weight_change,
-         cidid.appetite_change, 
-         cidid.sleep_change, 
-         cidid.fatigue, 
-         cidid.worthlessness, 
-         cidid.trouble_concentrating, 
-         cidid.thoughts_of_death, 
-         cidid.functioning, 
-         cidid.adverse_life_event,
+  select(ID,
          cidid.low_mood_numeric,
          cidid.anhedonia_numeric,
          cidid.how_long_numeric, 
@@ -411,13 +398,12 @@ CIDID.clean <- CIDID.items %>%
          cidid.worthlessness_numeric, 
          cidid.trouble_concentrating_numeric, 
          cidid.thoughts_of_death_numeric, 
-         cidid.functioning_numeric, 
-         cidid.adverse_life_event_numeric,
+         cidid.functioning_numeric,
          cidid.diagnosis_numeric,
          cidid.diagnosis)
 
 #Export into a rds file:
-#saveRDS(object = CIDID.clean, file = paste0(cleaned_path, "CIDID_cleaned.rds"))
+saveRDS(object = CIDID.clean, file = paste0(cleaned_path, "CIDID_cleaned.rds"))
 
 # Saves the R data including the recoding
 #save.image(file = paste0(cleaned_path, "GLAD_CIDID_clean.RData"))
