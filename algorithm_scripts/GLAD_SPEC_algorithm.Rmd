@@ -57,20 +57,19 @@ head(SPEC.cc)
 ```{r create dataset of SPEC diagnostic variables}
 SPEC.items <- SPEC.cc %>%
   select(ID,
-        spec.vomit_phobia,
-        spec.environment_phobia,
-        spec.situation_phobia,
-        spec.animal_phobia,
-        spec.blood_injection_phobia,
-        spec.other_phobia,
-        spec.avoid_phobias,
-        spec.endure_phobias_with_anxiety,
-        spec.phobia_frequency,
-        spec.age_first_phobia,
-        spec.age_most_recent_phobia,
-        spec.phobia_lasted,
-        spec.phobia_interfered,
-        spec.phobia_out_of_proportion)
+        spec.environment_phobia_numeric,
+        spec.situation_phobia_numeric,
+        spec.animal_phobia_numeric,
+        spec.blood_injection_phobia_numeric,
+        spec.other_phobia_numeric,
+        spec.avoid_phobias_numeric,
+        spec.endure_phobias_with_anxiety_numeric,
+        spec.phobia_frequency_numeric,
+        spec.age_first_phobia_numeric,
+        spec.age_most_recent_phobia_numeric,
+        spec.phobia_lasted_numeric,
+        spec.phobia_interfered_numeric,
+        spec.phobia_out_of_proportion_numeric)
 ```
 
 ```{r recode as NAs}
@@ -78,6 +77,9 @@ SPEC.items <- SPEC.cc %>%
 SPEC.items[SPEC.items == "Don't know"] <- NA
 SPEC.items[SPEC.items == "Prefer not to answer"] <- NA
 SPEC.items[SPEC.items == "Seen but not answered"] <- NA
+SPEC.items[SPEC.items == "-77"] <- NA
+SPEC.items[SPEC.items == "-88"] <- NA
+SPEC.items[SPEC.items == "-99"] <- NA
 ```
 
 # DSM-5 Specific phobia diagnostic criteria
@@ -120,12 +122,12 @@ SPEC.items$spec.phobias_count_numeric <- 0
 #Environmental phobia
 SPEC.items$spec.phobias_count_numeric<-with(SPEC.items,
                                                     ifelse(
-                                                      spec.environment_phobia %in% "Yes", 
+                                                      spec.environment_phobia %in% "1", 
                                                       spec.phobias_count_numeric + 1, spec.phobias_count_numeric))
 #Situation phobia
 SPEC.items$spec.phobias_count_numeric<-with(SPEC.items,
                                                     ifelse(
-                                                      spec.situation_phobia %in% "Yes", 
+                                                      spec.situation_phobia %in% "1", 
                                                       spec.phobias_count_numeric + 1, spec.phobias_count_numeric))
 #Animal phobia
 SPEC.items$spec.phobias_count_numeric<-with(SPEC.items,
