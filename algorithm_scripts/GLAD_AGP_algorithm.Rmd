@@ -52,21 +52,6 @@ head(AGP.cc)
 #Create dataset of all variables needed for AGP diagnosis
 AGP.items <- AGP.cc %>%
   select(ID,
-        agp.public_transport_phobia,
-        agp.open_spaces_phobia,
-        agp.enclosed_spaces_phobia,
-        agp.queue_or_crowd_phobia,
-        agp.outside_home_alone_phobia,
-        agp.phobia_frequency,
-        agp.avoid_phobia,
-        agp.endure_phobia_with_anxiety,
-        agp.require_companion,
-        agp.afraid_faint,
-        agp.afraid_escape_difficult,
-        agp.afraid_help_not_available,
-        agp.phobia_lasted,
-        agp.phobia_interfered,
-        agp.phobia_out_of_proportion,
         agp.public_transport_phobia_numeric,
         agp.open_spaces_phobia_numeric,
         agp.enclosed_spaces_phobia_numeric,
@@ -178,8 +163,11 @@ AGP.items <- AGP.items %>%
   mutate(agp.screener_numeric = 
            case_when(
              agp.feared_situations < 2 ~ 0,
-             agp.feared_situations >=2 & (agp.phobia_frequency == "Never" | agp.phobia_frequency == "Only one or two times ever" | agp.phobia_frequency == "Some of the time") ~ 0,
-             agp.feared_situations >=2 & (agp.phobia_frequency == "Almost always" | agp.phobia_frequency == "Always") ~ 1
+             agp.feared_situations >=2 & (agp.phobia_frequency_numeric == 0 | 
+                                            agp.phobia_frequency_numeric == 1 | 
+                                            agp.phobia_frequency_numeric == 2) ~ 0,
+             agp.feared_situations >=2 & (agp.phobia_frequency_numeric == 3 | 
+                                            agp.phobia_frequency_numeric == 4) ~ 1
              )
          )
 
@@ -194,10 +182,12 @@ B.  The individual fears or avoids these situations because of thoughts that esc
 AGP.items <- AGP.items %>% 
   mutate(agp.criterion_B_numeric =
            case_when(
-             agp.afraid_faint == "No" & agp.afraid_escape_difficult == "No" & agp.afraid_help_not_available == "No" ~ 0,
-             agp.afraid_faint == "Yes" ~ 1,
-             agp.afraid_escape_difficult == "Yes" ~ 1,
-             agp.afraid_help_not_available == "Yes" ~ 1
+             agp.afraid_faint_numeric == 0 & 
+               agp.afraid_escape_difficult_numeric == 0 & 
+               agp.afraid_help_not_available_numeric == 0 ~ 0,
+             agp.afraid_faint_numeric == 1 ~ 1,
+             agp.afraid_escape_difficult_numeric == 1 ~ 1,
+             agp.afraid_help_not_available_numeric == 1 ~ 1
            ))
 
 freq(AGP.items$agp.criterion_B_numeric)
@@ -208,10 +198,12 @@ D.  The agoraphobic situations are actively avoided, require the presence of a c
 AGP.items <- AGP.items %>% 
   mutate(agp.criterion_D_numeric =
            case_when(
-             agp.avoid_phobia == "No" & agp.endure_phobia_with_anxiety == "No" & agp.require_companion == "No" ~ 0,
-             agp.avoid_phobia == "Yes" ~ 1,
-             agp.endure_phobia_with_anxiety == "Yes" ~ 1,
-             agp.require_companion == "Yes" ~ 1
+             agp.avoid_phobia_numeric == 0 & 
+               agp.endure_phobia_with_anxiety_numeric == 0 & 
+               agp.require_companion_numeric == 0 ~ 0,
+             agp.avoid_phobia_numeric == 1 ~ 1,
+             agp.endure_phobia_with_anxiety_numeric == 1 ~ 1,
+             agp.require_companion_numeric == 1 ~ 1
            ))
 
 freq(AGP.items$agp.criterion_D_numeric)
@@ -298,9 +290,9 @@ AGP.items <- AGP.items %>%
              agp.screener_numeric == 0 | 
                agp.criterion_B_numeric == 0 |
                agp.criterion_D_numeric == 0 |
-               agp.phobia_out_of_proportion == "No" |
+               agp.phobia_out_of_proportion_numeric == 0 |
                agp.phobia_lasted_numeric <= 1 |
-               (agp.phobia_interfered == "Not at all" | agp.phobia_interfered == "A little")
+               (agp.phobia_interfered_numeric == 0 | agp.phobia_interfered_numeric == 1)
              ~ 0,
              #Criterion A (at least 2 feared situations endorsed) & Criterion C (almost always provoke fear/anxiety) screeners
              agp.screener_numeric == 1 &
@@ -309,11 +301,11 @@ AGP.items <- AGP.items %>%
                #Criterion D. Actively avoided, requires presence of companion, or endured with fear/anxiety
                agp.criterion_D_numeric == 1 &
                #Criterion E. Out of proportion to actual danger
-               agp.phobia_out_of_proportion == "Yes" &
+               agp.phobia_out_of_proportion_numeric == 1 &
                #Criterion F. Lasts for 6 months or more (duration)
                (agp.phobia_lasted_numeric > 1) &
                #Criterion G. Causes clinically significant impairment
-               (agp.phobia_interfered == "Some" | agp.phobia_interfered == "A lot") 
+               (agp.phobia_interfered_numeric == 2 | agp.phobia_interfered_numeric == 3) 
              ~ 1
            ))
 
@@ -338,21 +330,6 @@ summary(AGP.items$agp.diagnosis)
 
 AGP.clean <- AGP.items %>%
   select(ID,
-        agp.public_transport_phobia,
-        agp.open_spaces_phobia,
-        agp.enclosed_spaces_phobia,
-        agp.queue_or_crowd_phobia,
-        agp.outside_home_alone_phobia,
-        agp.phobia_frequency,
-        agp.avoid_phobia,
-        agp.endure_phobia_with_anxiety,
-        agp.require_companion,
-        agp.afraid_faint,
-        agp.afraid_escape_difficult,
-        agp.afraid_help_not_available,
-        agp.phobia_lasted,
-        agp.phobia_interfered,
-        agp.phobia_out_of_proportion,
         agp.public_transport_phobia_numeric,
         agp.open_spaces_phobia_numeric,
         agp.enclosed_spaces_phobia_numeric,
@@ -375,7 +352,7 @@ AGP.clean <- AGP.items %>%
         )
 
 #Export into a rds file:
-saveRDS(object = AGP.clean, file = paste0(cleaned_path, "AGP_cleaned.rds"))
+#saveRDS(object = AGP.clean, file = paste0(cleaned_path, "AGP_cleaned.rds"))
 
 # Saves the R data including the recoding
 #save.image(file = paste0(cleaned_path, "GLAD_AGP_clean.RData"))
