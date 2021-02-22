@@ -51,20 +51,7 @@ head(CIDID.cc)
 
 #Create dataset of all variables needed for MDD diagnosis
 CIDID.items <- CIDID.cc %>% 
-  select(ID, 
-         cidid.low_mood,
-         cidid.anhedonia,
-         cidid.how_long, 
-         cidid.how_often,
-         cidid.weight_change,
-         cidid.appetite_change, 
-         cidid.sleep_change, 
-         cidid.fatigue, 
-         cidid.worthlessness, 
-         cidid.trouble_concentrating, 
-         cidid.thoughts_of_death, 
-         cidid.functioning, 
-         cidid.adverse_life_event, #Not used in algorithm
+  select(ID,
          cidid.low_mood_numeric,
          cidid.anhedonia_numeric,
          cidid.how_long_numeric, 
@@ -76,8 +63,7 @@ CIDID.items <- CIDID.cc %>%
          cidid.worthlessness_numeric, 
          cidid.trouble_concentrating_numeric, 
          cidid.thoughts_of_death_numeric, 
-         cidid.functioning_numeric, 
-         cidid.adverse_life_event_numeric #Not used in algorithm
+         cidid.functioning_numeric
          )
 ```
 
@@ -135,9 +121,9 @@ Create combined low mood & anhedonia screening variable. If one of these screeni
 CIDID.items <- CIDID.items %>% 
   mutate(cidid.screener_numeric = 
            case_when(
-             cidid.low_mood == "No" & cidid.anhedonia == "No" ~ 0,
-             cidid.low_mood == "Yes" ~ 1,
-             cidid.anhedonia == "Yes" ~ 1
+             cidid.low_mood_numeric == 0 & cidid.anhedonia_numeric == 0 ~ 0,
+             cidid.low_mood_numeric == 1 ~ 1,
+             cidid.anhedonia_numeric == 1 ~ 1
            )
   )
 
@@ -431,7 +417,7 @@ CIDID.clean <- CIDID.items %>%
          cidid.diagnosis)
 
 #Export into a rds file:
-saveRDS(object = CIDID.clean, file = paste0(cleaned_path, "CIDID_cleaned.rds"))
+#saveRDS(object = CIDID.clean, file = paste0(cleaned_path, "CIDID_cleaned.rds"))
 
 # Saves the R data including the recoding
 #save.image(file = paste0(cleaned_path, "GLAD_CIDID_clean.RData"))
