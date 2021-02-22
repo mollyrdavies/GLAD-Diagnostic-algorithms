@@ -50,17 +50,6 @@ head(SOCP.cc)
 ```{r create dataset of SOCP diagnostic variables}
 SOCP.items <- SOCP.cc %>%
   select(ID,
-        socp.anx_social_situations,
-        socp.anx_being_observed,
-        socp.anx_others_think,
-        socp.anx_social_situation_frequency,
-        socp.avoid_social_situations,
-        socp.endure_social_situations,
-        socp.anx_irrational,
-        socp.age_first_episode_txt,
-        socp.age_last_episode_txt,
-        socp.longest_episode,
-        socp.interference_with_life,
         socp.anx_social_situations_numeric,
         socp.anx_being_observed_numeric,
         socp.anx_others_think_numeric,
@@ -123,12 +112,12 @@ If participants answer 'Yes' to any phobia in criterion A but report frequency o
 SOCP.items <- SOCP.items %>% 
   mutate(socp.criterion_A_numeric =
            case_when(
-             socp.anx_social_situations == "No" & socp.anx_being_observed == "No" ~ 0,
-             socp.anx_social_situations == "Yes" ~ 1,
-             socp.anx_being_observed == "Yes" ~ 1,
-             socp.anx_social_situations == "No" & is.na(socp.anx_being_observed) ~ NA_real_,
-             is.na(socp.anx_social_situations) & socp.anx_being_observed == "No" ~ NA_real_,
-             is.na(socp.anx_social_situations) & is.na(socp.anx_being_observed) ~ NA_real_
+             socp.anx_social_situations_numeric == 0 & socp.anx_being_observed_numeric == 0 ~ 0,
+             socp.anx_social_situations_numeric == 1 ~ 1,
+             socp.anx_being_observed_numeric == 1 ~ 1,
+             socp.anx_social_situations_numeric == 0 & is.na(socp.anx_being_observed_numeric) ~ NA_real_,
+             is.na(socp.anx_social_situations_numeric) & socp.anx_being_observed_numeric == 0 ~ NA_real_,
+             is.na(socp.anx_social_situations_numeric) & is.na(socp.anx_being_observed_numeric) ~ NA_real_
            ))
 
 summary(as.factor(SOCP.items$socp.criterion_A_numeric))
@@ -140,9 +129,9 @@ SOCP.items <- SOCP.items %>%
   mutate(socp.screener_numeric = 
            case_when(
              socp.criterion_A_numeric == 0 ~ 0,
-             !is.na(socp.anx_social_situation_frequency) & (socp.anx_social_situation_frequency == "Never" | socp.anx_social_situation_frequency == "Only one or two times ever" | socp.anx_social_situation_frequency == "Some of the time") ~ 0,
-             socp.criterion_A_numeric == 1 & (socp.anx_social_situation_frequency == "Almost always" | socp.anx_social_situation_frequency == "Always") ~ 1,
-             is.na(socp.criterion_A_numeric) | is.na(socp.anx_social_situation_frequency) ~ NA_real_
+             !is.na(socp.anx_social_situation_frequency_numeric) & (socp.anx_social_situation_frequency_numeric == 0 | socp.anx_social_situation_frequency_numeric == 1 | socp.anx_social_situation_frequency_numeric == 2) ~ 0,
+             socp.criterion_A_numeric == 1 & (socp.anx_social_situation_frequency_numeric == 3 | socp.anx_social_situation_frequency_numeric == 4) ~ 1,
+             is.na(socp.criterion_A_numeric) | is.na(socp.anx_social_situation_frequency_numeric) ~ NA_real_
            ))
 
 summary(as.factor(SOCP.items$socp.screener_numeric))
@@ -160,17 +149,17 @@ SOCP.items$socp.diagnosis_numeric <-
     (
       (socp.criterion_A_numeric == 0) |
     #Criterion B. Fear of negative evaluation
-      (socp.anx_others_think == "No") |
+      (socp.anx_others_think_numeric == 0) |
       #Criterion C. Almost always provoke fear or anxiety
-      (socp.anx_social_situation_frequency == "Never" | socp.anx_social_situation_frequency == "Only one or two times ever" | socp.anx_social_situation_frequency == "Some of the time") |
+      (socp.anx_social_situation_frequency_numeric == 0 | socp.anx_social_situation_frequency_numeric == 1 | socp.anx_social_situation_frequency_numeric == 2) |
       #Criterion D. Avoided or endured with fear
-      (socp.avoid_social_situations == "No" & socp.endure_social_situations == "No") |
+      (socp.avoid_social_situations_numeric == 0 & socp.endure_social_situations_numeric == 0) |
       #Criterion E. Out of proportion to actual threat
-      (socp.anx_irrational == "No") |
+      (socp.anx_irrational_numeric == 0) |
       #Criterion F. Lasted 6 months or more
-      (socp.longest_episode == "Less than 6 months") |
+      (socp.longest_episode_numeric == 1) |
       #Criterion G. Functional impairment
-      (socp.interference_with_life == "Not at all" | socp.interference_with_life == "A little")
+      (socp.interference_with_life_numeric == 0 | socp.interference_with_life_numeric == 1)
       #Code as 0 for no diagnosis
       ~ 0
     ),
@@ -179,17 +168,18 @@ SOCP.items$socp.diagnosis_numeric <-
     (
       (socp.criterion_A_numeric == 1) &
     #Criterion B. Fear of negative evaluation
-      (socp.anx_others_think == "Yes") &
+      (socp.anx_others_think_numeric == 1) &
       #Criterion C. Almost always provoke fear or anxiety
-      (socp.anx_social_situation_frequency == "Almost always" | socp.anx_social_situation_frequency == "Always") &
+      (socp.anx_social_situation_frequency_numeric == 3 | socp.anx_social_situation_frequency_numeric == 4) &
       #Criterion D. Avoided or endured with fear
-      (socp.avoid_social_situations == "Yes" | socp.endure_social_situations == "Yes") &
+      (socp.avoid_social_situations_numeric == 1 | socp.endure_social_situations_numeric == 1) &
       #Criterion E. Out of proportion to actual threat
-      (socp.anx_irrational == "Yes") &
+      (socp.anx_irrational_numeric == 1) &
       #Criterion F. Lasted 6 months or more
-      (socp.longest_episode == "6 - 12 months" | socp.longest_episode == "1 - 5 years" | socp.longest_episode == "5+ years" | socp.longest_episode == "All of my life / as long as I can remember") &
+      (socp.longest_episode_numeric == 2 | socp.longest_episode_numeric == 3 | 
+         socp.longest_episode_numeric == 4 | socp.longest_episode_numeric == 5) &
       #Criterion G. Functional impairment
-      (socp.interference_with_life == "Some" | socp.interference_with_life == "A lot")
+      (socp.interference_with_life_numeric == 2 | socp.interference_with_life_numeric == 3)
       #Code as 1 for socp diagnosis
       ~ 1
     ),
@@ -214,30 +204,33 @@ If a participant has an NA in this score but was far from meeting diagnostic cri
 SOCP.items$socp.social_phobia_symptoms.calc.NA<-0
 #Criterion B (fear of negative evaluation) is NA
 SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items, 
-                                    ifelse(socp.screener_numeric %in% 1 & is.na(socp.anx_others_think), 
+                                    ifelse(socp.screener_numeric %in% 1 & is.na(socp.anx_others_think_numeric), 
                                            socp.social_phobia_symptoms.calc.NA + 1, socp.social_phobia_symptoms.calc.NA))
 #Criterion D (avoid or endure) are both NA OR one option was NA and the other was 0 (if one is endorsed, participant meets this criterion and shouldn't be recoded as NA)
 SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items, 
                                     ifelse(
                                       socp.screener_numeric %in% 1 &
                                         (
-                                          (is.na(socp.avoid_social_situations) & socp.endure_social_situations == "No") |
-                                           (is.na(socp.endure_social_situations) & socp.avoid_social_situations == "No") |
-                                           (is.na(socp.avoid_social_situations) & is.na(socp.endure_social_situations))
+                                          (is.na(socp.avoid_social_situations_numeric) & 
+                                             socp.endure_social_situations_numeric == "No") |
+                                           (is.na(socp.endure_social_situations_numeric) & 
+                                              socp.avoid_social_situations_numeric == "No") |
+                                           (is.na(socp.avoid_social_situations_numeric) &
+                                              is.na(socp.endure_social_situations_numeric))
                                             ), 
                                            socp.social_phobia_symptoms.calc.NA + 1, socp.social_phobia_symptoms.calc.NA))
 
 #Criterion E (out of proportion) is NA
 SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items, 
-                                    ifelse(socp.screener_numeric %in% 1 & is.na(socp.anx_irrational), 
+                                    ifelse(socp.screener_numeric %in% 1 & is.na(socp.anx_irrational_numeric), 
                                            socp.social_phobia_symptoms.calc.NA + 1, socp.social_phobia_symptoms.calc.NA))
 #Criterion F (lasted 6 months or more) is NA
 SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items,
-                                    ifelse(socp.screener_numeric %in% 1 & is.na(socp.longest_episode),
+                                    ifelse(socp.screener_numeric %in% 1 & is.na(socp.longest_episode_numeric),
                                            socp.social_phobia_symptoms.calc.NA + 1, socp.social_phobia_symptoms.calc.NA))
 #Criterion G (impairment) is NA
 SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items,
-                                    ifelse(socp.screener_numeric %in% 1 & is.na(socp.interference_with_life),
+                                    ifelse(socp.screener_numeric %in% 1 & is.na(socp.interference_with_life_numeric),
                                            socp.social_phobia_symptoms.calc.NA + 1, socp.social_phobia_symptoms.calc.NA))
 
 summary(as.factor(SOCP.items$socp.social_phobia_symptoms.calc.NA))
@@ -279,18 +272,6 @@ summarytools::freq(SOCP.items$socp.diagnosis,
 ```{r export clean data}
 SOCP.clean <- SOCP.items %>%
   select(ID,
-        socp.anx_social_situations,
-        socp.anx_being_observed,
-        socp.anx_others_think,
-        socp.anx_social_situation_frequency,
-        socp.avoid_social_situations,
-        socp.endure_social_situations,
-        socp.anx_irrational,
-        socp.age_first_episode_txt,
-        socp.age_last_episode_txt,
-        socp.longest_episode,
-        socp.interference_with_life,
-        socp.interference_with_life_numeric,
         socp.anx_social_situations_numeric,
         socp.anx_being_observed_numeric,
         socp.anx_others_think_numeric,
