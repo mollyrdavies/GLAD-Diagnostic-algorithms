@@ -57,28 +57,11 @@ head(CIDIA.cc)
 ```{r create dataset of GAD diagnostic variables}
 CIDIA.items <- CIDIA.cc %>%
   select(ID,
-        cidia.felt_worried,
-        cidia.felt_worried_more,
+        cidia.felt_worried_numeric,
+        cidia.felt_worried_more_numeric,
         cidia.longest_period_worry_years,
         cidia.longest_period_worry_months,
         cidia.longest_period_worry_categorical,
-        cidia.worry_stronger_than_others,
-        cidia.most_days,
-        cidia.more_than_one_thing,
-        cidia.difficult_to_stop,
-        cidia.different_worries,
-        cidia.couldnt_stop,
-        cidia.difficult_to_control,
-        cidia.restless,
-        cidia.on_edge,
-        cidia.tired,
-        cidia.difficulty_concentrating,
-        cidia.irritable,
-        cidia.tense_muscles,
-        cidia.trouble_sleeping,
-        cidia.functioning,
-        cidia.felt_worried_numeric,
-        cidia.felt_worried_more_numeric,
         cidia.worry_stronger_than_others_numeric,
         cidia.most_days_numeric,
         cidia.more_than_one_thing_numeric,
@@ -238,12 +221,12 @@ Create variable for worry and duration screen
 CIDIA.items <- CIDIA.items %>% 
   mutate(cidia.screener_numeric = 
            case_when(
-             cidia.felt_worried == "No" & cidia.felt_worried_more == "No" 
+             cidia.felt_worried_numeric == 0 & cidia.felt_worried_more_numeric == 0 
              ~ 0,
-             (cidia.felt_worried == "Yes" | cidia.felt_worried_more == "Yes") & 
+             (cidia.felt_worried_numeric == 1 | cidia.felt_worried_more_numeric == 1) & 
                cidia.longest_period_worry_categorical_combined == "Less than 6 months"
              ~ 0,
-             (cidia.felt_worried == "Yes" | cidia.felt_worried_more == "Yes") &
+             (cidia.felt_worried_numeric == 1 | cidia.felt_worried_more_numeric == 1) &
                (cidia.longest_period_worry_categorical_combined == "Between 6 and 12 months" |
                   cidia.longest_period_worry_categorical_combined == "Between 1 and 5 years" |
                   cidia.longest_period_worry_categorical_combined == "More than 5 years" |
@@ -279,12 +262,12 @@ Note: Worry and duration are not included here, as the screener variable account
 CIDIA.items <- CIDIA.items %>% 
   mutate(cidia.criterion_A_numeric =
            case_when(
-             cidia.most_days == "No" ~ 0,
-             (cidia.more_than_one_thing == "One thing" & cidia.different_worries == "No") ~ 0,
+             cidia.most_days_numeric == 0 ~ 0,
+             (cidia.more_than_one_thing_numeric == 0 & cidia.different_worries_numeric == 0) ~ 0,
                #A. occurring  more  days  than not (frequency)
-               cidia.most_days == "Yes" &
+               cidia.most_days_numeric == 1 &
                #A. about a number of events or activities
-               (cidia.more_than_one_thing == "More than one thing" | cidia.different_worries == "Yes") ~ 1
+               (cidia.more_than_one_thing_numeric == 1 | cidia.different_worries_numeric == 1) ~ 1
          ))
 
 freq(CIDIA.items$cidia.criterion_A_numeric)
@@ -295,10 +278,10 @@ B.  The  individual finds it difficult to control the worry.
 CIDIA.items <- CIDIA.items %>% 
   mutate(cidia.criterion_B_numeric = 
            case_when(
-             cidia.difficult_to_stop == "No" & 
-               (cidia.couldnt_stop == "Never" | cidia.couldnt_stop == "Rarely" | cidia.couldnt_stop == "Sometimes") & 
-               (cidia.difficult_to_control == "Never" | cidia.difficult_to_control == "Rarely" | cidia.difficult_to_control == "Sometimes") ~ 0,
-             cidia.difficult_to_stop == "Yes" | cidia.couldnt_stop == "Often" | cidia.difficult_to_control == "Often" ~ 1
+             cidia.difficult_to_stop_numeric == 0 & 
+               (cidia.couldnt_stop_numeric == 0 | cidia.couldnt_stop_numeric == 1 | cidia.couldnt_stop_numeric == 2) & 
+               (cidia.difficult_to_control_numeric == 0 | cidia.difficult_to_control_numeric == 1 | cidia.difficult_to_control_numeric == 2) ~ 0,
+             cidia.difficult_to_stop_numeric == 1 | cidia.couldnt_stop_numeric == 3 | cidia.difficult_to_control_numeric == 3 ~ 1
            ))
 
 freq(CIDIA.items$cidia.criterion_B_numeric)
@@ -309,19 +292,12 @@ Create variable for restlessness or keyed up/on edge (which is a single symptom 
 CIDIA.items <- CIDIA.items %>% 
   mutate(cidia.restless_on_edge_numeric =
            case_when(
-             cidia.restless == "No" & cidia.on_edge == "No" ~ 0,
-             cidia.restless == "Yes" | cidia.on_edge == "Yes" ~ 1
+             cidia.restless_numeric == 0 & cidia.on_edge_numeric == 0 ~ 0,
+             cidia.restless_numeric == 1 | cidia.on_edge_numeric == 1 ~ 1
            ))
 
 summary(as.factor(CIDIA.items$cidia.restless_on_edge_numeric))
 
-# Recode as factor
-CIDIA.items <- CIDIA.items %>% 
-  mutate(cidia.restless_on_edge = 
-           recode_factor(cidia.restless_on_edge_numeric,
-                         "0" = "No",
-                         "1" = "Yes")
-         )
 ```
 
 
@@ -347,27 +323,27 @@ CIDIA.items$cidia.criterion_C_score_numeric<-with(CIDIA.items,
                                            cidia.criterion_C_score_numeric + 1, cidia.criterion_C_score_numeric))
 #Criterion C.2 - Being easily fatigued
 CIDIA.items$cidia.criterion_C_score_numeric<-with(CIDIA.items,
-                                    ifelse(!is.na(cidia.tired) 
-                                           & cidia.tired =="Yes",
+                                    ifelse(!is.na(cidia.tired_numeric) 
+                                           & cidia.tired_numeric ==1,
                                            cidia.criterion_C_score_numeric + 1, cidia.criterion_C_score_numeric))
 #Criterion C.3 - Difficulty concentrating
 CIDIA.items$cidia.criterion_C_score_numeric<-with(CIDIA.items,
-                                    ifelse(!is.na(cidia.difficulty_concentrating) 
-                                           & cidia.difficulty_concentrating == "Yes",
+                                    ifelse(!is.na(cidia.difficulty_concentrating_numeric) 
+                                           & cidia.difficulty_concentrating_numeric == 1,
                                            cidia.criterion_C_score_numeric + 1, cidia.criterion_C_score_numeric))
 #Criterion C.4 - Irritability
 CIDIA.items$cidia.criterion_C_score_numeric<-with(CIDIA.items, 
-                                    ifelse(!is.na(cidia.irritable) &
-                                             cidia.irritable == "Yes", 
+                                    ifelse(!is.na(cidia.irritable_numeric) &
+                                             cidia.irritable_numeric == 1, 
                                            cidia.criterion_C_score_numeric + 1, cidia.criterion_C_score_numeric))
 #Criterion C.5 - Muscle tension
 CIDIA.items$cidia.criterion_C_score_numeric<-with(CIDIA.items, 
-                                    ifelse(!is.na(cidia.tense_muscles) & cidia.tense_muscles == "Yes", 
+                                    ifelse(!is.na(cidia.tense_muscles_numeric) & cidia.tense_muscles_numeric == 1, 
                                            cidia.criterion_C_score_numeric + 1, cidia.criterion_C_score_numeric))
 #Criterion C.6 - Sleep disturbance
 CIDIA.items$cidia.criterion_C_score_numeric<-with(CIDIA.items, 
-                                    ifelse(!is.na(cidia.trouble_sleeping) 
-                                           & cidia.trouble_sleeping == "Yes", 
+                                    ifelse(!is.na(cidia.trouble_sleeping_numeric) 
+                                           & cidia.trouble_sleeping_numeric == 1, 
                                            cidia.criterion_C_score_numeric + 1, cidia.criterion_C_score_numeric))
 
 summary(as.factor(CIDIA.items$cidia.criterion_C_score_numeric))
@@ -379,8 +355,8 @@ D. The anxiety, worry, or physical symptoms cause impairment in functioning.
 CIDIA.items <- CIDIA.items %>% 
   mutate(cidia.criterion_D_numeric =
            case_when(
-             cidia.functioning == "Not at all" | cidia.functioning == "A little" ~ 0,
-             cidia.functioning == "A lot" | cidia.functioning == "Some" ~ 1
+             cidia.functioning_numeric == 0 | cidia.functioning_numeric == 1 ~ 0,
+             cidia.functioning_numeric == 2 | cidia.functioning_numeric == 3 ~ 1
            ))
 freq(CIDIA.items$cidia.criterion_D_numeric)
 ```
@@ -422,23 +398,23 @@ CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items,
                                            cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
 CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items,
-                                    ifelse(is.na(cidia.tired),
+                                    ifelse(is.na(cidia.tired_numeric),
                                            cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
 CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items,
-                                    ifelse(is.na(cidia.difficulty_concentrating),
+                                    ifelse(is.na(cidia.difficulty_concentrating_numeric),
                                            cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
 CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items, 
-                                    ifelse(is.na(cidia.irritable), 
+                                    ifelse(is.na(cidia.irritable_numeric), 
                                            cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
 CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items, 
-                                    ifelse(is.na(cidia.tense_muscles), 
+                                    ifelse(is.na(cidia.tense_muscles_numeric), 
                                            cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
 CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items, 
-                                    ifelse(is.na(cidia.trouble_sleeping), 
+                                    ifelse(is.na(cidia.trouble_sleeping_numeric), 
                                            cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
 summary(as.factor(CIDIA.items$cidia.criterion_C_score_numeric.NA))
@@ -497,28 +473,11 @@ summarytools::freq(CIDIA.items$cidia.diagnosis,
 
 CIDIA.clean <- CIDIA.items %>%
   select(ID,
-        cidia.felt_worried,
-        cidia.felt_worried_more,
+        cidia.felt_worried_numeric,
+        cidia.felt_worried_more_numeric,
         cidia.longest_period_worry_years,
         cidia.longest_period_worry_months,
         cidia.longest_period_worry_categorical,
-        cidia.worry_stronger_than_others,
-        cidia.most_days,
-        cidia.more_than_one_thing,
-        cidia.difficult_to_stop,
-        cidia.different_worries,
-        cidia.couldnt_stop,
-        cidia.difficult_to_control,
-        cidia.restless,
-        cidia.on_edge,
-        cidia.tired,
-        cidia.difficulty_concentrating,
-        cidia.irritable,
-        cidia.tense_muscles,
-        cidia.trouble_sleeping,
-        cidia.functioning,
-        cidia.felt_worried_numeric,
-        cidia.felt_worried_more_numeric,
         cidia.worry_stronger_than_others_numeric,
         cidia.most_days_numeric,
         cidia.more_than_one_thing_numeric,
@@ -540,7 +499,6 @@ CIDIA.clean <- CIDIA.items %>%
         cidia.criterion_C_score_numeric,
         cidia.criterion_C_score_numeric.NA,
         cidia.criterion_D_numeric,
-        cidia.restless_on_edge,
         cidia.restless_on_edge_numeric,
         cidia.diagnosis,
         cidia.diagnosis_numeric)
