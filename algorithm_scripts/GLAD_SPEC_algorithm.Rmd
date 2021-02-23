@@ -267,21 +267,21 @@ SPEC.items <- SPEC.items %>%
         #Criterion F. Functional impairment (not met)
              (spec.phobia_interfered_numeric == 0 | spec.phobia_interfered_numeric == 1) | 
         #Criterion C. Avoid or endure (not met)
-             (spec.avoid_phobias_numeric == 0 & spec.endure_phobias_with_anxiety_numeric == 0) ~ 0, 
+             (spec.avoid_phobias_numeric == 0 & spec.endure_phobias_with_anxiety_numeric == 0) ~ 0,
 #Any phobia
         #Criterion A
-                (spec.environment_phobia_numeric == 1 | spec.situation_phobia_numeric == 1 | spec.animal_phobia_numeric == 1 | spec.blood_injection_phobia_numeric == 1 | spec.other_phobia_numeric == 1) &
+             spec.phobias_count_numeric > 0 &
         #Criterion E. Frequency
              (spec.phobia_frequency_numeric == 3 | spec.phobia_frequency_numeric == 4) & 
         #Criterion D. Out of proportion
              spec.phobia_out_of_proportion_numeric == 1 &
         #Criterion E. Duration
-      (spec.phobia_lasted_numeric == 2 | spec.phobia_lasted_numeric == 3 | 
-         spec.phobia_lasted_numeric == 4 | spec.phobia_lasted_numeric == 5) & 
+            (spec.phobia_lasted_numeric == 2 | spec.phobia_lasted_numeric == 3 | 
+               spec.phobia_lasted_numeric == 4 | spec.phobia_lasted_numeric == 5) & 
         #Criterion F. Functional impairment
-        (spec.phobia_interfered_numeric == 2 | spec.phobia_interfered_numeric == 3) &
+            (spec.phobia_interfered_numeric == 2 | spec.phobia_interfered_numeric == 3) &
         #Criterion C. Avoid or endure
-        (spec.avoid_phobias_numeric == 1 | spec.endure_phobias_with_anxiety_numeric == 1) ~ 1)) #Criterion C. Avoid or endure
+            (spec.avoid_phobias_numeric == 1 | spec.endure_phobias_with_anxiety_numeric == 1) ~ 1)) #Criterion C. Avoid or endure
 
 #Get frequencies
 freq(SPEC.items$spec.diagnosis_numeric)

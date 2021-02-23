@@ -212,9 +212,9 @@ SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items,
                                       socp.screener_numeric %in% 1 &
                                         (
                                           (is.na(socp.avoid_social_situations_numeric) & 
-                                             socp.endure_social_situations_numeric == "No") |
+                                             socp.endure_social_situations_numeric == 0) |
                                            (is.na(socp.endure_social_situations_numeric) & 
-                                              socp.avoid_social_situations_numeric == "No") |
+                                              socp.avoid_social_situations_numeric == 0) |
                                            (is.na(socp.avoid_social_situations_numeric) &
                                               is.na(socp.endure_social_situations_numeric))
                                             ), 
