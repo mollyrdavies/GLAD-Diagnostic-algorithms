@@ -45,7 +45,7 @@ library(summarytools)
 source("../../../DF1.0_data_path.R")
 ```
 
-# SOCP renaming
+# SOCP pre-processing
 
 ```{r read in cleaned SOCP data}
 if (GLAD == TRUE) {
@@ -132,13 +132,13 @@ skimr::skim(SOCP_renamed.combined)
 
 ```{r clean dataset}
 SOCP <- SOCP_renamed.combined %>%
-    mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
-    mutate_if(is.numeric, ~na_if(., -99)) %>%
-    mutate_if(is.numeric, ~na_if(., -77)) #%>%
-    #mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # HASHED (no factors in dataset) - Recode missing values to NAs in factor variables
-    #mutate_if(is.factor, ~na_if(., "Don't know")) %>%
-    #mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
-    #mutate_if(is.factor, ~na_if(., "Prefer not to answer"))
+  mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
+  mutate_if(is.numeric, ~na_if(., -99)) %>%
+  mutate_if(is.numeric, ~na_if(., -77)) #%>%
+  #mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # HASHED (no factors in dataset) - Recode missing values to NAs in factor variables
+  #mutate_if(is.factor, ~na_if(., "Don't know")) %>%
+  #mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
+  #mutate_if(is.factor, ~na_if(., "Prefer not to answer"))
 ```
 
 # DSM-5 Social phobia diagnostic criteria

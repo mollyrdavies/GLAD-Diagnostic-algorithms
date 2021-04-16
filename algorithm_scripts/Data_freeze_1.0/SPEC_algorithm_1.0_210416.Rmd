@@ -129,7 +129,6 @@ if (GLAD == TRUE & COPING_NBR == TRUE) {
 
 ```{r clean dataset}
 SPEC <- SPEC_renamed.combined %>%
-  select(-externalDataReference) %>% 
   mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
   mutate_if(is.numeric, ~na_if(., -99)) %>%
   mutate_if(is.numeric, ~na_if(., -77)) #%>%
