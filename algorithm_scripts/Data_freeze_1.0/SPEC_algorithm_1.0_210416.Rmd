@@ -1,7 +1,7 @@
 ---
-title: "Lifetime DSM-5 specific phobia: Diagnostic algorithm (GLAD Study data)"
+title: "Lifetime DSM-5 specific phobia: Diagnostic algorithm (GLAD and COPING NBR data)"
 author: "Molly R. Davies"
-date: "22/10/20"
+date: "16/04/2021"
 output: html_document
 ---
 
