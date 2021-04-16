@@ -1,0 +1,163 @@
+---
+title: "DIAGCOMP_MHD_cleaning: Data freeze 1.0 (GLAD and COPING NBR data)"
+author: "Molly R. Davies"
+date: "16/04/2021"
+output: html_document
+---
+
+This is the script to clean the mental health diagnoses (MHD) variables of the GLAD Study and COPING NIHR BioResource (NBR) data for the paper "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
+
+The MHD dataset includes all single-item diagnoses.
+
+Script written by M. R. Davies.
+Email:  molly.davies@kcl.ac.uk
+
+All scripts for the paper can be accessed at:
+https://github.com/mollyrdavies/GLAD-Diagnostic-algorithms.git
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set up
+
+Clear workspace
+```{r clear workspace}
+rm(list = ls())
+```
+
+Select which cohorts to run the cleaning script on by changing the value to TRUE (include) or FALSE (exclude). If multiple cohorts selected, data will be combined into a single dataset.
+
+*Note: Currently only GLAD and COPING_NBR cohorts included.
+```{r select cohorts}
+GLAD = TRUE
+COPING_NBR = TRUE
+```
+
+```{r load packages}
+library(tidyverse)
+library(psych)
+library(summarytools)
+```
+
+```{r source path for reading/saving data}
+#Source raw data directory (raw_path) & clean data export directory (cleaned_path)
+source("../../DF1.0_data_path.R")
+```
+
+
+# MHD pre-processing
+
+```{r read in MHD data}
+if (GLAD == TRUE) {
+#Read GLAD data
+glad_mhd_file <- paste(glad_raw_path, "mhd_glad.rds", sep = "")
+glad_mhd <- read_rds(glad_mhd_file)
+}
+
+if (COPING_NBR == TRUE) {
+#Read COPING NBR data
+coping_nbr_mhd_file <- paste(coping_nbr_raw_path, "mhd_coping_nbr.rds", sep = "")
+coping_nbr_mhd <- read_rds(coping_nbr_mhd_file)
+}
+```
+
+Add information on cohort/sample.
+```{r MHD add sample column}
+if (GLAD == TRUE) {
+glad_mhd$sample <- "GLAD"
+}
+
+if (COPING_NBR == TRUE) {
+coping_nbr_mhd$sample <- "NBR"
+}
+```
+
+##GLAD
+```{r clean GLAD MHD variables}
+if (GLAD == TRUE) {
+glad_mhd_renamed <- glad_mhd %>% 
+  drop_na(externalDataReference) %>% 
+  distinct(externalDataReference, .keep_all = TRUE) %>% 
+  rename("ID" = "externalDataReference") %>%
+  mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
+  mutate_if(is.numeric, ~na_if(., -99)) %>%
+  mutate_if(is.numeric, ~na_if(., -77)) %>%
+  mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # Recode missing values to NAs in factor variables
+  mutate_if(is.factor, ~na_if(., "Don't know")) %>%
+  mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
+  mutate_if(is.factor, ~na_if(., "Prefer not to answer")) %>%
+  mutate_if(is.factor, ~forcats::fct_drop(., only = "Seen but not answered")) %>% # Drop empty factor levels
+  mutate_if(is.factor, ~forcats::fct_drop(., only = "Don't know")) %>%
+  mutate_if(is.factor, ~forcats::fct_drop(., only = "Prefer not to answer")) %>%
+  mutate_if(is.factor, ~forcats::fct_drop(., only = "Prefer not to say"))
+}
+```
+
+##COPING/NBR
+```{r clean COPING MHD variables}
+if (COPING_NBR == TRUE) {
+coping_nbr_mhd_renamed <- coping_nbr_mhd %>%
+  drop_na(subjectid) %>% 
+  distinct(subjectid, .keep_all = TRUE) %>% 
+  rename("ID" = "subjectid"
+         #"COPING_ID" = "LoginID", #not exported
+         ) %>% 
+  mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
+  mutate_if(is.numeric, ~na_if(., -99)) %>%
+  mutate_if(is.numeric, ~na_if(., -77)) %>%
+  mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # Recode missing values to NAs in factor variables
+  mutate_if(is.factor, ~na_if(., "Don't know")) %>%
+  mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
+  mutate_if(is.factor, ~na_if(., "Prefer not to answer")) %>%
+  mutate_if(is.factor, ~forcats::fct_drop(., only = "Seen but not answered")) %>% # Drop empty factor levels
+  mutate_if(is.factor, ~forcats::fct_drop(., only = "Don't know")) %>%
+  mutate_if(is.factor, ~forcats::fct_drop(., only = "Prefer not to answer")) %>%
+  mutate_if(is.factor, ~forcats::fct_drop(., only = "Prefer not to say"))
+}
+```
+
+```{r rename GLAD MHD dataset (if GLAD only)}
+if (GLAD == TRUE & COPING_NBR == FALSE) {
+  MHD_renamed.combined <- glad_mhd_renamed
+}
+```
+
+```{r rename COPING NBR MHD dataset (if COPING NBR only)}
+if (GLAD == FALSE & COPING_NBR == TRUE) {
+  MHD_renamed.combined <- coping_nbr_mhd_renamed
+}
+```
+
+```{r merge GLAD & COPING NBR MHD datasets}
+if (GLAD == TRUE & COPING_NBR == TRUE) {
+MHD_renamed.combined <- bind_rows(
+  glad_mhd_renamed,
+  coping_nbr_mhd_renamed
+)
+}
+```
+
+# Export clean dataset
+
+```{r select MHD variables}
+#Select variables
+MHD.clean <- MHD_renamed.combined %>%
+  select(ID,
+        mhd.mdd,
+        mhd.pmdd,
+        mhd.bipolar_disorder,
+        mhd.gad,
+        mhd.specific_phobia,
+        mhd.social_anxiety,
+        mhd.panic_attacks,
+        mhd.panic_disorder,
+        mhd.agoraphobia
+        )
+
+#Export into a rds file:
+saveRDS(object = MHD.clean, file = paste0(cleaned_path, "MHD_cleaned.rds"))
+
+# Saves the R data including the recoding
+#save.image(file = paste0(cleaned_path, "GLAD_MHD_clean.RData")
+```
