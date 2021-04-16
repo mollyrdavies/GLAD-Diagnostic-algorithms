@@ -127,15 +127,16 @@ if (GLAD == TRUE & COPING_NBR == TRUE) {
 }
 ```
 
-```{r create dataset of SPEC diagnostic variables}
+```{r clean dataset}
 SPEC <- SPEC_renamed.combined %>%
-    mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
-    mutate_if(is.numeric, ~na_if(., -99)) %>%
-    mutate_if(is.numeric, ~na_if(., -77)) #%>%
-    #mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # Recode missing values to NAs in factor variables
-    #mutate_if(is.factor, ~na_if(., "Don't know")) %>%
-    #mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
-    #mutate_if(is.factor, ~na_if(., "Prefer not to answer"))
+  select(-externalDataReference) %>% 
+  mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
+  mutate_if(is.numeric, ~na_if(., -99)) %>%
+  mutate_if(is.numeric, ~na_if(., -77)) #%>%
+  #mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # Recode missing values to NAs in factor variables
+  #mutate_if(is.factor, ~na_if(., "Don't know")) %>%
+  #mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
+  #mutate_if(is.factor, ~na_if(., "Prefer not to answer"))
 ```
 
 # DSM-5 Specific phobia diagnostic criteria

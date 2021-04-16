@@ -5,7 +5,7 @@ date: "16/04/2021"
 output: html_document
 ---
 
-This script runs an algorithm based on DSM-5 diagnostic criteria, to ascertain likely lifetime diagnosis of social anxiety disorder (previously social phobia) using the GLAD and COPING NBR data.
+This script runs an algorithm based on DSM-5 diagnostic criteria, to ascertain likely lifetime diagnosis of social anxiety disorder (previously social phobia) using the GLAD Study and COPING NIHR BioResource (NBR) data.
 
 Algorithm developed for the paper "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
 
@@ -130,7 +130,7 @@ SOCP_renamed.combined <- bind_rows(
 skimr::skim(SOCP_renamed.combined)
 ```
 
-```{r create dataset of SOCP diagnostic variables}
+```{r clean dataset}
 SOCP <- SOCP_renamed.combined %>%
     mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
     mutate_if(is.numeric, ~na_if(., -99)) %>%
