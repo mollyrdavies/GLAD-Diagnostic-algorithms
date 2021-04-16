@@ -1,11 +1,11 @@
 ---
-title: "Lifetime DSM-5 social phobia: Diagnostic algorithm (GLAD Study data)"
+title: "Lifetime DSM-5 social phobia: Diagnostic algorithm (GLAD and COPING NBR data)"
 author: "Molly R. Davies"
-date: "23/10/2020"
+date: "16/04/2021"
 output: html_document
 ---
 
-This script runs an algorithm based on DSM-5 diagnostic criteria, to ascertain likely lifetime diagnosis of social anxiety disorder (previously social phobia) using the GLAD Study data.
+This script runs an algorithm based on DSM-5 diagnostic criteria, to ascertain likely lifetime diagnosis of social anxiety disorder (previously social phobia) using the GLAD Study and COPING NIHR BioResource (NBR) data.
 
 Algorithm developed for the paper "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
 
@@ -26,6 +26,14 @@ Clear workspace
 rm(list = ls())
 ```
 
+Select which cohorts to run the algorithms on by changing the value to TRUE (include) or FALSE (exclude). If multiple cohorts selected, data will be combined into a single dataset.
+
+*Note: Currently only GLAD and COPING_NBR cohorts included in algorithms.
+```{r select cohorts}
+GLAD = TRUE
+COPING_NBR = TRUE
+```
+
 ```{r load packages}
 library(tidyverse)
 library(psych)
@@ -34,28 +42,103 @@ library(summarytools)
 
 ```{r source path for reading/saving data}
 #Source raw data directory (raw_path) & clean data export directory (cleaned_path)
-source("../ANXCMBD_data_path.R")
+source("../../../DF1.0_data_path.R")
 ```
+
+# SOCP pre-processing
 
 ```{r read in cleaned SOCP data}
-SOCP_file <- paste(renamed_path, "SOCP.rds", sep = "")
+if (GLAD == TRUE) {
+#Read GLAD data
+glad_socp_file <- paste(glad_raw_path, "socp_glad.rds", sep = "")
+glad_socp <- read_rds(glad_socp_file)
+}
 
-SOCP.cc <- read_rds(SOCP_file)
+if (COPING_NBR == TRUE) {
+#Read COPING data
+coping_nbr_socp_file <- paste(coping_nbr_optional_raw_path, "socp_coping_nbr_optional.rds", sep = "")
+coping_nbr_socp <- read_rds(coping_nbr_socp_file)
+}
+
 ```
 
-```{r visualize data}
-head(SOCP.cc)
+```{r SOCP add sample column}
+if (GLAD == TRUE) {
+glad_socp$sample <- "GLAD"
+}
+
+if (COPING_NBR == TRUE) {
+coping_nbr_socp$sample <- "NBR"
+}
 ```
 
-```{r create dataset of SOCP diagnostic variables}
-SOCP.items <- SOCP.cc %>%
-    mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
-    mutate_if(is.numeric, ~na_if(., -99)) %>%
-    mutate_if(is.numeric, ~na_if(., -77)) #%>%
-    #mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # HASHED (no factors in dataset) - Recode missing values to NAs in factor variables
-    #mutate_if(is.factor, ~na_if(., "Don't know")) %>%
-    #mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
-    #mutate_if(is.factor, ~na_if(., "Prefer not to answer"))
+```{r GLAD SOCP renaming}
+if (GLAD == TRUE) {
+glad_socp_renamed <- glad_socp %>% 
+  drop_na(externalDataReference) %>% 
+  distinct(externalDataReference, .keep_all = TRUE) %>% 
+  rename("ID" = "externalDataReference")
+}
+```
+
+```{r skim renamed GLAD SOCP dataset}
+if (GLAD == TRUE) {
+skimr::skim(glad_socp_renamed)
+}
+```
+
+
+```{r COPING SOCP renaming}
+if (COPING_NBR == TRUE) {
+coping_nbr_socp_renamed <- coping_nbr_socp %>% 
+  drop_na(recipientFirstName) %>% 
+  distinct(recipientFirstName, .keep_all = TRUE) %>% 
+  rename("ID" = "recipientFirstName",
+         "COPING_ID" = "externalDataReference",
+         "socp.social_situations_interfere_interfere" = "socp.important_area_social_situations") #different from GLAD
+}
+```
+
+```{r skim renamed COPING SOCP dataset}
+if (COPING_NBR == TRUE) {
+skimr::skim(coping_nbr_socp_renamed)
+}
+```
+
+```{r rename GLAD SOCP dataset (if GLAD only)}
+if (GLAD == TRUE & COPING_NBR == FALSE) {
+  SOCP_renamed.combined <- glad_socp_renamed
+}
+```
+
+```{r rename COPING NBR SOCP dataset (if COPING NBR only)}
+if (GLAD == FALSE & COPING_NBR == TRUE) {
+  SOCP_renamed.combined <- coping_nbr_socp_renamed
+}
+```
+
+```{r merge SOCP datasets}
+if (GLAD == TRUE & COPING_NBR == TRUE) {
+SOCP_renamed.combined <- bind_rows(
+  glad_socp_renamed,
+  coping_nbr_socp_renamed
+)
+}
+```
+
+```{r view new SOCP dataset}
+skimr::skim(SOCP_renamed.combined)
+```
+
+```{r clean dataset}
+SOCP <- SOCP_renamed.combined %>%
+  mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
+  mutate_if(is.numeric, ~na_if(., -99)) %>%
+  mutate_if(is.numeric, ~na_if(., -77)) #%>%
+  #mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # HASHED (no factors in dataset) - Recode missing values to NAs in factor variables
+  #mutate_if(is.factor, ~na_if(., "Don't know")) %>%
+  #mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
+  #mutate_if(is.factor, ~na_if(., "Prefer not to answer"))
 ```
 
 # DSM-5 Social phobia diagnostic criteria
@@ -96,7 +179,7 @@ If participants answer 'No' to all phobias in criterion A, then they are given a
 If participants answer 'Yes' to any phobia in criterion A but report frequency of these fears as "Never", "Only one or two times ever", or "Some of the time", then they are given a 0 for diagnosis and skip the remaining questions.
 
 ```{r social phobia criterion A combined variable}
-SOCP.items <- SOCP.items %>% 
+SOCP <- SOCP %>% 
   mutate(socp.criterion_A_numeric =
            case_when(
              socp.being_in_social_situations == 0 & socp.being_observed == 0 ~ 0,
@@ -107,12 +190,12 @@ SOCP.items <- SOCP.items %>%
              is.na(socp.being_in_social_situations) & is.na(socp.being_observed) ~ NA_real_
            ))
 
-summary(as.factor(SOCP.items$socp.criterion_A_numeric))
+summary(as.factor(SOCP$socp.criterion_A_numeric))
 ```
 
 ```{r social phobia screener variable}
 #Questionnaire screening variable
-SOCP.items <- SOCP.items %>% 
+SOCP <- SOCP %>% 
   mutate(socp.screener_numeric = 
            case_when(
              socp.criterion_A_numeric == 0 ~ 0,
@@ -121,15 +204,15 @@ SOCP.items <- SOCP.items %>%
              is.na(socp.criterion_A_numeric) | is.na(socp.social_situations_anxiety_fear) ~ NA_real_
            ))
 
-summary(as.factor(SOCP.items$socp.screener_numeric))
+summary(as.factor(SOCP$socp.screener_numeric))
 ```
 
 ## DSM-5 social phobia algorithm
 Applying the diagnostic algorithm to questionnaire responses
 ```{r diagnostic algorithm for social phobia}
 
-SOCP.items$socp.diagnosis_numeric <-
-  with(SOCP.items,
+SOCP$socp.diagnosis_numeric <-
+  with(SOCP,
   dplyr::case_when(
 ## No social phobia
     #Criterion A. Marked fear in social situations
@@ -173,7 +256,7 @@ SOCP.items$socp.diagnosis_numeric <-
 )
 )
 
-freq(SOCP.items$socp.diagnosis_numeric)
+freq(SOCP$socp.diagnosis_numeric)
 
 ```
 
@@ -188,13 +271,13 @@ Similarly, once participants pass the screeners, if any of the other core sympto
 If a participant has an NA in this score but was far from meeting diagnostic criteria, then we may still want to keep them as a '0' for diagnosis. This score is therefore counted separately to allow for this flexibility.
 ```{r social phobia NA symptom count score}
 
-SOCP.items$socp.social_phobia_symptoms.calc.NA<-0
+SOCP$socp.social_phobia_symptoms.calc.NA<-0
 #Criterion B (fear of negative evaluation) is NA
-SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items, 
+SOCP$socp.social_phobia_symptoms.calc.NA<-with(SOCP, 
                                     ifelse(socp.screener_numeric %in% 1 & is.na(socp.people_willthink_orhave_thoughtin), 
                                            socp.social_phobia_symptoms.calc.NA + 1, socp.social_phobia_symptoms.calc.NA))
 #Criterion D (avoid or endure) are both NA OR one option was NA and the other was 0 (if one is endorsed, participant meets this criterion and shouldn't be recoded as NA)
-SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items, 
+SOCP$socp.social_phobia_symptoms.calc.NA<-with(SOCP, 
                                     ifelse(
                                       socp.screener_numeric %in% 1 &
                                         (
@@ -208,29 +291,29 @@ SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items,
                                            socp.social_phobia_symptoms.calc.NA + 1, socp.social_phobia_symptoms.calc.NA))
 
 #Criterion E (out of proportion) is NA
-SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items, 
+SOCP$socp.social_phobia_symptoms.calc.NA<-with(SOCP, 
                                     ifelse(socp.screener_numeric %in% 1 & is.na(socp.proportion_social_situations_situations), 
                                            socp.social_phobia_symptoms.calc.NA + 1, socp.social_phobia_symptoms.calc.NA))
 #Criterion F (lasted 6 months or more) is NA
-SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items,
+SOCP$socp.social_phobia_symptoms.calc.NA<-with(SOCP,
                                     ifelse(socp.screener_numeric %in% 1 & is.na(socp.social_situations_lasted_longest),
                                            socp.social_phobia_symptoms.calc.NA + 1, socp.social_phobia_symptoms.calc.NA))
 #Criterion G (impairment) is NA
-SOCP.items$socp.social_phobia_symptoms.calc.NA<-with(SOCP.items,
+SOCP$socp.social_phobia_symptoms.calc.NA<-with(SOCP,
                                     ifelse(socp.screener_numeric %in% 1 & is.na(socp.social_situations_interfere_interfere),
                                            socp.social_phobia_symptoms.calc.NA + 1, socp.social_phobia_symptoms.calc.NA))
 
-summary(as.factor(SOCP.items$socp.social_phobia_symptoms.calc.NA))
+summary(as.factor(SOCP$socp.social_phobia_symptoms.calc.NA))
 
 ```
 
 Ppts are coded NA if they didn't respond to questions that could have met diagnostic criteria.
 ```{r recode social phobia missingness as NA}
 #Frequencies before accounting for missingness
-freq(SOCP.items$socp.diagnosis_numeric )
+freq(SOCP$socp.diagnosis_numeric )
 
 #Recode as NA for missingness
-SOCP.items$socp.diagnosis_numeric <- with(SOCP.items,
+SOCP$socp.diagnosis_numeric <- with(SOCP,
                                        ifelse(
                                          is.na(socp.screener_numeric) | 
                                            socp.social_phobia_symptoms.calc.NA > 0,
@@ -238,19 +321,19 @@ SOCP.items$socp.diagnosis_numeric <- with(SOCP.items,
                                        ))
 
 #Frequencies after accounting for missingness
-freq(SOCP.items$socp.diagnosis_numeric)
+freq(SOCP$socp.diagnosis_numeric)
 
 ```
 
 ```{r socp.diagnosis (calculated) recode, results='asis'}
-summary(SOCP.items$socp.diagnosis_numeric)
+summary(SOCP$socp.diagnosis_numeric)
 
-SOCP.items$socp.diagnosis <- recode_factor(SOCP.items$socp.diagnosis_numeric,
+SOCP$socp.diagnosis <- recode_factor(SOCP$socp.diagnosis_numeric,
                              "0" = "No social phobia",
                              "1" = "Social phobia")
 
 # Check if the recoding worked
-summarytools::freq(SOCP.items$socp.diagnosis,
+summarytools::freq(SOCP$socp.diagnosis,
                    style = "rmarkdown")
 ```
 
@@ -259,7 +342,7 @@ summarytools::freq(SOCP.items$socp.diagnosis,
 ```{r export clean data}
 
 #Export data
-saveRDS(object = SOCP.items, file = paste0(cleaned_path, "SOCP_cleaned.rds"))
+saveRDS(object = SOCP, file = paste0(cleaned_path, "SOCP_cleaned.rds"))
 
 # Saves the R data including the recoding
 #save.image(file = paste0(cleaned_path, "GLAD_SOCP_clean.RData")

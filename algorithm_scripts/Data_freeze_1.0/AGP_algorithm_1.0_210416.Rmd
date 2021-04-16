@@ -1,11 +1,11 @@
 ---
-title: 'Lifetime DSM-5 agoraphobia: Diagnostic algorithm (GLAD Study data)'
+title: 'Lifetime DSM-5 agoraphobia: Diagnostic algorithm (GLAD and COPING NBR data)'
 author: "Molly R. Davies"
-date: "24/10/2020"
+date: "16/04/2021"
 output: html_document
 ---
 
-This script runs an algorithm based on DSM-5 diagnostic criteria, to ascertain likely lifetime diagnosis of agoraphobia using the GLAD Study data.
+This script runs an algorithm based on DSM-5 diagnostic criteria, to ascertain likely lifetime diagnosis of agoraphobia using the GLAD Study and COPING NIHR BioResource (NBR) data.
 
 Algorithm developed for the paper "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
 
@@ -26,6 +26,14 @@ Clear workspace
 rm(list = ls())
 ```
 
+Select which cohorts to run the algorithms on by changing the value to TRUE (include) or FALSE (exclude). If multiple cohorts selected, data will be combined into a single dataset.
+
+*Note: Currently only GLAD and COPING_NBR cohorts included in algorithms.
+```{r select cohorts}
+GLAD = TRUE
+COPING_NBR = TRUE
+```
+
 ```{r load packages}
 library(tidyverse)
 library(psych)
@@ -34,23 +42,83 @@ library(summarytools)
 
 ```{r source path for reading/saving data}
 #Source raw data directory (raw_path) & clean data export directory (cleaned_path)
-source("../ANXCMBD_data_path.R")
+source("../../../DF1.0_data_path.R")
 ```
+
+
+# AGP renaming
 
 ```{r read in cleaned AGP data}
-AGP_file <- paste(renamed_path, "AGP.rds", sep = "")
+if (GLAD == TRUE) {
+#Read GLAD data
+glad_agp_file <- paste(glad_raw_path, "agp_glad.rds", sep = "")
+glad_agp.cc <- read_rds(glad_agp_file)
+}
 
-AGP.cc <- read_rds(AGP_file)
+if (COPING_NBR == TRUE) {
+#Read COPING data
+coping_nbr_agp_file <- paste(coping_nbr_optional_raw_path, "agp_coping_nbr_optional.rds", sep = "")
+coping_nbr_agp.cc <- read_rds(coping_nbr_agp_file)
+}
 ```
 
-```{r visualise AGP data}
-head(AGP.cc)
+```{r AGP add sample column}
+if (GLAD == TRUE) {
+glad_agp.cc$sample <- "GLAD"
+}
+
+
+coping_nbr_agp.cc$sample <- "NBR"
+```
+
+```{r GLAD AGP renaming}
+if (GLAD == TRUE) {
+glad_agp_renamed <- glad_agp.cc %>% 
+  drop_na(externalDataReference) %>% 
+  distinct(externalDataReference, .keep_all = TRUE) %>% 
+  rename("ID" = "externalDataReference")
+}
+```
+
+```{r COPING AGP renaming}
+
+coping_nbr_agp_renamed <- coping_nbr_agp.cc %>% 
+  drop_na(recipientFirstName) %>% 
+  distinct(recipientFirstName, .keep_all = TRUE) %>% 
+  rename("ID" = "recipientFirstName",
+         "COPING_ID" = "externalDataReference",
+         "agp.lose_control_embarrass_faint" = "agp.embarrass_faint_lose_control", #different from GLAD
+         "agp.escape_afraid_difficult_happened" = "agp.escape_happened_afraid_difficult", #different from GLAD
+         "agp.interfered_activities_fears_life" = "agp.activities_interfered_life_fears" #different from GLAD
+         )
+```
+
+
+```{r rename GLAD AGP dataset (if GLAD only)}
+if (GLAD == TRUE & COPING_NBR == FALSE) {
+  AGP_renamed.combined <- glad_agp_renamed
+}
+```
+
+```{r rename COPING NBR AGP dataset (if COPING NBR only)}
+if (GLAD == FALSE & COPING_NBR == TRUE) {
+  AGP_renamed.combined <- coping_nbr_agp_renamed
+}
+```
+
+```{r merge AGP datasets}
+if (GLAD == TRUE & COPING_NBR == TRUE) {
+AGP_renamed.combined <- bind_rows(
+  glad_agp_renamed,
+  coping_nbr_agp_renamed
+)
+}
 ```
 
 ```{r create dataset of AGP diagnostic variables}
 
 #Create dataset of all variables needed for AGP diagnosis
-AGP.items <- AGP.cc %>%
+AGP <- AGP_renamed.combined %>%
     mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
     mutate_if(is.numeric, ~na_if(., -99)) %>%
     mutate_if(is.numeric, ~na_if(., -77)) %>%
@@ -105,41 +173,41 @@ Calculate AGP fearful situations 'score' (the number of criterion A symptoms end
 ```{r AGP fearful situations score}
 #Create score for AGP fearful situations
 #Do NOT use 'is.na' for these as then you cannot +1 to it. Use the no.info item for NA (below). 
-AGP.items$agp.feared_situations<-0
+AGP$agp.feared_situations<-0
 
 #Criterion A.1 - Using public transportation
-AGP.items$agp.feared_situations<-with(AGP.items, 
+AGP$agp.feared_situations<-with(AGP, 
                                     ifelse(!is.na(agp.using_public_transportation) 
                                            & agp.using_public_transportation == 1, 
                                            agp.feared_situations + 1, agp.feared_situations))
 #Criterion A.2 - Being in open spaces
-AGP.items$agp.feared_situations<-with(AGP.items,
+AGP$agp.feared_situations<-with(AGP,
                                     ifelse(!is.na(agp.being_in_open_spaces) 
                                            & agp.being_in_open_spaces == 1,
                                            agp.feared_situations + 1, agp.feared_situations))
 #Criterion A.3 - Being in enclosed spaces
-AGP.items$agp.feared_situations<-with(AGP.items,
+AGP$agp.feared_situations<-with(AGP,
                                     ifelse(!is.na(agp.being_in_enclosed_spaces) 
                                            & agp.being_in_enclosed_spaces == 1,
                                            agp.feared_situations + 1, agp.feared_situations))
 #Criterion A.4 - Standing in line or being in a crowd
-AGP.items$agp.feared_situations<-with(AGP.items, 
+AGP$agp.feared_situations<-with(AGP, 
                                     ifelse(!is.na(agp.queue_crowd_standing) &
                                              agp.queue_crowd_standing == 1, 
                                            agp.feared_situations + 1, agp.feared_situations))
 #Criterion A.5 - Being outside of the home alone
-AGP.items$agp.feared_situations<-with(AGP.items, 
+AGP$agp.feared_situations<-with(AGP, 
                                     ifelse(!is.na(agp.being_outside_of_the_home_alone) &
                                              agp.being_outside_of_the_home_alone == 1, 
                                            agp.feared_situations + 1, agp.feared_situations))
 
 #Check distribution of scores
-summary(as.factor(AGP.items$agp.feared_situations))
+summary(as.factor(AGP$agp.feared_situations))
 
 ```
 
 ```{r agoraphobia screener}
-AGP.items <- AGP.items %>% 
+AGP <- AGP %>% 
   mutate(agp.screener_numeric = 
            case_when(
              agp.feared_situations < 2 ~ 0,
@@ -151,7 +219,7 @@ AGP.items <- AGP.items %>%
              )
          )
 
-freq(AGP.items$agp.screener_numeric)
+freq(AGP$agp.screener_numeric)
 ```
 
 ## Criterion variables
@@ -159,7 +227,7 @@ Note: These criterion variables will have a large number of NAs if the screening
 
 B.  The individual fears or avoids these situations because of thoughts that escape might be difficult or help might not be available in the event of developing panic-like symptoms or other incapacitating or embarrassing symptoms 
 ```{r agoraphobia criterion B variable}
-AGP.items <- AGP.items %>% 
+AGP <- AGP %>% 
   mutate(agp.criterion_B_numeric =
            case_when(
              agp.lose_control_embarrass_faint == 0 & 
@@ -170,12 +238,12 @@ AGP.items <- AGP.items %>%
              agp.needed_afraid == 1 ~ 1
            ))
 
-freq(AGP.items$agp.criterion_B_numeric)
+freq(AGP$agp.criterion_B_numeric)
 ```
 
 D.  The agoraphobic situations are actively avoided, require the presence of a companion, or are endured with intense fear or anxiety.
 ```{r agoraphobia criterion D variable}
-AGP.items <- AGP.items %>% 
+AGP <- AGP %>% 
   mutate(agp.criterion_D_numeric =
            case_when(
              agp.avoid_these_situations == 0 & 
@@ -186,7 +254,7 @@ AGP.items <- AGP.items %>%
              agp.require_the_presence_of_a_companion == 1 ~ 1
            ))
 
-freq(AGP.items$agp.criterion_D_numeric)
+freq(AGP$agp.criterion_D_numeric)
 ```
 
 ## Missingness
@@ -196,30 +264,30 @@ If participants do not respond to the screening questions, then they are not sho
 
 ```{r AGP fearful situations NA count score}
 #Create score to calculate how many missing values are in the AGP fearful situations screener
-AGP.items$agp.feared_situations.NA<-0
+AGP$agp.feared_situations.NA<-0
 
 #Criterion A.1 - Using public transportation
-AGP.items$agp.feared_situations.NA<-with(AGP.items, 
+AGP$agp.feared_situations.NA<-with(AGP, 
                                     ifelse(is.na(agp.using_public_transportation) , 
                                            agp.feared_situations.NA + 1, agp.feared_situations.NA))
 #Criterion A.2 - Being in open spaces
-AGP.items$agp.feared_situations.NA<-with(AGP.items,
+AGP$agp.feared_situations.NA<-with(AGP,
                                     ifelse(is.na(agp.being_in_open_spaces),
                                            agp.feared_situations.NA + 1, agp.feared_situations.NA))
 #Criterion A.3 - Being in enclosed spaces
-AGP.items$agp.feared_situations.NA<-with(AGP.items,
+AGP$agp.feared_situations.NA<-with(AGP,
                                     ifelse(is.na(agp.being_in_enclosed_spaces),
                                            agp.feared_situations.NA + 1, agp.feared_situations.NA))
 #Criterion A.4 - Standing in line or being in a crowd
-AGP.items$agp.feared_situations.NA<-with(AGP.items, 
+AGP$agp.feared_situations.NA<-with(AGP, 
                                     ifelse(is.na(agp.queue_crowd_standing), 
                                            agp.feared_situations.NA + 1, agp.feared_situations.NA))
 #Criterion A.5 - Being outside of the home alone
-AGP.items$agp.feared_situations.NA<-with(AGP.items, 
+AGP$agp.feared_situations.NA<-with(AGP, 
                                     ifelse(is.na(agp.being_outside_of_the_home_alone), 
                                            agp.feared_situations.NA + 1, agp.feared_situations.NA))
 
-summary(as.factor(AGP.items$agp.feared_situations.NA))
+summary(as.factor(AGP$agp.feared_situations.NA))
 
 ```
 
@@ -229,15 +297,15 @@ Once participants pass the screeners, if any of the other core symptoms are NA t
 Future considerations: If a participant has an NA in this score but was far from meeting diagnostic criteria, then we may still want to keep them as a '0' for diagnosis.
 ```{r variable for AGP symptom missingness}
 #Missing responses/no information on core symptoms
-AGP.items$no.info<-0
+AGP$no.info<-0
 #+1 to missingness score if criterion B items are missing
-AGP.items$no.info <- with(AGP.items,
+AGP$no.info <- with(AGP,
                                ifelse(agp.screener_numeric %in% 1 & is.na(agp.criterion_B_numeric),
                                       no.info + 1, no.info
                                                 )
                                       )
 #+1 to missingness if criteria E, F, or G items are missing
-AGP.items$no.info <- with(AGP.items,
+AGP$no.info <- with(AGP,
                                ifelse(agp.screener_numeric %in% 1 & 
                                         (is.na(agp.actual_danger_involved_proportion) |
                                         is.na(agp.longest_time_fears_lasted) |
@@ -246,18 +314,18 @@ AGP.items$no.info <- with(AGP.items,
                                                 )
                                       )
 #+1 to missingness if criterion D item are missing
-AGP.items$no.info <- with(AGP.items,
+AGP$no.info <- with(AGP,
                                ifelse(agp.screener_numeric %in% 1 & is.na(agp.criterion_D_numeric),
                                       no.info + 1, no.info
                                                 )
                                       )
 
-summary(as.factor(AGP.items$no.info))
+summary(as.factor(AGP$no.info))
 ```
 
 ```{r lifetime AGP diagnosis variable}
 #Code lifetime AGP as NA if any core symptoms were missed
-AGP.items <- AGP.items %>% 
+AGP <- AGP %>% 
   mutate(agp.diagnosis_numeric = 
            case_when(
              #Code as NA for missingness in screener that may have affected diagnosis
@@ -289,7 +357,7 @@ AGP.items <- AGP.items %>%
              ~ 1
            ))
 
-freq(as.factor(AGP.items$agp.diagnosis_numeric))
+freq(as.factor(AGP$agp.diagnosis_numeric))
 
 ```
 
@@ -297,11 +365,11 @@ freq(as.factor(AGP.items$agp.diagnosis_numeric))
 
 ```{r agp.diagnosis recode}
 
-AGP.items$agp.diagnosis <- recode_factor(AGP.items$agp.diagnosis_numeric,
+AGP$agp.diagnosis <- recode_factor(AGP$agp.diagnosis_numeric,
                              "0" = "No agoraphobia",
                              "1" = "Agoraphobia")
 #Summary of recoded variable
-summary(AGP.items$agp.diagnosis)
+summary(AGP$agp.diagnosis)
 ```
 
 ## Clean AGP dataset
@@ -309,7 +377,7 @@ summary(AGP.items$agp.diagnosis)
 ```{r clean AGP dataframe}
 
 #Export into a rds file:
-saveRDS(object = AGP.items, file = paste0(cleaned_path, "AGP_cleaned.rds"))
+saveRDS(object = AGP, file = paste0(cleaned_path, "AGP_cleaned.rds"))
 
 # Saves the R data including the recoding
 #save.image(file = paste0(cleaned_path, "GLAD_AGP_clean.RData"))

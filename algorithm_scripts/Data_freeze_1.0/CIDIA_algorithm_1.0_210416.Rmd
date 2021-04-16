@@ -1,11 +1,11 @@
 ---
-title: "CIDI Lifetime GAD: Diagnostic algorithm (GLAD Study data)"
+title: "CIDI Lifetime GAD: Diagnostic algorithm (GLAD and COPING NBR data)"
 author: "Molly R. Davies and Alicia J. Peel"
-date: "21/05/2020"
+date: "16/04/2021"
 output: html_document
 ---
 
-This script runs an algorithm adapted from the Composite International Diagnostic Interview - Short form (CIDI-SF), based on DSM-5 diagnostic criteria, to ascertain likely lifetime diagnosis of generalised anxiety disorder (GAD) using the GLAD Study data.
+This script runs an algorithm adapted from the Composite International Diagnostic Interview - Short form (CIDI-SF), based on DSM-5 diagnostic criteria, to ascertain likely lifetime diagnosis of generalised anxiety disorder (GAD)using the GLAD Study and COPING NIHR BioResource (NBR) data..
 
 Algorithm developed for the paper "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
 
@@ -23,7 +23,15 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Clear workspace
 ```{r clear workspace}
-#rm(list = ls())
+rm(list = ls())
+```
+
+Select which cohorts to run the algorithms on by changing the value to TRUE (include) or FALSE (exclude). If multiple cohorts selected, data will be combined into a single dataset.
+
+*Note: Currently only GLAD and COPING_NBR cohorts included in algorithms.
+```{r select cohorts}
+GLAD = TRUE
+COPING_NBR = TRUE
 ```
 
 ```{r load packages}
@@ -34,28 +42,104 @@ library(summarytools)
 
 ```{r source path for reading/saving data}
 #Source raw data directory (raw_path) & clean data export directory (cleaned_path)
-source("../ANXCMBD_data_path.R")
+source("../../../DF1.0_data_path.R")
 ```
 
-```{r read in cleaned CIDIA data}
-CIDIA_file <- paste(renamed_path, "CIDIA.rds", sep = "")
 
-CIDIA.cc <- read_rds(CIDIA_file)
+# CIDIA pre-processing
+
+```{r read in CIDIA data}
+if (GLAD == TRUE) {
+#Read GLAD data
+glad_cidia_file <- paste(glad_raw_path, "cidia_glad.rds", sep = "")
+glad_cidia <- read_rds(glad_cidia_file)
+}
+
+if (COPING_NBR == TRUE) {
+#Read COPING NBR data
+coping_nbr_cidia_file <- paste(coping_nbr_raw_path, "cidia_coping_nbr.rds", sep = "")
+coping_nbr_cidia <- read_rds(coping_nbr_cidia_file)
+}
 ```
 
-```{r visualise CIDIA data}
-head(CIDIA.cc)
+```{r CIDIA add sample column}
+if (GLAD == TRUE) {
+glad_cidia$sample <- "GLAD"
+}
+if (COPING_NBR == TRUE) {
+coping_nbr_cidia$sample <- "NBR"
+}
 ```
 
-```{r create dataset of GAD diagnostic variables}
-CIDIA.items <- CIDIA.cc %>%
-    mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
-    mutate_if(is.numeric, ~na_if(., -99)) %>%
-    mutate_if(is.numeric, ~na_if(., -77)) %>%
-    mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # Recode missing values to NAs in factor variables
-    mutate_if(is.factor, ~na_if(., "Don't know")) %>%
-    mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
-    mutate_if(is.factor, ~na_if(., "Prefer not to answer"))
+```{r GLAD CIDIA renaming}
+if (GLAD == TRUE) {
+glad_cidia_renamed <- glad_cidia %>% 
+  drop_na(externalDataReference) %>% 
+  distinct(externalDataReference, .keep_all = TRUE) %>% 
+  rename("ID" = "externalDataReference")
+}
+```
+
+```{r visualise renamed GLAD CIDIA data}
+if (GLAD == TRUE) {
+skimr::skim(glad_cidia_renamed)
+}
+```
+
+```{r COPING CIDIA renaming}
+if (COPING_NBR == TRUE) {
+coping_nbr_cidia_renamed <- coping_nbr_cidia %>% 
+  drop_na(subjectid) %>% 
+  distinct(subjectid, .keep_all = TRUE) %>% 
+  rename("ID" = "subjectid",
+         #"COPING_ID" = "externalDataReference", #not extracted, add if needed
+         "cidia.longest_period_continued_kind.3" = "cidia.longest_period_continued_kind.3.1", #Different from GLAD
+         "cidia.longest_period_continued_kind.4" = "cidia.longest_period_continued_kind.3" #Different from GLAD
+         )
+}
+```
+
+```{r visualise renamed COPING CIDIA data}
+if (COPING_NBR == TRUE) {
+  skimr::skim(coping_nbr_cidia_renamed)
+}
+```
+
+```{r rename GLAD CIDIA dataset (if GLAD only)}
+if (GLAD == TRUE & COPING_NBR == FALSE) {
+  CIDIA_renamed.combined <- glad_cidia_renamed
+}
+```
+
+```{r rename COPING NBR CIDIA dataset (if COPING NBR only)}
+if (GLAD == FALSE & COPING_NBR == TRUE) {
+  CIDIA_renamed.combined <- coping_nbr_cidia_renamed
+}
+```
+
+```{r merge GLAD & COPING NBR CIDIA datasets}
+if (GLAD == TRUE & COPING_NBR == TRUE) {
+  CIDIA_renamed.combined <- bind_rows(
+    glad_cidia_renamed,
+    coping_nbr_cidia_renamed
+    )
+}
+```
+
+```{r skim combined CIDIA dataset}
+skimr::skim(CIDIA_renamed.combined)
+```
+
+```{r clean dataset}
+CIDIA <- CIDIA_renamed.combined %>%
+  select(-externalDataReference) %>% 
+  mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
+  mutate_if(is.numeric, ~na_if(., -99)) %>%
+  mutate_if(is.numeric, ~na_if(., -77)) %>%
+  mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # Recode missing values to NAs in factor variables
+  mutate_if(is.factor, ~na_if(., "Don't know")) %>%
+  mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
+  mutate_if(is.factor, ~na_if(., "Prefer not to answer"))
 ```
 
 # Cleaning variables
@@ -67,19 +151,20 @@ categorical, and allows for easy analysis of all participants together.
 
 ### Longest period of worry - continuous (combined)
 The continuous variable consisted of months and years, which need to be added together.
-```{r longest_period_worry combine years and months}
+```{r GLAD longest_period_worry combine years and months}
+if (GLAD == TRUE) {
 #Visualise data
-summary(CIDIA.items$cidia.longest_period_continued_kind)
-summary(CIDIA.items$cidia.longest_period_continued_kind.1)
+summary(CIDIA$cidia.longest_period_continued_kind)
+summary(CIDIA$cidia.longest_period_continued_kind.1)
 
 #Convert months to numeric
-CIDIA.items$cidia.longest_period_continued_kind.1 <- as.numeric(CIDIA.items$cidia.longest_period_continued_kind.1)
+CIDIA$cidia.longest_period_continued_kind.1 <- as.numeric(CIDIA$cidia.longest_period_continued_kind.1)
 
 #Convert months to years
-CIDIA.items$cidia.longest_period_continued_kind.1.years <- CIDIA.items$cidia.longest_period_continued_kind.1/12
+CIDIA$cidia.longest_period_continued_kind.1.years <- CIDIA$cidia.longest_period_continued_kind.1/12
 
 #Set value for 'months as years' variable to zero if the other contains a value
-CIDIA.months.years<-data.frame(cbind(CIDIA.items$cidia.longest_period_continued_kind.1.years, CIDIA.items$cidia.longest_period_continued_kind))
+CIDIA.months.years<-data.frame(cbind(CIDIA$cidia.longest_period_continued_kind.1.years, CIDIA$cidia.longest_period_continued_kind))
 names(CIDIA.months.years)<-c("cidia.longest_period_continued_kind.1.years", "cidia.longest_period_continued_kind")
 
 #Recode 'months as years' variable to 0 if years variable has a value 
@@ -97,34 +182,46 @@ CIDIA.months.years<-CIDIA.months.years %>%
              !is.na(cidia.longest_period_continued_kind) ~ cidia.longest_period_continued_kind))
          
 #Combine month & year values for total time of longest period of worry
-CIDIA.items$cidia.longest_period_worry_combined.unc <- rowSums(cbind(CIDIA.months.years$cidia.longest_period_continued_kind.1.years, CIDIA.months.years$cidia.longest_period_continued_kind))
+CIDIA$cidia.longest_period_worry_combined.unc <- rowSums(cbind(CIDIA.months.years$cidia.longest_period_continued_kind.1.years, CIDIA.months.years$cidia.longest_period_continued_kind))
 
 #Round the new variable
-CIDIA.items$cidia.longest_period_worry_combined <- round(CIDIA.items$cidia.longest_period_worry_combined.unc, digits = 2)
+CIDIA$cidia.longest_period_worry_combined <- round(CIDIA$cidia.longest_period_worry_combined.unc, digits = 2)
 
 #Summarise new variable
-summary(CIDIA.items$cidia.longest_period_worry_combined)
+summary(CIDIA$cidia.longest_period_worry_combined)
 
-sum(with(CIDIA.items,
+sum(with(CIDIA,
          ifelse(!is.na(cidia.longest_period_worry_combined) & cidia.longest_period_worry_combined > 50, 1, 0)
          )
 )
+}
+
+#If COPING only, add variable to COPING_NBR data so below script works
+if (GLAD == FALSE & COPING_NBR == TRUE) {
+  CIDIA$cidia.longest_period_worry_combined <- NA
+}
 ```
 
-### Longest period of worry categoorical - combined (COPING cohorts only)
+### Longest period of worry categorical - combined (COPING cohorts only)
 The COPING baseline includes a follow-up question asking participants who selected "less than 6 months" how long (in months) was their longest period of worry. There was an option to select 6 months, which would qualify for a diagnosis.
-```{r combine longest period of worry categorical variables}
-CIDIA.items <- CIDIA.items %>% 
-  mutate(cidia.longest_period_continued_kind.2_clean =
+```{r COPING combine longest period of worry categorical variables}
+if (COPING_NBR == TRUE) {
+CIDIA <- CIDIA %>% 
+  mutate(cidia.longest_period_continued_kind.2_combined =
            case_when(
              cidia.longest_period_continued_kind.2 > 1 ~ cidia.longest_period_continued_kind.2,
-             cidia.longest_period_continued_kind.2 == 1 & cidia.longest_period_continued_kind.3.1 == 6 ~ 2,
-             cidia.longest_period_continued_kind.2 == 1 & cidia.longest_period_continued_kind.3.1 < 6 ~ cidia.longest_period_continued_kind.2,
-             cidia.longest_period_continued_kind.2 == 1 & is.na(cidia.longest_period_continued_kind.3.1) ~ cidia.longest_period_continued_kind.2
+             cidia.longest_period_continued_kind.2 == 1 & cidia.longest_period_continued_kind.3 == 6 ~ 2,
+             cidia.longest_period_continued_kind.2 == 1 & cidia.longest_period_continued_kind.3 < 6 ~ cidia.longest_period_continued_kind.2,
+             cidia.longest_period_continued_kind.2 == 1 & is.na(cidia.longest_period_continued_kind.3) ~ cidia.longest_period_continued_kind.2
            ))
-summary(as.factor(CIDIA.items$cidia.longest_period_continued_kind.2))
-summary(as.factor(CIDIA.items$cidia.longest_period_continued_kind.2_clean))
+summary(as.factor(CIDIA$cidia.longest_period_continued_kind.2))
+summary(as.factor(CIDIA$cidia.longest_period_continued_kind.2_combined))
+}
 
+#IF GLAD only, transfer GLAD kind.2 variable so below script works
+if (GLAD == TRUE & COPING_NBR == FALSE) {
+  CIDIA$cidia.longest_period_continued_kind.2_combined <- CIDIA$cidia.longest_period_continued_kind.2
+}
 ```
 
 
@@ -132,23 +229,23 @@ summary(as.factor(CIDIA.items$cidia.longest_period_continued_kind.2_clean))
 Combine categorical and continuous variables into a single categorical variable.
 ```{r create longest_period_worry_categorical.combined}
 #Create column
-CIDIA.items$cidia.longest_period_continued_kind.2_combined.unc <- NA
+CIDIA$cidia.longest_period_continued_kind.2_combined.unc <- NA
 #Combine columns into single categorical variable
-CIDIA.items$cidia.longest_period_continued_kind.2_combined.unc <- with(
-  CIDIA.items,
-  ifelse(is.na(cidia.longest_period_continued_kind.2_clean) 
+CIDIA$cidia.longest_period_continued_kind.2_combined.unc <- with(
+  CIDIA,
+  ifelse(is.na(cidia.longest_period_continued_kind.2_combined) 
          & !is.na(cidia.longest_period_worry_combined),
          (cut(cidia.longest_period_worry_combined,
               breaks = c(0, 0.49, 1, 5, Inf),
               labels = c(1, 2, 3, 5))),
-         cidia.longest_period_continued_kind.2_clean))
+         cidia.longest_period_continued_kind.2_combined))
 
 ```
 
 ```{r recode longest_period_worry_categorical.combined}
 #Recode factor
-CIDIA.items$cidia.longest_period_continued_kind.2_combined <-
-  recode_factor(CIDIA.items$cidia.longest_period_continued_kind.2_combined.unc,
+CIDIA$cidia.longest_period_worry_combined_cleaned <-
+  recode_factor(CIDIA$cidia.longest_period_continued_kind.2_combined.unc,
                              "1" = "Less than 6 months",
                              "2" = "Between 6 and 12 months",
                              "3" = "Between 1 and 5 years", 
@@ -158,15 +255,15 @@ CIDIA.items$cidia.longest_period_continued_kind.2_combined <-
 ```
 
 ```{r longest_period_worry_categorical summary, results='asis'}
-summarytools::freq(CIDIA.items$cidia.longest_period_continued_kind.2_combined,
+summarytools::freq(CIDIA$cidia.longest_period_worry_combined_cleaned,
                    style = "rmarkdown")
 ```
 
 ```{r compare total NA in combined variable to originals}
 #There should be fewer NAs in the categorical_combined variable than in the categorical and continuous variables alone
-sum(is.na(CIDIA.items$cidia.longest_period_continued_kind.2)) #Categorical
-sum(is.na(CIDIA.items$cidia.longest_period_worry_combined)) #Continuous
-sum(is.na(CIDIA.items$cidia.longest_period_continued_kind.2_combined)) #Combined
+sum(is.na(CIDIA$cidia.longest_period_continued_kind.2_combined)) #Categorical
+sum(is.na(CIDIA$cidia.longest_period_worry_combined)) #Continuous
+sum(is.na(CIDIA$cidia.longest_period_worry_combined_cleaned)) #Combined
 
 ```
 
@@ -182,7 +279,7 @@ C.  The  anxiety and  worry are  associated  with  three  (or more)  of the foll
   3.   Difficulty concentrating or mind going  blank.
   4.   Irritability.
   5.   Muscle tension.
-  6.   Sleep  disturbance  (difficulty  falling  or  staying  asleep,  or  restless,  unsatisfyingsleep).
+  6.   Sleep  disturbance  (difficulty  falling  or  staying  asleep,  or  restless,  unsatisfying sleep).
 
 D.  The anxiety, worry, or physical symptoms cause clinically significant distress*** or impairment in social,  occupational,  or other important areas of functioning.
 
@@ -208,36 +305,38 @@ If the participant reports either anxiety or worry but doesn't report symptoms l
 
 Create variable for worry and duration screen
 ```{r variable for worry and duration screener}
-CIDIA.items <- CIDIA.items %>% 
+CIDIA <- CIDIA %>% 
   mutate(cidia.screener_numeric = 
            case_when(
              cidia.tense_anxious_felt_worried == 0 & cidia.lot_people_things_situation == 0 
              ~ 0,
              (cidia.tense_anxious_felt_worried == 1 | cidia.lot_people_things_situation == 1) & 
-               cidia.longest_period_continued_kind.2_combined == "Less than 6 months"
+               cidia.longest_period_worry_combined_cleaned == "Less than 6 months"
              ~ 0,
              (cidia.tense_anxious_felt_worried == 1 | cidia.lot_people_things_situation == 1) &
-               (cidia.longest_period_continued_kind.2_combined == "Between 6 and 12 months" |
-                  cidia.longest_period_continued_kind.2_combined == "Between 1 and 5 years" |
-                  cidia.longest_period_continued_kind.2_combined == "More than 5 years" |
-                  cidia.longest_period_continued_kind.2_combined == "All of my life/as long as I can remember") 
+               (cidia.longest_period_worry_combined_cleaned == "Between 6 and 12 months" |
+                  cidia.longest_period_worry_combined_cleaned == "Between 1 and 5 years" |
+                  cidia.longest_period_worry_combined_cleaned == "More than 5 years" |
+                  cidia.longest_period_worry_combined_cleaned == "All of my life/as long as I can remember") 
              ~ 1
            ))
-summary(as.factor(CIDIA.items$cidia.screener_numeric))
+summary(as.factor(CIDIA$cidia.screener_numeric))
 
 #Duration criteria variable created for curiosity, to check N participants that didn't meet this criterion
-CIDIA.items <- CIDIA.items %>% 
+CIDIA <- CIDIA %>% 
   mutate(cidia.duration_numeric = 
            case_when(
-             cidia.longest_period_continued_kind.2_combined == "Less than 6 months"
+             cidia.tense_anxious_felt_worried == 0 & cidia.lot_people_things_situation == 0 
+             ~ -99,
+             cidia.longest_period_worry_combined_cleaned == "Less than 6 months"
              ~ 0,
-             (cidia.longest_period_continued_kind.2_combined == "Between 6 and 12 months" |
-                  cidia.longest_period_continued_kind.2_combined == "Between 1 and 5 years" |
-                  cidia.longest_period_continued_kind.2_combined == "More than 5 years" |
-                  cidia.longest_period_continued_kind.2_combined == "All of my life/as long as I can remember") ~ 1
+             (cidia.longest_period_worry_combined_cleaned == "Between 6 and 12 months" |
+                  cidia.longest_period_worry_combined_cleaned == "Between 1 and 5 years" |
+                  cidia.longest_period_worry_combined_cleaned == "More than 5 years" |
+                  cidia.longest_period_worry_combined_cleaned == "All of my life/as long as I can remember") ~ 1
            ))
 
-summary(as.factor(CIDIA.items$cidia.duration_numeric))
+summary(as.factor(CIDIA$cidia.duration_numeric))
 
 ```
 
@@ -249,7 +348,7 @@ Note: These criterion variables will have a large number of NAs if the screening
 A. Excessive  anxiety  and  worry  (apprehensive  expectation), occurring more days than not for at least 6 months, about a number of events or activities.
 Note: Worry and duration are not included here, as the screener variable accounts for those responses.
 ```{r variable for criterion A}
-CIDIA.items <- CIDIA.items %>% 
+CIDIA <- CIDIA %>% 
   mutate(cidia.criterion_A_numeric =
            case_when(
              cidia.did_you_worry_most_days == 0 ~ 0,
@@ -260,12 +359,12 @@ CIDIA.items <- CIDIA.items %>%
                (cidia.job_security_failing_health == 1 | cidia.mind_worries_time == 1) ~ 1
          ))
 
-freq(CIDIA.items$cidia.criterion_A_numeric)
+freq(CIDIA$cidia.criterion_A_numeric)
 ```
 
 B.  The  individual finds it difficult to control the worry.
 ```{r variable for criterion B}
-CIDIA.items <- CIDIA.items %>% 
+CIDIA <- CIDIA %>% 
   mutate(cidia.criterion_B_numeric = 
            case_when(
              cidia.stop_worrying_difficult_find == 0 & 
@@ -274,19 +373,19 @@ CIDIA.items <- CIDIA.items %>%
              cidia.stop_worrying_difficult_find == 1 | cidia.matter_hard_strong_put == 3 | cidia.control_difficult_find_worry == 3 ~ 1
            ))
 
-freq(CIDIA.items$cidia.criterion_B_numeric)
+freq(CIDIA$cidia.criterion_B_numeric)
 ```
 
 Create variable for restlessness or keyed up/on edge (which is a single symptom criterion in the DSM for GAD)
 ```{r variable for restless & keyed up/on edge (criterion C)}
-CIDIA.items <- CIDIA.items %>% 
+CIDIA <- CIDIA %>% 
   mutate(cidia.restless_on_edge_numeric =
            case_when(
              cidia.restless == 0 & cidia.keyed_up_or_on_edge == 0 ~ 0,
              cidia.restless == 1 | cidia.keyed_up_or_on_edge == 1 ~ 1
            ))
 
-summary(as.factor(CIDIA.items$cidia.restless_on_edge_numeric))
+summary(as.factor(CIDIA$cidia.restless_on_edge_numeric))
 
 ```
 
@@ -305,50 +404,50 @@ C.  The  anxiety and  worry are  associated  with  three  (or more)  of the foll
 ```{r anxiety symptom score (criterion C)}
 #Create score for anxiety symptoms 
 #Do NOT use 'is.na' for these as then you cannot +1 to it. Use the no.info item for NA. 
-CIDIA.items$cidia.criterion_C_score_numeric<-0
+CIDIA$cidia.criterion_C_score_numeric<-0
 #Criterion C.1 - Restlessness or feeling keyed up or on edge
-CIDIA.items$cidia.criterion_C_score_numeric<-with(CIDIA.items, 
+CIDIA$cidia.criterion_C_score_numeric<-with(CIDIA, 
                                     ifelse(!is.na(cidia.restless_on_edge_numeric) 
                                            & cidia.restless_on_edge_numeric > 0, 
                                            cidia.criterion_C_score_numeric + 1, cidia.criterion_C_score_numeric))
 #Criterion C.2 - Being easily fatigued
-CIDIA.items$cidia.criterion_C_score_numeric<-with(CIDIA.items,
+CIDIA$cidia.criterion_C_score_numeric<-with(CIDIA,
                                     ifelse(!is.na(cidia.easily_tired) 
                                            & cidia.easily_tired ==1,
                                            cidia.criterion_C_score_numeric + 1, cidia.criterion_C_score_numeric))
 #Criterion C.3 - Difficulty concentrating
-CIDIA.items$cidia.criterion_C_score_numeric<-with(CIDIA.items,
+CIDIA$cidia.criterion_C_score_numeric<-with(CIDIA,
                                     ifelse(!is.na(cidia.mind_difficulty_keeping) 
                                            & cidia.mind_difficulty_keeping == 1,
                                            cidia.criterion_C_score_numeric + 1, cidia.criterion_C_score_numeric))
 #Criterion C.4 - Irritability
-CIDIA.items$cidia.criterion_C_score_numeric<-with(CIDIA.items, 
+CIDIA$cidia.criterion_C_score_numeric<-with(CIDIA, 
                                     ifelse(!is.na(cidia.more_irritable_than_usual) &
                                              cidia.more_irritable_than_usual == 1, 
                                            cidia.criterion_C_score_numeric + 1, cidia.criterion_C_score_numeric))
 #Criterion C.5 - Muscle tension
-CIDIA.items$cidia.criterion_C_score_numeric<-with(CIDIA.items, 
+CIDIA$cidia.criterion_C_score_numeric<-with(CIDIA, 
                                     ifelse(!is.na(cidia.having_tense_sore_or_aching_muscles) & cidia.having_tense_sore_or_aching_muscles == 1, 
                                            cidia.criterion_C_score_numeric + 1, cidia.criterion_C_score_numeric))
 #Criterion C.6 - Sleep disturbance
-CIDIA.items$cidia.criterion_C_score_numeric<-with(CIDIA.items, 
+CIDIA$cidia.criterion_C_score_numeric<-with(CIDIA, 
                                     ifelse(!is.na(cidia.often_having_trouble_falling_or_staying_asleep) 
                                            & cidia.often_having_trouble_falling_or_staying_asleep == 1, 
                                            cidia.criterion_C_score_numeric + 1, cidia.criterion_C_score_numeric))
 
-summary(as.factor(CIDIA.items$cidia.criterion_C_score_numeric))
+summary(as.factor(CIDIA$cidia.criterion_C_score_numeric))
 
 ```
 
 D. The anxiety, worry, or physical symptoms cause impairment in functioning.
 ```{r variable for criterion D}
-CIDIA.items <- CIDIA.items %>% 
+CIDIA <- CIDIA %>% 
   mutate(cidia.criterion_D_numeric =
            case_when(
              cidia.including_study_problems_interfere == 0 | cidia.including_study_problems_interfere == 1 ~ 0,
              cidia.including_study_problems_interfere == 2 | cidia.including_study_problems_interfere == 3 ~ 1
            ))
-freq(CIDIA.items$cidia.criterion_D_numeric)
+freq(CIDIA$cidia.criterion_D_numeric)
 ```
 
 # Missingness
@@ -357,64 +456,64 @@ freq(CIDIA.items$cidia.criterion_D_numeric)
 #Missing responses/no information on any of the core symptoms of anxiety
 #(Later, if no.info > 1 overall, then lifetime GAD will be coded as NA)
 
-CIDIA.items$no.info<-0
+CIDIA$no.info<-0
 #+1 to missingness score if criterion A variable is NA
-CIDIA.items$no.info<-with(CIDIA.items,
+CIDIA$no.info<-with(CIDIA,
                              ifelse(is.na(cidia.criterion_A_numeric), 
                                     no.info + 1, no.info)
                              )
 #+1 to missingness score if difficulty controlling worry (criterion B) variable is NA
-CIDIA.items$no.info<-with(CIDIA.items,
+CIDIA$no.info<-with(CIDIA,
                              ifelse(is.na(cidia.criterion_B_numeric), 
                                     no.info + 1, no.info)
                              )
 #+1 to missingness score if functioning (criterion D) is unanswered
-CIDIA.items$no.info <- with(CIDIA.items,
+CIDIA$no.info <- with(CIDIA,
                                ifelse(is.na(cidia.criterion_D_numeric),
                                       no.info + 1, no.info)
                                       )
 
-summary(as.factor(CIDIA.items$no.info))
+summary(as.factor(CIDIA$no.info))
 ```
 
 
 ```{r anxiety symptom NA count score}
 #Create score to calculate how many missing values are in the anxiety symptom scores
 
-CIDIA.items$cidia.criterion_C_score_numeric.NA<-0
+CIDIA$cidia.criterion_C_score_numeric.NA<-0
 
-CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items, 
+CIDIA$cidia.criterion_C_score_numeric.NA<-with(CIDIA, 
                                     ifelse(is.na(cidia.restless_on_edge_numeric), 
                                            cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
-CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items,
+CIDIA$cidia.criterion_C_score_numeric.NA<-with(CIDIA,
                                     ifelse(is.na(cidia.easily_tired),
                                            cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
-CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items,
+CIDIA$cidia.criterion_C_score_numeric.NA<-with(CIDIA,
                                     ifelse(is.na(cidia.mind_difficulty_keeping),
                                            cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
-CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items, 
+CIDIA$cidia.criterion_C_score_numeric.NA<-with(CIDIA, 
                                     ifelse(is.na(cidia.more_irritable_than_usual), 
                                            cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
-CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items, 
+CIDIA$cidia.criterion_C_score_numeric.NA<-with(CIDIA, 
                                     ifelse(is.na(cidia.having_tense_sore_or_aching_muscles), 
                                            cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
-CIDIA.items$cidia.criterion_C_score_numeric.NA<-with(CIDIA.items, 
+CIDIA$cidia.criterion_C_score_numeric.NA<-with(CIDIA, 
                                     ifelse(is.na(cidia.often_having_trouble_falling_or_staying_asleep), 
                                            cidia.criterion_C_score_numeric.NA + 1, cidia.criterion_C_score_numeric.NA))
 
-summary(as.factor(CIDIA.items$cidia.criterion_C_score_numeric.NA))
+summary(as.factor(CIDIA$cidia.criterion_C_score_numeric.NA))
 
 ```
 
 # DSM-5 GAD diagnostic algorithm
 
 ```{r lifetime GAD diagnosis variable}
-CIDIA.items <- CIDIA.items %>% 
+CIDIA <- CIDIA %>% 
   mutate(cidia.diagnosis_numeric =
            case_when(
              #Ppts are coded NA if they didn't respond to any of the screening questions
@@ -440,20 +539,20 @@ CIDIA.items <- CIDIA.items %>%
                cidia.criterion_D_numeric == 1 ~ 1
            ))
 
-freq(CIDIA.items$cidia.diagnosis_numeric)
+freq(CIDIA$cidia.diagnosis_numeric)
 
 ```
 
 ```{r cidia.diagnosis recode}
 #Rename variable and recode
-CIDIA.items$cidia.diagnosis <- recode_factor(CIDIA.items$cidia.diagnosis_numeric,
+CIDIA$cidia.diagnosis <- recode_factor(CIDIA$cidia.diagnosis_numeric,
                              "0" = "No GAD diagnosis",
                              "1" = "GAD diagnosis")
-freq(CIDIA.items$cidia.diagnosis)
+freq(CIDIA$cidia.diagnosis)
 ```
 
 ```{r lifetime_anxiety_screen summary, results='asis'}
-summarytools::freq(CIDIA.items$cidia.diagnosis,
+summarytools::freq(CIDIA$cidia.diagnosis,
                    style = "rmarkdown")
 ```
 
@@ -462,7 +561,7 @@ summarytools::freq(CIDIA.items$cidia.diagnosis,
 ```{r clean CIDIA dataframe}
 
 #Export into a rds file:
-saveRDS(object = CIDIA.items, file = paste0(cleaned_path, "CIDIA_cleaned.rds"))
+saveRDS(object = CIDIA, file = paste0(cleaned_path, "CIDIA_cleaned.rds"))
 
 # Saves the R data including the recoding
 #save.image(file = paste0(cleaned_path, "GLAD_CIDIA_clean.RData")
