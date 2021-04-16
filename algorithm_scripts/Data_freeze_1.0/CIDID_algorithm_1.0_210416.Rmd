@@ -26,7 +26,7 @@ Clear workspace
 rm(list = ls())
 ```
 
-Select which cohorts to run the algorithms on. If multiple cohorts selected, data will be combined into a single dataset.
+Select which cohorts to run the algorithms on by changing the value to TRUE (include) or FALSE (exclude). If multiple cohorts selected, data will be combined into a single dataset.
 
 *Note: Currently only GLAD and COPING_NBR cohorts included in algorithms.
 ```{r select cohorts}
@@ -46,7 +46,7 @@ source("../../../DF1.0_data_path.R")
 ```
 
 
-# CIDID renaming
+# CIDID pre-processing
 
 ```{r read in CIDID data}
 if (GLAD == TRUE) {
@@ -62,7 +62,7 @@ coping_nbr_cidid <- read_rds(coping_nbr_cidid_file)
 }
 ```
 
-Add information oncohort/sample.
+Add information on cohort/sample.
 ```{r CIDID add sample column}
 if (GLAD == TRUE) {
 glad_cidid$sample <- "GLAD"
@@ -105,6 +105,18 @@ skimr::skim(coping_nbr_cidid_renamed)
 }
 ```
 
+```{r rename GLAD CIDID dataset (if GLAD only)}
+if (GLAD == TRUE & COPING_NBR == FALSE) {
+  CIDID_renamed.combined <- glad_cidid_renamed
+}
+```
+
+```{r rename COPING NBR CIDID dataset (if COPING NBR only)}
+if (GLAD == FALSE & COPING_NBR == TRUE) {
+  CIDID_renamed.combined <- coping_nbr_cidid_renamed
+}
+```
+
 ```{r merge GLAD & COPING NBR CIDID datasets}
 if (GLAD == TRUE & COPING_NBR == TRUE) {
 CIDID_renamed.combined <- bind_rows(
@@ -118,7 +130,7 @@ CIDID_renamed.combined <- bind_rows(
 skimr::skim(CIDID_renamed.combined)
 ```
 
-```{r create dataset of MDD diagnostic variables}
+```{r clean dataset}
 #Create dataset of all variables needed for MDD diagnosis
 CIDID <- CIDID_renamed.combined %>% 
   select(-externalDataReference) %>% 
