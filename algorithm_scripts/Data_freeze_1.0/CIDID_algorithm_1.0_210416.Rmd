@@ -1,11 +1,11 @@
 ---
-title: "CIDI Lifetime MDD: Diagnostic algorithm (GLAD Study data)"
+title: "CIDI Lifetime MDD: Diagnostic algorithm (GLAD and COPING NBR data)"
 author: "Molly R. Davies and Megan Skelton"
 date: "24/10/2020"
 output: html_document
 ---
 
-This script runs an algorithm adapted from the Composite International Diagnostic Interview - Short form (CIDI-SF), based on DSM-5 diagnostic criteria, to ascertain likely lifetime diagnosis of major depressive disorder (MDD) using the GLAD Study data.
+This script runs an algorithm adapted from the Composite International Diagnostic Interview - Short form (CIDI-SF), based on DSM-5 diagnostic criteria, to ascertain likely lifetime diagnosis of major depressive disorder (MDD) using the GLAD Study and COPING NIHR BioResource (NBR) data.
 
 Algorithm developed for the paper "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
 
@@ -26,6 +26,14 @@ Clear workspace
 rm(list = ls())
 ```
 
+Select which cohorts to run the algorithms on. If multiple cohorts selected, data will be combined into a single dataset.
+
+*Note: Currently only GLAD and COPING_NBR cohorts included in algorithms.
+```{r select cohorts}
+GLAD = TRUE
+COPING_NBR = TRUE
+```
+
 ```{r load packages}
 library(tidyverse)
 library(psych)
@@ -34,30 +42,93 @@ library(summarytools)
 
 ```{r source path for reading/saving data}
 #Source raw data directory (raw_path) & clean data export directory (cleaned_path)
-source("../ANXCMBD_data_path.R")
+source("../../../DF1.0_data_path.R")
 ```
 
 
-```{r read in cleaned CIDID data}
-CIDID_file <- paste(renamed_path, "CIDID.rds", sep = "")
+# CIDID renaming
 
-CIDID.cc <- read_rds(CIDID_file)
+```{r read in CIDID data}
+if (GLAD == TRUE) {
+#Read GLAD data
+glad_cidid_file <- paste(glad_raw_path, "cidid_glad.rds", sep = "")
+glad_cidid <- read_rds(glad_cidid_file)
+}
+
+if (COPING_NBR == TRUE) {
+#Read COPING NBR data
+coping_nbr_cidid_file <- paste(coping_nbr_raw_path, "cidid_coping_nbr.rds", sep = "")
+coping_nbr_cidid <- read_rds(coping_nbr_cidid_file)
+}
 ```
 
-```{r visualise CIDID data}
-head(CIDID.cc)
+Add information oncohort/sample.
+```{r CIDID add sample column}
+if (GLAD == TRUE) {
+glad_cidid$sample <- "GLAD"
+}
+
+if (COPING_NBR == TRUE) {
+coping_nbr_cidid$sample <- "NBR"
+}
+```
+
+```{r GLAD CIDID renaming}
+if (GLAD == TRUE) {
+glad_cidid_renamed <- glad_cidid %>%
+  drop_na(externalDataReference) %>% 
+  distinct(externalDataReference, .keep_all = TRUE) %>% 
+  rename("ID" = "externalDataReference")
+}
+```
+
+```{r visualise renamed GLAD CIDID data}
+if (GLAD == TRUE) {
+skimr::skim(glad_cidid_renamed)
+}
+```
+
+```{r COPING CIDID renaming}
+if (COPING_NBR == TRUE) {
+coping_nbr_cidid_renamed <- coping_nbr_cidid %>% 
+  drop_na(subjectid) %>% 
+  distinct(subjectid, .keep_all = TRUE) %>% 
+  rename("ID" = "subjectid",
+         #"COPING_ID" = "COPING_ID", #not extracted, add if needed
+         )
+}
+```
+
+```{r visualise renamed COPING NBR CIDID data}
+if (COPING_NBR == TRUE) {
+skimr::skim(coping_nbr_cidid_renamed)
+}
+```
+
+```{r merge GLAD & COPING NBR CIDID datasets}
+if (GLAD == TRUE & COPING_NBR == TRUE) {
+CIDID_renamed.combined <- bind_rows(
+  glad_cidid_renamed,
+  coping_nbr_cidid_renamed
+)
+}
+```
+
+```{r skim combined CIDID dataset}
+skimr::skim(CIDID_renamed.combined)
 ```
 
 ```{r create dataset of MDD diagnostic variables}
 #Create dataset of all variables needed for MDD diagnosis
-CIDID.items <- CIDID.cc %>% 
-    mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
-    mutate_if(is.numeric, ~na_if(., -99)) %>%
-    mutate_if(is.numeric, ~na_if(., -77)) %>%
-    mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # Recode missing values to NAs in factor variables
-    mutate_if(is.factor, ~na_if(., "Don't know")) %>%
-    mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
-    mutate_if(is.factor, ~na_if(., "Prefer not to answer"))
+CIDID <- CIDID_renamed.combined %>% 
+  select(-externalDataReference) %>% 
+  mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
+  mutate_if(is.numeric, ~na_if(., -99)) %>%
+  mutate_if(is.numeric, ~na_if(., -77)) %>%
+  mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # Recode missing values to NAs in factor variables
+  mutate_if(is.factor, ~na_if(., "Don't know")) %>%
+  mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
+  mutate_if(is.factor, ~na_if(., "Prefer not to answer"))
 ```
 
 # DSM-5 MDD diagnostic criteria
@@ -101,7 +172,7 @@ If the participant responds No (0) to both low mood and anhedonia variables, the
 Create combined low mood & anhedonia screening variable. If one of these screening variables is "No" and the other is NA, the screener is coded NA.
 ```{r variable for low mood & anhedonia screener}
 #A. at least one of the symptoms is either (1) depressed mood or (2)  loss of interest or pleasure.
-CIDID.items <- CIDID.items %>% 
+CIDID <- CIDID %>% 
   mutate(cidid.screener_numeric = 
            case_when(
              cidid.felt_sad_blue_row == 0 & cidid.lost_interest_hobbies_give == 0 ~ 0,
@@ -110,7 +181,7 @@ CIDID.items <- CIDID.items %>%
            )
   )
 
-freq(CIDID.items$cidid.screener_numeric)
+freq(CIDID$cidid.screener_numeric)
 
 ```
 
@@ -127,7 +198,7 @@ These variables were separated in the CIDID but fulfil a single criterion in the
 
 ```{r variable for criterion A.3 weight & appetite change}
 #Create variable for weight & appetite change (separate questions in the CIDID)
-CIDID.items <- CIDID.items %>% 
+CIDID <- CIDID %>% 
   mutate(cidid.weight_appetite_change_numeric = 
            case_when(
              cidid.appetite_change_experience == 0 & cidid.didyour_weight_change == 0 ~ 0,
@@ -139,7 +210,7 @@ CIDID.items <- CIDID.items %>%
              cidid.didyour_weight_change == 3 ~ 1
            ))
 
-summary(as.factor(CIDID.items$cidid.weight_appetite_change_numeric))
+summary(as.factor(CIDID$cidid.weight_appetite_change_numeric))
 
 ```
 
@@ -163,49 +234,49 @@ Criterion A: Five (or more) of the following symptoms have been present during t
 ```{r depression symptom score (criterion A)}
 #Create score for depression symptoms
 #Do NOT use 'is.na' for these as then you cannot +1 to it. Use the no.info item for NA (below). 
-CIDID.items$cidid.criterion_A_score_numeric<-0
+CIDID$cidid.criterion_A_score_numeric<-0
 
 #Criterion A.1 - low mood
-CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
+CIDID$cidid.criterion_A_score_numeric<-with(CIDID, 
                                     ifelse(!is.na(cidid.felt_sad_blue_row) 
                                            & cidid.felt_sad_blue_row == 1, 
                                            cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
 #Criterion A.2 - anhedonia
-CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items,
+CIDID$cidid.criterion_A_score_numeric<-with(CIDID,
                                     ifelse(!is.na(cidid.lost_interest_hobbies_give) 
                                            & cidid.lost_interest_hobbies_give == 1,
                                            cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
 #Criterion A.3 - weight &/or appetite change
-CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items,
+CIDID$cidid.criterion_A_score_numeric<-with(CIDID,
                                     ifelse(!is.na(cidid.weight_appetite_change_numeric) 
                                            & cidid.weight_appetite_change_numeric > 0,
                                            cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
 #Criterion A.4 - sleep change (insomnia or hypersomnia)
-CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
+CIDID$cidid.criterion_A_score_numeric<-with(CIDID, 
                                     ifelse(!is.na(cidid.did_your_sleep_change) &
                                              cidid.did_your_sleep_change == 1, 
                                            cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
 #Criterion A.6 - fatigue or loss of energy
-CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
+CIDID$cidid.criterion_A_score_numeric<-with(CIDID, 
                                     ifelse(!is.na(cidid.tired_energy_usual_low) & cidid.tired_energy_usual_low == 1, 
                                            cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
 #Criterion A.7 - Feelings of worthlesness
-CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
+CIDID$cidid.criterion_A_score_numeric<-with(CIDID, 
                                     ifelse(!is.na(cidid.worthless_good_feel_people) 
                                            & cidid.worthless_good_feel_people == 1, 
                                            cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
 #Criterion A.8 - Diminished ability to concentrate
-CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items,
+CIDID$cidid.criterion_A_score_numeric<-with(CIDID,
                                     ifelse(!is.na(cidid.trouble_concentrating_lot_usual) 
                                            & cidid.trouble_concentrating_lot_usual == 1,
                                            cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
 #Criterion A.9 - Recurrent thoughts of death or suicidal ideation
-CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
+CIDID$cidid.criterion_A_score_numeric<-with(CIDID, 
                                     ifelse(!is.na(cidid.death_lot_general) 
                                            & cidid.death_lot_general == 1, 
                                            cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
 #Check distribution of scores (range should be 0-8)
-summary(as.factor(CIDID.items$cidid.criterion_A_score_numeric))
+summary(as.factor(CIDID$cidid.criterion_A_score_numeric))
 
 ```
 
@@ -215,10 +286,10 @@ summary(as.factor(CIDID.items$cidid.criterion_A_score_numeric))
 
 #If "Every day" is less frequently endorsed than "Less often", cidid.how_often is recoded.
 if (
-  sum(ifelse(CIDID.items$cidid.did_you_feel_this_way %in% 1, 1, 0)) > sum(ifelse(CIDID.items$cidid.did_you_feel_this_way %in% 3, 1, 0))
+  sum(ifelse(CIDID$cidid.did_you_feel_this_way %in% 1, 1, 0)) > sum(ifelse(CIDID$cidid.did_you_feel_this_way %in% 3, 1, 0))
   ) 
     {
-      CIDID.items <- CIDID.items %>% 
+      CIDID <- CIDID %>% 
         mutate(cidid.how_often = 
          case_when(
            cidid.did_you_feel_this_way == 3 ~ 1,
@@ -228,9 +299,9 @@ if (
 }
 #If "All day long" is less frequently endorsed than "Less than half of the day", cidid.how_long is recoded.
 if (
-  sum(ifelse(CIDID.items$cidid.day_feelings %in% 1, 1, 0)) > sum(ifelse(CIDID.items$cidid.day_feelings %in% 4, 1, 0))
+  sum(ifelse(CIDID$cidid.day_feelings %in% 1, 1, 0)) > sum(ifelse(CIDID$cidid.day_feelings %in% 4, 1, 0))
   ) {
-CIDID.items <- CIDID.items %>% 
+CIDID <- CIDID %>% 
   mutate(cidid.day_feelings = 
          case_when(
            cidid.day_feelings == 1 ~ 4,
@@ -253,61 +324,61 @@ Once participants pass the screeners, if any of the other core symptoms are NA t
 Future considerations: If a participant has an NA in this score but was far from meeting diagnostic criteria, then we may still want to keep them as a '0' for diagnosis.
 ```{r variable for missingness}
 #Missing responses/no information on core symptoms
-CIDID.items$no.info<-0
+CIDID$no.info<-0
 #+1 to missingness score if duration has missing value
-CIDID.items$no.info <- with(CIDID.items,
+CIDID$no.info <- with(CIDID,
                                ifelse(is.na(cidid.day_feelings),
                                       no.info + 1, no.info))
 #+1 to missingness score if frequency has missing value
-CIDID.items$no.info <- with(CIDID.items,
+CIDID$no.info <- with(CIDID,
                                ifelse(is.na(cidid.did_you_feel_this_way),
                                       no.info + 1, no.info))
 #+1 to missingness score if functioning criteria has missing value
-CIDID.items$no.info <- with(CIDID.items,
+CIDID$no.info <- with(CIDID,
                                ifelse(is.na(cidid.including_study_problems_interfere),
                                       no.info + 1, no.info))
 
-summary(as.factor(CIDID.items$no.info))
+summary(as.factor(CIDID$no.info))
 ```
 
 ```{r depression symptom NA count score}
 #Create score to calculate how many missing values are in the depression symptom scores
 
-CIDID.items$cidid.criterion_A_score_numeric.NA<-0
+CIDID$cidid.criterion_A_score_numeric.NA<-0
 
-CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
+CIDID$cidid.criterion_A_score_numeric.NA<-with(CIDID, 
                                     ifelse(is.na(cidid.felt_sad_blue_row), 
                                            cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
-CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items,
+CIDID$cidid.criterion_A_score_numeric.NA<-with(CIDID,
                                     ifelse(is.na(cidid.lost_interest_hobbies_give),
                                            cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
-CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items,
+CIDID$cidid.criterion_A_score_numeric.NA<-with(CIDID,
                                     ifelse(is.na(cidid.weight_appetite_change_numeric),
                                            cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
-CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
+CIDID$cidid.criterion_A_score_numeric.NA<-with(CIDID, 
                                     ifelse(is.na(cidid.did_your_sleep_change), 
                                            cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
-CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
+CIDID$cidid.criterion_A_score_numeric.NA<-with(CIDID, 
                                     ifelse(is.na(cidid.tired_energy_usual_low), 
                                            cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
-CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
+CIDID$cidid.criterion_A_score_numeric.NA<-with(CIDID, 
                                     ifelse(is.na(cidid.worthless_good_feel_people), 
                                            cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
-CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items,
+CIDID$cidid.criterion_A_score_numeric.NA<-with(CIDID,
                                     ifelse(is.na(cidid.trouble_concentrating_lot_usual),
                                            cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
-CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
+CIDID$cidid.criterion_A_score_numeric.NA<-with(CIDID, 
                                     ifelse(is.na(cidid.death_lot_general), 
                                            cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
 
-summary(as.factor(CIDID.items$cidid.criterion_A_score_numeric.NA))
+summary(as.factor(CIDID$cidid.criterion_A_score_numeric.NA))
 
 ```
 
@@ -315,7 +386,7 @@ summary(as.factor(CIDID.items$cidid.criterion_A_score_numeric.NA))
 
 ```{r lifetime MDD diagnosis variable}
 
-CIDID.items <- CIDID.items %>% 
+CIDID <- CIDID %>% 
   mutate(cidid.diagnosis_numeric =
            case_when(
           #Ppts are coded NA if they didn't respond to the screening questions, or had "No" in one screening question and NA in the other
@@ -351,31 +422,32 @@ CIDID.items <- CIDID.items %>%
              ~ 1
            ))
          
-summary(as.factor(CIDID.items$cidid.diagnosis_numeric))
+summary(as.factor(CIDID$cidid.diagnosis_numeric))
 ```
 
 ```{r cidid.diagnosis recode}
 #Create new variable name and recode
-CIDID.items$cidid.diagnosis <- recode_factor(CIDID.items$cidid.diagnosis_numeric,
+CIDID$cidid.diagnosis <- recode_factor(CIDID$cidid.diagnosis_numeric,
                              "0" = "No MDD diagnosis",
                              "1" = "MDD diagnosis")
 
 #Summary of recoded variable
-summary(CIDID.items$cidid.diagnosis)
+summary(CIDID$cidid.diagnosis)
 ```
 
 ```{r CIDID recurrent vs single episode}
 
-freq(CIDID.items$cidid.low_mood_weeks_life.1)
+freq(CIDID$cidid.low_mood_weeks_life.1)
 
-CIDID.items <- CIDID.items %>% 
+CIDID <- CIDID %>% 
   mutate(cidid.recurrent_vs_single_episode =
            case_when(
-             (cidid.diagnosis == "MDD diagnosis" & cidid.low_mood_weeks_life.1 >= 2) ~ "Recurrent",
-             (cidid.diagnosis == "MDD diagnosis" & cidid.low_mood_weeks_life.1 == 1) ~ "Single Episode"
+             (cidid.diagnosis_numeric == 1 & cidid.low_mood_weeks_life.1 >= 2) ~ "Recurrent MDD",
+             (cidid.diagnosis == 1 & cidid.low_mood_weeks_life.1 == 1) ~ "Single-episode MDD",
+             cidid.diagnosis_numeric == 0 ~ "No MDD"
          ))
 
-freq(CIDID.items$cidid.recurrent_vs_single_episode)
+freq(CIDID$cidid.recurrent_vs_single_episode)
 
 ```
 
@@ -385,7 +457,7 @@ freq(CIDID.items$cidid.recurrent_vs_single_episode)
 ```{r export clean CIDID dataframe}
 
 #Export into a rds file:
-saveRDS(object = CIDID.items, file = paste0(cleaned_path, "CIDID_cleaned.rds"))
+saveRDS(object = CIDID, file = paste0(cleaned_path, "CIDID_cleaned.rds"))
 
 # Saves the R data including the recoding
 #save.image(file = paste0(cleaned_path, "GLAD_CIDID_clean.RData"))
