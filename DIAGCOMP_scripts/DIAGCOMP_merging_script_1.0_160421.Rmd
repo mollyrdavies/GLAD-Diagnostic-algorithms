@@ -1,0 +1,180 @@
+---
+title: "DIAGCOMP_merging_script: Data freeze 1.0"
+author: "Molly R. Davies"
+date: "18/10/2020"
+output: html_document
+---
+
+This script merges cleaned datasets for the purpose of analyses included in the paper titled "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
+
+Script written by M. R. Davies.
+Email:  molly.davies@kcl.ac.uk
+
+All scripts for the paper can be accessed at:
+https://github.com/mollyrdavies/GLAD-Diagnostic-algorithms.git
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Set up
+```{r Setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      comment=NA,
+                      prompt=FALSE,
+                      cache=FALSE)
+
+
+options(bitmapType = 'quartz') # to render fonts better
+```
+
+Clear global environment
+```{r Clear global environment}
+remove(list = ls())
+```
+
+Retrieve the current date to use it for file endings to not overwrite files when one exports files
+```{r Recent date}
+date = Sys.Date()
+```
+
+
+Load packages
+```{r load packages}
+library(tidyverse)
+library(skimr)
+```
+
+# Read data
+
+```{r source path for reading/saving data}
+#Source raw data directory (raw_path) & clean data export directory (cleaned_path)
+source("../../DF1.0_data_path.R")
+```
+
+```{r set paths}
+#Names
+dem_name <- "DEM_cleaned.rds"
+mhd_name <- "MHD_cleaned.rds"
+CIDID_name <- "CIDID_cleaned.rds"
+CIDIA_name <- "CIDIA_cleaned.rds"
+SPEC_name <- "SPEC_cleaned.rds"
+SOCP_name <- "SOCP_cleaned.rds"
+PAD_name <- "PAD_cleaned.rds"
+AGP_name <- "AGP_cleaned.rds"
+
+#Files
+dem_filename <- paste(cleaned_path, dem_name, sep = "")
+mhd_filename <- paste(cleaned_path, mhd_name, sep = "")
+CIDID_filename <- paste(cleaned_path, CIDID_name, sep = "")
+CIDIA_filename <- paste(cleaned_path, CIDIA_name, sep = "")
+SPEC_filename <- paste(cleaned_path, SPEC_name, sep = "")
+SOCP_filename <- paste(cleaned_path, SOCP_name, sep = "")
+PAD_filename <- paste(cleaned_path, PAD_name, sep = "")
+AGP_filename <- paste(cleaned_path, AGP_name, sep = "")
+
+```
+
+# Import data
+```{r import data}
+dem <- read_rds(dem_filename)
+dim(dem)
+
+mhd <- read_rds(mhd_filename)
+dim(mhd)
+
+CIDID <- read_rds(CIDID_filename)
+dim(CIDID)
+
+CIDIA <- read_rds(CIDIA_filename)
+dim(CIDIA)
+
+SPEC <- read_rds(SPEC_filename)
+dim(SPEC)
+
+SOCP <- read_rds(SOCP_filename)
+dim(SOCP)
+
+PAD <- read_rds(PAD_filename)
+dim(PAD)
+
+AGP <- read_rds(AGP_filename)
+dim(AGP)
+```
+
+```{r check IDs match across datasets}
+#COPING NBR sample have 2 surveys being merged: 
+#DEM, CIDID, and CIDIA are part of COPING baseline; SPEC, SOCP, PAD, and AGP are optional questionnaires
+DEM_NBR <- dem %>% 
+  filter(sample == "NBR")
+SPEC_NBR <- SPEC %>% 
+  filter(sample == "NBR")
+x <- DEM_NBR[DEM_NBR$ID %in% SPEC_NBR$ID,]
+
+length(DEM_NBR$ID)
+length(SPEC_NBR$ID)
+length(x$ID)
+head(DEM_NBR$ID)
+head(SPEC_NBR)
+```
+
+```{r drop startDate and endDate columns from all datasets except DEM}
+MHD_nodate <- subset(mhd, select = -c(startDate, endDate, externalDataReference))
+CIDID_nodate <- subset(CIDID, select = -c(startDate, endDate))
+CIDIA_nodate <- subset(CIDIA, select = -c(startDate, endDate))
+SPEC_nodate <- subset(SPEC, select = -c(startDate, endDate, COPING_ID))
+SOCP_nodate <- subset(SOCP, select = -c(startDate, endDate, COPING_ID))
+PAD_nodate <- subset(PAD, select = -c(startDate, endDate, COPING_ID))
+AGP_nodate <- subset(AGP, select = -c(startDate, endDate, COPING_ID))
+```
+
+Merge the datasets by ID.
+```{r merge datasets}
+dat <- list(
+            dem,
+            MHD_nodate,
+            CIDID_nodate,
+            CIDIA_nodate,
+            SPEC_nodate, 
+            SOCP_nodate,
+            PAD_nodate,
+            AGP_nodate
+            ) %>% 
+  reduce(left_join, by = c("ID", "sample"))
+```
+
+```{r check merge worked as expected}
+#Check that the NAs for a diagnosis remain the same in the combined datasets (there will be more NAs for NBR SPEC because the questionnaire was optional)
+sum(ifelse(SPEC$sample == "NBR" & is.na(SPEC$spec.diagnosis), 1, 0))
+sum(ifelse(dat$sample == "NBR" & is.na(dat$spec.diagnosis), 1, 0))
+sum(ifelse(SPEC$sample == "GLAD" & is.na(SPEC$spec.diagnosis), 1, 0))
+sum(ifelse(dat$sample == "GLAD" & is.na(dat$spec.diagnosis), 1, 0))
+
+#Check for PAD (waiting for updated SPEC dataset)
+sum(ifelse(PAD$sample == "NBR" & is.na(PAD$pad.diagnosis), 1, 0))
+sum(ifelse(dat$sample == "NBR" & is.na(dat$pad.diagnosis), 1, 0))
+sum(ifelse(PAD$sample == "GLAD" & is.na(PAD$pad.diagnosis), 1, 0))
+sum(ifelse(dat$sample == "GLAD" & is.na(dat$pad.diagnosis), 1, 0))
+
+#Check that the NAs for one of the demographics variables remain the same in the combined datasets
+sum(ifelse(dem$sample == "NBR" & is.na(dem$Highest.Education), 1, 0))
+sum(ifelse(dat$sample == "NBR" & is.na(dat$Highest.Education), 1, 0))
+sum(ifelse(dem$sample == "GLAD" & is.na(dem$Highest.Education), 1, 0))
+sum(ifelse(dat$sample == "GLAD" & is.na(dat$Highest.Education), 1, 0))
+
+sum(ifelse(dem$sample == "NBR" & is.na(dem$age), 1, 0))
+sum(ifelse(dat$sample == "NBR" & is.na(dat$age), 1, 0))
+sum(ifelse(dem$sample == "GLAD" & is.na(dem$age), 1, 0))
+sum(ifelse(dat$sample == "GLAD" & is.na(dat$age), 1, 0))
+```
+
+
+```{r Skim data}
+#look at the data
+skimr::skim(dat)
+```
+
+```{r Save combined dataset as rds file}
+saveRDS(object = dat, file = paste0(cleaned_path, "combined_cleaned.rds"))
+```
+

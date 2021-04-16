@@ -37,6 +37,7 @@ COPING_NBR = TRUE
 library(tidyverse)
 library(psych)
 library(summarytools)
+library(eeptools)
 ```
 
 ```{r source path for reading/saving data}
@@ -82,8 +83,10 @@ glad_dem_renamed <- glad_dem %>%
   drop_na(externalDataReference) %>% 
   distinct(externalDataReference, .keep_all = TRUE) %>% 
   rename("ID" = "externalDataReference",
-         "age" = "dem.how_old_are_you_now.txt",
          "sex" = "dem.select_questionnaire_items_medical",
+         "Birthday_numeric" = "dem.day",
+         "Birthmonth_numeric" = "dem.month",
+         "Birthyear_numeric" = "dem.year",
          "gender" = "dem.which_gender_do_you_identify_with",
          "dem.university_numeric" = "dem.college_or_university_degree",
          "dem.alevels_numeric" = "dem.a_levelsas_levels_or_equivalent",
@@ -131,7 +134,15 @@ coping_nbr_dem_renamed <- coping_nbr_dem %>%
          ) %>% 
   mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
   mutate_if(is.numeric, ~na_if(., -99)) %>%
-  mutate_if(is.numeric, ~na_if(., -77))
+  mutate_if(is.numeric, ~na_if(., -77)) %>%
+  mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # Recode missing values to NAs in factor variables
+  mutate_if(is.factor, ~na_if(., "Don't know")) %>%
+  mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
+  mutate_if(is.factor, ~na_if(., "Prefer not to answer")) %>%
+  mutate_if(is.factor, ~forcats::fct_drop(., only = "Seen but not answered")) %>% # Drop empty factor levels
+  mutate_if(is.factor, ~forcats::fct_drop(., only = "Don't know")) %>%
+  mutate_if(is.factor, ~forcats::fct_drop(., only = "Prefer not to answer")) %>%
+  mutate_if(is.factor, ~forcats::fct_drop(., only = "Prefer not to say"))
 }
 ```
 
@@ -292,24 +303,27 @@ DEM_renamed.combined <- bind_rows(
 ```
 
 
-```{r select variables}
+```{r add unc to variables}
+#Add "unc" to the variables that will be cleaned in this script
 DEM <- DEM_renamed.combined %>% 
-  select(ID,
-         age,
-         sex,
-         dem.university_numeric,
-         dem.alevels_numeric,
-         dem.gcse_numeric,
-         dem.cse_numeric,
-         dem.NVQ_numeric,
-         dem.education_other_numeric,
-         dem.ethnicity_numeric,
-         dem.employment_numeric
+  rename("sex.unc" = "sex",
+         "Birthday_numeric.unc" = "Birthday_numeric",
+         "Birthmonth_numeric.unc" = "Birthmonth_numeric",
+         "Birthyear_numeric.unc" = "Birthyear_numeric",
+         "dem.university_numeric.unc" = "dem.university_numeric",
+         "dem.alevels_numeric.unc" = "dem.alevels_numeric",
+         "dem.gcse_numeric.unc" = "dem.gcse_numeric",
+         "dem.cse_numeric.unc" = "dem.cse_numeric",
+         "dem.NVQ_numeric.unc" = "dem.NVQ_numeric",
+         "dem.education_other_numeric.unc" = "dem.education_other_numeric",
+         "dem.ethnicity_numeric.unc" = "dem.ethnicity_numeric",
+         "dem.employment_numeric.unc" = "dem.employment_numeric"
          ) 
 ```
 
-```{r add unc to column names}
-colnames(DEM) <- paste(colnames(DEM), "unc", sep = ".")
+```{r add unc to all column names}
+#This chunk is unused - to be added to full DEM cleaning script
+#colnames(DEM) <- paste(colnames(DEM), "unc", sep = ".")
 ```
 
 ```{r visualise demographics data}
@@ -317,6 +331,62 @@ head(DEM)
 ```
 
 # Age
+
+## Calculating age from birthdates
+
+### Clean birthyear
+
+```{r add 1900 to birthyear}
+#add 1900 to birthyear
+DEM$Birthyear_numeric.calc <- DEM$Birthyear_numeric.unc + 1900
+```
+
+```{r set Birthyear upper limits}
+# Set upper limit for year (all participants must be over 16 at time of recruitment)
+birthyear.m_upper = 2005
+
+# Check how many participants have outlier values in height
+birthyear.n_upper <- which(DEM$Birthyear_numeric.calc > birthyear.m_upper)
+
+length(birthyear.n_upper)
+
+```
+
+```{r remove birthyear outliers}
+if(length(birthyear.n_upper)>0){
+# Remove outliers
+DEM$Birthyear_numeric <- with(data = DEM, ifelse(Birthyear_numeric.calc > birthyear.m_upper, NA, Birthyear_numeric.calc))
+}
+```
+
+```{r calculating age from birthday}
+
+#create dob as date format
+DEM$Birthdate <- as.Date(paste(DEM$Birthyear_numeric,
+                                  DEM$Birthmonth_numeric.unc,
+                                  DEM$Birthday_numeric.unc,
+                                  sep = "-"),
+                               "%Y-%m-%d")
+
+head(DEM$Birthdate)
+
+# convert survey endDate to date format
+DEM$endDate_dateformat <- as.Date(DEM$endDate,
+                                  "%Y-%m-%d HH:MM:SS", tz="UTC")
+
+#Calculate dem.age (remove NAs as it throws an error)
+ages <- age_calc(na.omit(DEM$Birthdate), enddate = DEM$endDate_dateformat, units = "years")
+
+#Create dem.age column
+DEM$age.unc <- NA
+
+#Populate with values (excluding NAs)
+DEM$age.unc.decimal <- ages
+
+#Round age down
+DEM$age.unc <- floor(DEM$age.unc.decimal)
+
+```
 
 ## Average age (in text, Sample Descriptors section)
 
@@ -588,17 +658,18 @@ freq(DEM$Employment)
 
 ```{r clean DEM dataframe}
 #Select variables
-DEM.clean <- DEM %>%
-  select(ID = ID.unc,
-        age,
-        sex,
-        Highest.Education,
-        Ethnicity,
-        Employment
-        )
+#DEM.clean <- DEM %>%
+#  select(ID,
+#         sample,
+#         age,
+#         sex,
+#         Highest.Education,
+#         Ethnicity,
+#         Employment
+#         )
 
 #Export into a rds file:
-saveRDS(object = DEM.clean, file = paste0(cleaned_path, "DEM_cleaned.rds"))
+saveRDS(object = DEM, file = paste0(cleaned_path, "DEM_cleaned.rds"))
 
 # Saves the R data including the recoding
 #save.image(file = paste0(cleaned_path, "GLAD_DEM_clean.RData")
