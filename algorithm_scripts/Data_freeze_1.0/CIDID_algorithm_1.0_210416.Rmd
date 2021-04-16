@@ -1,0 +1,393 @@
+---
+title: "CIDI Lifetime MDD: Diagnostic algorithm (GLAD Study data)"
+author: "Molly R. Davies and Megan Skelton"
+date: "24/10/2020"
+output: html_document
+---
+
+This script runs an algorithm adapted from the Composite International Diagnostic Interview - Short form (CIDI-SF), based on DSM-5 diagnostic criteria, to ascertain likely lifetime diagnosis of major depressive disorder (MDD) using the GLAD Study data.
+
+Algorithm developed for the paper "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
+
+Full description of the algorithms and scripts written for the paper can be accessed at:
+https://github.com/mollyrdavies/GLAD-Diagnostic-algorithms.git
+
+Script written by M. R. Davies and Megan Skelton.
+Email:  molly.davies@kcl.ac.uk
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set up
+
+Clear workspace
+```{r clear workspace}
+rm(list = ls())
+```
+
+```{r load packages}
+library(tidyverse)
+library(psych)
+library(summarytools)
+```
+
+```{r source path for reading/saving data}
+#Source raw data directory (raw_path) & clean data export directory (cleaned_path)
+source("../ANXCMBD_data_path.R")
+```
+
+
+```{r read in cleaned CIDID data}
+CIDID_file <- paste(renamed_path, "CIDID.rds", sep = "")
+
+CIDID.cc <- read_rds(CIDID_file)
+```
+
+```{r visualise CIDID data}
+head(CIDID.cc)
+```
+
+```{r create dataset of MDD diagnostic variables}
+#Create dataset of all variables needed for MDD diagnosis
+CIDID.items <- CIDID.cc %>% 
+    mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
+    mutate_if(is.numeric, ~na_if(., -99)) %>%
+    mutate_if(is.numeric, ~na_if(., -77)) %>%
+    mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # Recode missing values to NAs in factor variables
+    mutate_if(is.factor, ~na_if(., "Don't know")) %>%
+    mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
+    mutate_if(is.factor, ~na_if(., "Prefer not to answer"))
+```
+
+# DSM-5 MDD diagnostic criteria
+
+A.  Five (or more) of the following symptoms have been present during the same 2-week period and represent a change from previous functioning: at least one of the symptoms is either (1) depressed mood or (2)  loss of interest or pleasure.
+Note: Do not include symptoms that are clearly attributable to another medical condition.
+  1.   Depressed mood most of the day,  nearly every day,  as indicated by either subjective  report  (e.g.,  feels sad,  empty,  hopeless)  or observation  made  by others  (e.g.,appears tearful). 
+  (Note: In children and adolescents,  can be irritable mood.)
+  2.   Markedly diminished  interest or pleasure in all,  or almost all,  activities  most of the day,  nearly every day (as indicated  by either subjective account or observation).
+  3.   Significant weight loss when not dieting or weight gain (e.g., a change of more than5% of body weight in a month), or decrease or increase in appetite nearly every day.(Note: In children, consider failure to make expected weight gain.)
+  4.   Insomnia or hypersomnia nearly every day.
+  5.   Psychomotor agitation  or  retardation  nearly  every day  (observable  by others,  notmerely subjective feelings of restlessness or being slowed down).*
+  6.   Fatigue or loss of energy nearly every day.
+  7.   Feelings of worthlessness or excessive or inappropriate guilt* (which  may be delusional)  nearly every day (not merely self-reproach or guilt about being sick).
+  8.   Diminished  ability to think or concentrate,  or indecisiveness,  nearly every day  (either by subjective account or as observed by others).
+  9.   Recurrent thoughts of death (not just fear of dying), recurrent suicidal ideation without a specific plan,  or a suicide attempt or a specific plan for committing suicide
+  
+B.  The  symptoms  cause  clinically  significant  distress*  or  impairment  in  social,  occupational, or other important areas of functioning.
+
+C.  The episode is not attributable to the physiological effects of a substance or to another medical condition.*
+
+Note: Criteria A-C  represent a major depressive episode.
+
+D.  The  occurrence  of the  major depressive  episode  is  not  better explained  by  schizoaffective  disorder,  schizophrenia,  schizophreniform  disorder,  delusional  disorder,  orother specified and unspecified schizophrenia spectrum and other psychotic disorders.*
+
+E.  There has never been a manic episode or a hypomanic episode.*
+Note: This exclusion does not apply if all of the manic-like or hypomanic-like episodesare substance-induced or are attributable to the physiological effects of another medical condition.
+
+
+*The CIDID does not measure these items
+
+
+# Screening variables
+The major depressive disorder screening questions include:
+1) Low mood or anhedonia (criterion A)
+
+*How the screening questions work*
+If the participant responds No (0) to both low mood and anhedonia variables, they are scored 0 for diagnosis and skip the rest of the MDD section.
+
+
+Create combined low mood & anhedonia screening variable. If one of these screening variables is "No" and the other is NA, the screener is coded NA.
+```{r variable for low mood & anhedonia screener}
+#A. at least one of the symptoms is either (1) depressed mood or (2)  loss of interest or pleasure.
+CIDID.items <- CIDID.items %>% 
+  mutate(cidid.screener_numeric = 
+           case_when(
+             cidid.felt_sad_blue_row == 0 & cidid.lost_interest_hobbies_give == 0 ~ 0,
+             cidid.felt_sad_blue_row == 1 ~ 1,
+             cidid.lost_interest_hobbies_give == 1 ~ 1
+           )
+  )
+
+freq(CIDID.items$cidid.screener_numeric)
+
+```
+
+
+# Criterion variables
+In each case where more than 1 response fulfills a diagnostic criterion, a new variable is created.
+
+Note: These criterion variables will have a large number of NAs if the screening criteria aren't met, as the question is not displayed in these cases. This is accounted for in the algorithm.
+
+Weight & appetite screen
+Criterion A.3. Significant weight loss when not dieting or weight gain (e.g., a change of more than5% of body weight in a month), or decrease or increase in appetite nearly every day.(Note: In children, consider failure to make expected weight gain.)
+
+These variables were separated in the CIDID but fulfil a single criterion in the DSM5, so are combined.
+
+```{r variable for criterion A.3 weight & appetite change}
+#Create variable for weight & appetite change (separate questions in the CIDID)
+CIDID.items <- CIDID.items %>% 
+  mutate(cidid.weight_appetite_change_numeric = 
+           case_when(
+             cidid.appetite_change_experience == 0 & cidid.didyour_weight_change == 0 ~ 0,
+             cidid.appetite_change_experience == 1 ~ 1,
+             cidid.appetite_change_experience == 2 ~ 1,
+             cidid.appetite_change_experience == 3 ~ 1,
+             cidid.didyour_weight_change == 1 ~ 1,
+             cidid.didyour_weight_change == 2 ~ 1,
+             cidid.didyour_weight_change == 3 ~ 1
+           ))
+
+summary(as.factor(CIDID.items$cidid.weight_appetite_change_numeric))
+
+```
+
+Calculate depression symptoms 'score' (the number of criterion A symptoms endorsed)
+
+Criterion A: Five (or more) of the following symptoms have been present during the same 2-week period and represent a change from previous functioning:
+1.   Depressed mood most of the day,  nearly every day,  as indicated by either subjective  report  (e.g.,  feels sad,  empty,  hopeless)  or observation  made  by others  (e.g.,appears tearful). 
+  (Note: In children and adolescents,  can be irritable mood.)
+  2.   Markedly diminished  interest or pleasure in all,  or almost all,  activities  most of the day,  nearly every day (as indicated  by either subjective account or observation).
+  3.   Significant weight loss when not dieting or weight gain (e.g., a change of more than5% of body weight in a month), or decrease or increase in appetite nearly every day.(Note: In children, consider failure to make expected weight gain.)
+  4.   Insomnia or hypersomnia nearly every day.
+  5.   Psychomotor agitation  or  retardation  nearly  every day  (observable  by others,  notmerely subjective feelings of restlessness or being slowed down).***
+  6.   Fatigue or loss of energy nearly every day.
+  7.   Feelings of worthlessness or excessive or inappropriate guilt*** (which  may be delusional)  nearly every day (not merely self-reproach or guilt about being sick).
+  8.   Diminished  ability to think or concentrate,  or indecisiveness,  nearly every day  (either by subjective account or as observed by others).
+  9.   Recurrent thoughts of death (not just fear of dying), recurrent suicidal ideation without a specific plan,  or a suicide attempt or a specific plan for committing suicide
+
+*A.5 - CIDID has no measure of psychomotor agitation or retardation
+*A.7 - CIDID has no measure of inappropriate guilt, phrasing is 'feel down on themselves, no good, worthless'
+
+```{r depression symptom score (criterion A)}
+#Create score for depression symptoms
+#Do NOT use 'is.na' for these as then you cannot +1 to it. Use the no.info item for NA (below). 
+CIDID.items$cidid.criterion_A_score_numeric<-0
+
+#Criterion A.1 - low mood
+CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
+                                    ifelse(!is.na(cidid.felt_sad_blue_row) 
+                                           & cidid.felt_sad_blue_row == 1, 
+                                           cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
+#Criterion A.2 - anhedonia
+CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items,
+                                    ifelse(!is.na(cidid.lost_interest_hobbies_give) 
+                                           & cidid.lost_interest_hobbies_give == 1,
+                                           cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
+#Criterion A.3 - weight &/or appetite change
+CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items,
+                                    ifelse(!is.na(cidid.weight_appetite_change_numeric) 
+                                           & cidid.weight_appetite_change_numeric > 0,
+                                           cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
+#Criterion A.4 - sleep change (insomnia or hypersomnia)
+CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
+                                    ifelse(!is.na(cidid.did_your_sleep_change) &
+                                             cidid.did_your_sleep_change == 1, 
+                                           cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
+#Criterion A.6 - fatigue or loss of energy
+CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
+                                    ifelse(!is.na(cidid.tired_energy_usual_low) & cidid.tired_energy_usual_low == 1, 
+                                           cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
+#Criterion A.7 - Feelings of worthlesness
+CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
+                                    ifelse(!is.na(cidid.worthless_good_feel_people) 
+                                           & cidid.worthless_good_feel_people == 1, 
+                                           cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
+#Criterion A.8 - Diminished ability to concentrate
+CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items,
+                                    ifelse(!is.na(cidid.trouble_concentrating_lot_usual) 
+                                           & cidid.trouble_concentrating_lot_usual == 1,
+                                           cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
+#Criterion A.9 - Recurrent thoughts of death or suicidal ideation
+CIDID.items$cidid.criterion_A_score_numeric<-with(CIDID.items, 
+                                    ifelse(!is.na(cidid.death_lot_general) 
+                                           & cidid.death_lot_general == 1, 
+                                           cidid.criterion_A_score_numeric + 1, cidid.criterion_A_score_numeric))
+#Check distribution of scores (range should be 0-8)
+summary(as.factor(CIDID.items$cidid.criterion_A_score_numeric))
+
+```
+
+# Fix temporary coding error (April 2020 data freeze)
+```{r recode incorrect MDD variable}
+#These variables need to be re-exported with correct coding. At the moment they are backwards and need to be recoded.
+
+#If "Every day" is less frequently endorsed than "Less often", cidid.how_often is recoded.
+if (
+  sum(ifelse(CIDID.items$cidid.did_you_feel_this_way %in% 1, 1, 0)) > sum(ifelse(CIDID.items$cidid.did_you_feel_this_way %in% 3, 1, 0))
+  ) 
+    {
+      CIDID.items <- CIDID.items %>% 
+        mutate(cidid.how_often = 
+         case_when(
+           cidid.did_you_feel_this_way == 3 ~ 1,
+           cidid.did_you_feel_this_way == 2 ~ 2,
+           cidid.did_you_feel_this_way == 1 ~ 3
+         ))
+}
+#If "All day long" is less frequently endorsed than "Less than half of the day", cidid.how_long is recoded.
+if (
+  sum(ifelse(CIDID.items$cidid.day_feelings %in% 1, 1, 0)) > sum(ifelse(CIDID.items$cidid.day_feelings %in% 4, 1, 0))
+  ) {
+CIDID.items <- CIDID.items %>% 
+  mutate(cidid.day_feelings = 
+         case_when(
+           cidid.day_feelings == 1 ~ 4,
+           cidid.day_feelings == 2 ~ 3,
+           cidid.day_feelings == 3 ~ 2,
+           cidid.day_feelings == 4 ~ 1
+         ))
+}
+
+```
+
+# Missingness
+
+*Screening missingness:*
+If participants do not respond to the screening questions, then they are not shown the remaining questions and should autmatically have "NA" as their score. These NAs are already captured in the screening variable created above.
+
+*Symptom missingness:*
+Once participants pass the screeners, if any of the other core symptoms are NA then the participant might have received a diagnosis of MD, but we won't know. 
+
+Future considerations: If a participant has an NA in this score but was far from meeting diagnostic criteria, then we may still want to keep them as a '0' for diagnosis.
+```{r variable for missingness}
+#Missing responses/no information on core symptoms
+CIDID.items$no.info<-0
+#+1 to missingness score if duration has missing value
+CIDID.items$no.info <- with(CIDID.items,
+                               ifelse(is.na(cidid.day_feelings),
+                                      no.info + 1, no.info))
+#+1 to missingness score if frequency has missing value
+CIDID.items$no.info <- with(CIDID.items,
+                               ifelse(is.na(cidid.did_you_feel_this_way),
+                                      no.info + 1, no.info))
+#+1 to missingness score if functioning criteria has missing value
+CIDID.items$no.info <- with(CIDID.items,
+                               ifelse(is.na(cidid.including_study_problems_interfere),
+                                      no.info + 1, no.info))
+
+summary(as.factor(CIDID.items$no.info))
+```
+
+```{r depression symptom NA count score}
+#Create score to calculate how many missing values are in the depression symptom scores
+
+CIDID.items$cidid.criterion_A_score_numeric.NA<-0
+
+CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
+                                    ifelse(is.na(cidid.felt_sad_blue_row), 
+                                           cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
+
+CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items,
+                                    ifelse(is.na(cidid.lost_interest_hobbies_give),
+                                           cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
+
+CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items,
+                                    ifelse(is.na(cidid.weight_appetite_change_numeric),
+                                           cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
+
+CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
+                                    ifelse(is.na(cidid.did_your_sleep_change), 
+                                           cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
+
+CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
+                                    ifelse(is.na(cidid.tired_energy_usual_low), 
+                                           cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
+
+CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
+                                    ifelse(is.na(cidid.worthless_good_feel_people), 
+                                           cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
+
+CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items,
+                                    ifelse(is.na(cidid.trouble_concentrating_lot_usual),
+                                           cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
+
+CIDID.items$cidid.criterion_A_score_numeric.NA<-with(CIDID.items, 
+                                    ifelse(is.na(cidid.death_lot_general), 
+                                           cidid.criterion_A_score_numeric.NA + 1, cidid.criterion_A_score_numeric.NA))
+
+summary(as.factor(CIDID.items$cidid.criterion_A_score_numeric.NA))
+
+```
+
+# DSM-5 MDD diagnostic algorithm
+
+```{r lifetime MDD diagnosis variable}
+
+CIDID.items <- CIDID.items %>% 
+  mutate(cidid.diagnosis_numeric =
+           case_when(
+          #Ppts are coded NA if they didn't respond to the screening questions, or had "No" in one screening question and NA in the other
+             is.na(cidid.screener_numeric) ~ NA_real_,
+          #Ppts are coded NA if they didn't respond to symptom questions that may have met diagnostic criteria 
+             cidid.criterion_A_score_numeric == 4 & cidid.criterion_A_score_numeric.NA > 0 ~ NA_real_,
+             cidid.criterion_A_score_numeric == 3 & cidid.criterion_A_score_numeric.NA > 1 ~ NA_real_,
+             cidid.criterion_A_score_numeric == 2 & cidid.criterion_A_score_numeric.NA > 2 ~ NA_real_,
+             cidid.criterion_A_score_numeric == 1 & cidid.criterion_A_score_numeric.NA > 3 ~ NA_real_,
+             cidid.screener_numeric == 1 & cidid.criterion_A_score_numeric == 0 & cidid.criterion_A_score_numeric.NA > 4 ~ NA_real_,
+          #Ppts are coded NA if they met screening criteria but didn't respond to at least one of the other criteria
+             cidid.screener_numeric == 1 & no.info > 0 ~ NA_real_,
+          #Ppts are coded 0 if they don't meet screening criteria
+             cidid.screener_numeric == 0 ~ 0,
+          #Ppts are coded 0 if they meet screening criteria but don't meet at least one of the other criteria
+               cidid.screener_numeric == 1 & 
+               (cidid.criterion_A_score_numeric < 5 |
+               (cidid.day_feelings == 1 | cidid.day_feelings == 2) | 
+               cidid.did_you_feel_this_way == 1 |
+               (cidid.including_study_problems_interfere == 0 | cidid.including_study_problems_interfere == 1)) 
+             ~ 0,
+          #Ppts are coded as 1 if the meet all criteria
+             #A. at least one of the symptoms is either (1) depressed mood or (2)  loss of interest or pleasure
+             cidid.screener_numeric == 1 &
+               #A. at least 5 symptoms
+               cidid.criterion_A_score_numeric >= 5 &
+               #A. most of the day
+               (cidid.day_feelings == 3 | cidid.day_feelings == 4) & 
+               #A. nearly every day
+               (cidid.did_you_feel_this_way == 2 | cidid.did_you_feel_this_way == 3) &
+               #B. functional  impairment
+               (cidid.including_study_problems_interfere == 2 | cidid.including_study_problems_interfere == 3) 
+             ~ 1
+           ))
+         
+summary(as.factor(CIDID.items$cidid.diagnosis_numeric))
+```
+
+```{r cidid.diagnosis recode}
+#Create new variable name and recode
+CIDID.items$cidid.diagnosis <- recode_factor(CIDID.items$cidid.diagnosis_numeric,
+                             "0" = "No MDD diagnosis",
+                             "1" = "MDD diagnosis")
+
+#Summary of recoded variable
+summary(CIDID.items$cidid.diagnosis)
+```
+
+```{r CIDID recurrent vs single episode}
+
+freq(CIDID.items$cidid.low_mood_weeks_life.1)
+
+CIDID.items <- CIDID.items %>% 
+  mutate(cidid.recurrent_vs_single_episode =
+           case_when(
+             (cidid.diagnosis == "MDD diagnosis" & cidid.low_mood_weeks_life.1 >= 2) ~ "Recurrent",
+             (cidid.diagnosis == "MDD diagnosis" & cidid.low_mood_weeks_life.1 == 1) ~ "Single Episode"
+         ))
+
+freq(CIDID.items$cidid.recurrent_vs_single_episode)
+
+```
+
+
+# Clean CIDID dataset
+
+```{r export clean CIDID dataframe}
+
+#Export into a rds file:
+saveRDS(object = CIDID.items, file = paste0(cleaned_path, "CIDID_cleaned.rds"))
+
+# Saves the R data including the recoding
+#save.image(file = paste0(cleaned_path, "GLAD_CIDID_clean.RData"))
+```
+

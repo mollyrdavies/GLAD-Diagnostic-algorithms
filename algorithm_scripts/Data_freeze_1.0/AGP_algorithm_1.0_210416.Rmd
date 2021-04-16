@@ -1,0 +1,316 @@
+---
+title: 'Lifetime DSM-5 agoraphobia: Diagnostic algorithm (GLAD Study data)'
+author: "Molly R. Davies"
+date: "24/10/2020"
+output: html_document
+---
+
+This script runs an algorithm based on DSM-5 diagnostic criteria, to ascertain likely lifetime diagnosis of agoraphobia using the GLAD Study data.
+
+Algorithm developed for the paper "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
+
+Full description of the algorithms and scripts written for the paper can be accessed at:
+https://github.com/mollyrdavies/GLAD-Diagnostic-algorithms.git
+
+Script written by M. R. Davies.
+Email:  molly.davies@kcl.ac.uk
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set up
+
+Clear workspace
+```{r clear workspace}
+rm(list = ls())
+```
+
+```{r load packages}
+library(tidyverse)
+library(psych)
+library(summarytools)
+```
+
+```{r source path for reading/saving data}
+#Source raw data directory (raw_path) & clean data export directory (cleaned_path)
+source("../ANXCMBD_data_path.R")
+```
+
+```{r read in cleaned AGP data}
+AGP_file <- paste(renamed_path, "AGP.rds", sep = "")
+
+AGP.cc <- read_rds(AGP_file)
+```
+
+```{r visualise AGP data}
+head(AGP.cc)
+```
+
+```{r create dataset of AGP diagnostic variables}
+
+#Create dataset of all variables needed for AGP diagnosis
+AGP.items <- AGP.cc %>%
+    mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
+    mutate_if(is.numeric, ~na_if(., -99)) %>%
+    mutate_if(is.numeric, ~na_if(., -77)) %>%
+    mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # Recode missing values to NAs in factor variables
+    mutate_if(is.factor, ~na_if(., "Don't know")) %>%
+    mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
+    mutate_if(is.factor, ~na_if(., "Prefer not to answer"))
+```
+
+## DSM-5 Agoraphobia diagnostic criteria
+
+A.   Marked fear or anxiety about two (or more) of the following five situations:
+        1.	Using public transportation (e.g., automobiles, buses, trains, ships, planes).
+        2.	Being in open spaces (e.g., parking lots, marketplaces, bridges).
+        3.	Being in enclosed places (e.g., shops, theaters, cinemas).
+        4.	Standing in line or being in a crowd.
+        5.	Being outside of the home alone.
+
+B.  The individual fears or avoids these situations because of thoughts that escape might be difficult or help might not be available in the event of developing panic-like symptoms or other incapacitating or embarrassing symptoms (e.g., fear of falling in the elderly; fear of incontinence).
+
+C.  The agoraphobic situations almost always provoke fear or anxiety.
+
+D.  The agoraphobic situations are actively avoided, require the presence of a companion, or are endured with intense fear or anxiety.
+
+E.  The fear or anxiety is out of proportion to the actual danger posed by the agoraphobic situations and to the sociocultural context.
+
+F.   The fear, anxiety, or avoidance is persistent, typically lasting for 6 months or more.
+
+G.  The fear, anxiety, or avoidance causes clinically significant distress or impairment in social, occupational, or other important areas of functioning.
+
+H.  If another medical condition (e.g., inflammatory bowel disease, Parkinson’s disease) is present, the fear, anxiety, or avoidance is clearly excessive.*
+
+I.    The fear, anxiety, or avoidance is not better explained by the symptoms of another mental disorder—for example, the symptoms are not confined to specific phobia, situational type; do not involve only social situations (as in social anxiety disorder): and are not re¬lated exclusively to obsessions (as in obsessive-compulsive disorder), perceived defects or flaws in physical appearance (as in body dysmorphic disorder), reminders of traumatic events (as in posttraumatic stress disorder),  or fear of separation  (as in separation anxiety disorder).
+
+Note: Agoraphobia is diagnosed irrespective of the presence of panic disorder. If an indi¬vidual’s presentation meets criteria for panic disorder and agoraphobia, both diagnoses should be assigned
+
+
+*The questionnaire does not adequately or fully measure these criteria
+
+## Screening variables
+The agoraphobia screening questions include:
+1) 2 or more fearful situations (criterion A)
+2) These situations almost always or always cause fear/anxiety (criterion C)
+
+*How the screening questions work*
+If participants only have 0-1 situation (criterion A) that causes fear/anxiety, then they are given a 0 for diagnosis and skip the remaining questions.
+
+If participants have at least 2 fearful situations (criterion A) but report that these situations "Never", "Only one or two times ever", or "Some of the time" cause fear/anxiety, then they are given a 0 for diagnosis and skip the remaining questions.
+
+Calculate AGP fearful situations 'score' (the number of criterion A symptoms endorsed)
+
+```{r AGP fearful situations score}
+#Create score for AGP fearful situations
+#Do NOT use 'is.na' for these as then you cannot +1 to it. Use the no.info item for NA (below). 
+AGP.items$agp.feared_situations<-0
+
+#Criterion A.1 - Using public transportation
+AGP.items$agp.feared_situations<-with(AGP.items, 
+                                    ifelse(!is.na(agp.using_public_transportation) 
+                                           & agp.using_public_transportation == 1, 
+                                           agp.feared_situations + 1, agp.feared_situations))
+#Criterion A.2 - Being in open spaces
+AGP.items$agp.feared_situations<-with(AGP.items,
+                                    ifelse(!is.na(agp.being_in_open_spaces) 
+                                           & agp.being_in_open_spaces == 1,
+                                           agp.feared_situations + 1, agp.feared_situations))
+#Criterion A.3 - Being in enclosed spaces
+AGP.items$agp.feared_situations<-with(AGP.items,
+                                    ifelse(!is.na(agp.being_in_enclosed_spaces) 
+                                           & agp.being_in_enclosed_spaces == 1,
+                                           agp.feared_situations + 1, agp.feared_situations))
+#Criterion A.4 - Standing in line or being in a crowd
+AGP.items$agp.feared_situations<-with(AGP.items, 
+                                    ifelse(!is.na(agp.queue_crowd_standing) &
+                                             agp.queue_crowd_standing == 1, 
+                                           agp.feared_situations + 1, agp.feared_situations))
+#Criterion A.5 - Being outside of the home alone
+AGP.items$agp.feared_situations<-with(AGP.items, 
+                                    ifelse(!is.na(agp.being_outside_of_the_home_alone) &
+                                             agp.being_outside_of_the_home_alone == 1, 
+                                           agp.feared_situations + 1, agp.feared_situations))
+
+#Check distribution of scores
+summary(as.factor(AGP.items$agp.feared_situations))
+
+```
+
+```{r agoraphobia screener}
+AGP.items <- AGP.items %>% 
+  mutate(agp.screener_numeric = 
+           case_when(
+             agp.feared_situations < 2 ~ 0,
+             agp.feared_situations >=2 & (agp.situations_anxiety_fear == 0 | 
+                                            agp.situations_anxiety_fear == 1 | 
+                                            agp.situations_anxiety_fear == 2) ~ 0,
+             agp.feared_situations >=2 & (agp.situations_anxiety_fear == 3 | 
+                                            agp.situations_anxiety_fear == 4) ~ 1
+             )
+         )
+
+freq(AGP.items$agp.screener_numeric)
+```
+
+## Criterion variables
+Note: These criterion variables will have a large number of NAs if the screening criteria aren't met, as the question is not displayed in these cases. This is accounted for in the algorithm.
+
+B.  The individual fears or avoids these situations because of thoughts that escape might be difficult or help might not be available in the event of developing panic-like symptoms or other incapacitating or embarrassing symptoms 
+```{r agoraphobia criterion B variable}
+AGP.items <- AGP.items %>% 
+  mutate(agp.criterion_B_numeric =
+           case_when(
+             agp.lose_control_embarrass_faint == 0 & 
+               agp.escape_afraid_difficult_happened == 0 & 
+               agp.needed_afraid == 0 ~ 0,
+             agp.lose_control_embarrass_faint == 1 ~ 1,
+             agp.escape_afraid_difficult_happened == 1 ~ 1,
+             agp.needed_afraid == 1 ~ 1
+           ))
+
+freq(AGP.items$agp.criterion_B_numeric)
+```
+
+D.  The agoraphobic situations are actively avoided, require the presence of a companion, or are endured with intense fear or anxiety.
+```{r agoraphobia criterion D variable}
+AGP.items <- AGP.items %>% 
+  mutate(agp.criterion_D_numeric =
+           case_when(
+             agp.avoid_these_situations == 0 & 
+               agp.endure_them_with_intense_anxiety == 0 & 
+               agp.require_the_presence_of_a_companion == 0 ~ 0,
+             agp.avoid_these_situations == 1 ~ 1,
+             agp.endure_them_with_intense_anxiety == 1 ~ 1,
+             agp.require_the_presence_of_a_companion == 1 ~ 1
+           ))
+
+freq(AGP.items$agp.criterion_D_numeric)
+```
+
+## Missingness
+If participants do not respond to the screening questions, then they are not shown the remaining questions and should autmatically have "NA" as their score.
+
+*Screening missingness*
+
+```{r AGP fearful situations NA count score}
+#Create score to calculate how many missing values are in the AGP fearful situations screener
+AGP.items$agp.feared_situations.NA<-0
+
+#Criterion A.1 - Using public transportation
+AGP.items$agp.feared_situations.NA<-with(AGP.items, 
+                                    ifelse(is.na(agp.using_public_transportation) , 
+                                           agp.feared_situations.NA + 1, agp.feared_situations.NA))
+#Criterion A.2 - Being in open spaces
+AGP.items$agp.feared_situations.NA<-with(AGP.items,
+                                    ifelse(is.na(agp.being_in_open_spaces),
+                                           agp.feared_situations.NA + 1, agp.feared_situations.NA))
+#Criterion A.3 - Being in enclosed spaces
+AGP.items$agp.feared_situations.NA<-with(AGP.items,
+                                    ifelse(is.na(agp.being_in_enclosed_spaces),
+                                           agp.feared_situations.NA + 1, agp.feared_situations.NA))
+#Criterion A.4 - Standing in line or being in a crowd
+AGP.items$agp.feared_situations.NA<-with(AGP.items, 
+                                    ifelse(is.na(agp.queue_crowd_standing), 
+                                           agp.feared_situations.NA + 1, agp.feared_situations.NA))
+#Criterion A.5 - Being outside of the home alone
+AGP.items$agp.feared_situations.NA<-with(AGP.items, 
+                                    ifelse(is.na(agp.being_outside_of_the_home_alone), 
+                                           agp.feared_situations.NA + 1, agp.feared_situations.NA))
+
+summary(as.factor(AGP.items$agp.feared_situations.NA))
+
+```
+
+*Symptom missingness*
+Once participants pass the screeners, if any of the other core symptoms are NA then the participant might have received a diagnosis of agoraphobia, but we won't know. 
+
+Future considerations: If a participant has an NA in this score but was far from meeting diagnostic criteria, then we may still want to keep them as a '0' for diagnosis.
+```{r variable for AGP symptom missingness}
+#Missing responses/no information on core symptoms
+AGP.items$no.info<-0
+#+1 to missingness score if criterion B items are missing
+AGP.items$no.info <- with(AGP.items,
+                               ifelse(agp.screener_numeric %in% 1 & is.na(agp.criterion_B_numeric),
+                                      no.info + 1, no.info
+                                                )
+                                      )
+#+1 to missingness if criteria E, F, or G items are missing
+AGP.items$no.info <- with(AGP.items,
+                               ifelse(agp.screener_numeric %in% 1 & 
+                                        (is.na(agp.actual_danger_involved_proportion) |
+                                        is.na(agp.longest_time_fears_lasted) |
+                                        is.na(agp.interfered_activities_fears_life)),
+                                      no.info + 1, no.info
+                                                )
+                                      )
+#+1 to missingness if criterion D item are missing
+AGP.items$no.info <- with(AGP.items,
+                               ifelse(agp.screener_numeric %in% 1 & is.na(agp.criterion_D_numeric),
+                                      no.info + 1, no.info
+                                                )
+                                      )
+
+summary(as.factor(AGP.items$no.info))
+```
+
+```{r lifetime AGP diagnosis variable}
+#Code lifetime AGP as NA if any core symptoms were missed
+AGP.items <- AGP.items %>% 
+  mutate(agp.diagnosis_numeric = 
+           case_when(
+             #Code as NA for missingness in screener that may have affected diagnosis
+             agp.feared_situations == 1 & agp.feared_situations.NA == 1 ~ NA_real_,
+             agp.feared_situations < 2 & agp.feared_situations.NA >= 2 ~ NA_real_,
+             #Code as NA for missingness in core symptoms if screeners were met (screeners already accounted for in no.info variable)
+             no.info > 0 ~ NA_real_,
+             #If participant wouldn't have met screener despite NA, code diagnosis as 0
+             agp.feared_situations == 0 & agp.feared_situations.NA == 1 ~ 0,
+             agp.screener_numeric == 0 | 
+               agp.criterion_B_numeric == 0 |
+               agp.criterion_D_numeric == 0 |
+               agp.actual_danger_involved_proportion == 0 |
+               agp.longest_time_fears_lasted <= 1 |
+               (agp.interfered_activities_fears_life == 0 | agp.interfered_activities_fears_life == 1)
+             ~ 0,
+             #Criterion A (at least 2 feared situations endorsed) & Criterion C (almost always provoke fear/anxiety) screeners
+             agp.screener_numeric == 1 &
+               #Criterion B. Fears or avoids these situations for any of these reasons
+               agp.criterion_B_numeric == 1 &
+               #Criterion D. Actively avoided, requires presence of companion, or endured with fear/anxiety
+               agp.criterion_D_numeric == 1 &
+               #Criterion E. Out of proportion to actual danger
+               agp.actual_danger_involved_proportion == 1 &
+               #Criterion F. Lasts for 6 months or more (duration)
+               (agp.longest_time_fears_lasted > 1) &
+               #Criterion G. Causes clinically significant impairment
+               (agp.interfered_activities_fears_life == 2 | agp.interfered_activities_fears_life == 3) 
+             ~ 1
+           ))
+
+freq(as.factor(AGP.items$agp.diagnosis_numeric))
+
+```
+
+## Recode calculated lifetime AGP diagnosis variable
+
+```{r agp.diagnosis recode}
+
+AGP.items$agp.diagnosis <- recode_factor(AGP.items$agp.diagnosis_numeric,
+                             "0" = "No agoraphobia",
+                             "1" = "Agoraphobia")
+#Summary of recoded variable
+summary(AGP.items$agp.diagnosis)
+```
+
+## Clean AGP dataset
+
+```{r clean AGP dataframe}
+
+#Export into a rds file:
+saveRDS(object = AGP.items, file = paste0(cleaned_path, "AGP_cleaned.rds"))
+
+# Saves the R data including the recoding
+#save.image(file = paste0(cleaned_path, "GLAD_AGP_clean.RData"))
+```
