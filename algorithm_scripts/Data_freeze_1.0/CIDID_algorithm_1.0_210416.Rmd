@@ -1,7 +1,7 @@
 ---
 title: "CIDI Lifetime MDD: Diagnostic algorithm (GLAD and COPING NBR data)"
 author: "Molly R. Davies and Megan Skelton"
-date: "24/10/2020"
+date: "16/04/2021"
 output: html_document
 ---
 
