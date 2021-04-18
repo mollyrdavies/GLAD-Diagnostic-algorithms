@@ -1,0 +1,664 @@
+---
+title: "DIAGCOMP_descriptives_frequencies"
+author: "Molly R. Davies"
+date: 30/10/2020
+output:  
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+    number_sections: false
+    highlight: monochrome
+    theme: cerulean
+code_folding: show
+
+html_notebook:
+  theme: cerulean
+toc: yes
+---
+
+This is the script to run demographic descriptives and frequencies of the single-item/algorithm-based diagnoses of the GLAD Study sample. Results are reported in the paper titled "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
+
+Script written by M. R. Davies.
+Email:  molly.davies@kcl.ac.uk
+
+All scripts for the paper can be accessed at:
+https://github.com/mollyrdavies/GLAD-Diagnostic-algorithms.git
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set up
+```{r install packages}
+#install.packages("summarytools")
+#install.packages("tidyverse")
+#install.packages("descr")
+```
+
+```{r import packages}
+library(descr)
+library(summarytools)
+library(tidyverse)
+```
+
+```{r source file paths}
+source("../../DF1.0_data_path.R")
+```
+
+```{r read data}
+dat.cc <- read_rds(paste0(cleaned_path, "combined_cleaned_new_variables.rds"))
+```
+
+```{r visualise dataset}
+dim(dat.cc)
+head(dat.cc)
+```
+
+# Demographics of GLAD sample
+
+## Mean age
+
+```{r mean age}                        
+mean(dat.cc$age, na.rm = T)
+```
+
+## Sex frequencies
+
+```{r sex freq}                        
+freq(dat.cc$sex)
+```
+
+## Ethnicity frequencies
+
+```{r ethnicity freq}
+freq(dat.cc$Ethnicity)
+```
+
+## Highest Education frequencies
+
+```{r higher education freq}
+freq(dat.cc$Highest.Education)
+```
+
+# Diagnosis: Frequencies and proportions
+Frequencies of diagnoses calculated for participants with values in BOTH single-item and algorithm-based diagnosis per disorder.
+Participants with NAs for one measure were excluded for that diagnosis.
+
+# Get frequencies for each diagnosis, excluding NAs per disorder
+
+```{r MDD frequencies}
+#Algorithm-based MDD frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.mdd) & !is.na(cidid.diagnosis)) %>%
+  summarytools::freq(cidid.diagnosis, report.NAs = T) 
+
+#Single-item MDD frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.mdd) & !is.na(cidid.diagnosis)) %>%
+  summarytools::freq(mhd.mdd)
+
+```
+
+```{r Any Anxiety frequencies}
+#Algorithm-based any anxiety frequencies
+dat.cc %>% 
+  filter(!is.na(LifetimeAnyAnx) & !is.na(ClinicianAnyAnx)) %>%
+  summarytools::freq(LifetimeAnyAnx)
+
+#Single-item any anxiety frequencies
+dat.cc %>% 
+  filter(!is.na(LifetimeAnyAnx) & !is.na(ClinicianAnyAnx)) %>%
+  summarytools::freq(ClinicianAnyAnx)
+
+```
+
+```{r GAD frequencies}
+#Algorithm-based GAD frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.gad) & !is.na(cidia.diagnosis)) %>%
+  summarytools::freq(cidia.diagnosis)
+
+#Single-item GAD frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.gad) & !is.na(cidia.diagnosis)) %>%
+  summarytools::freq(mhd.gad)
+
+```
+
+```{r Specific phobia frequencies}
+#Algorithm-based specific phobia frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.specific_phobia) & !is.na(spec.diagnosis)) %>%
+  summarytools::freq(spec.diagnosis)
+
+#Single-item specific phobia frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.specific_phobia) & !is.na(spec.diagnosis)) %>%
+  summarytools::freq(mhd.specific_phobia)
+```
+
+```{r Social anxiety disorder frequencies}
+#Algorithm-based social anxiety frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.social_anxiety) & !is.na(socp.diagnosis)) %>%
+  summarytools::freq(socp.diagnosis)
+
+#Single-item social anxiety frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.social_anxiety) & !is.na(socp.diagnosis)) %>%
+  summarytools::freq(mhd.social_anxiety)
+
+```
+
+```{r Panic disorder frequencies}
+#Algorithm-based panic disorder frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.panic_disorder) & !is.na(pad.diagnosis)) %>%
+  summarytools::freq(pad.diagnosis)
+
+#Single-item panic disorder frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.panic_disorder) & !is.na(pad.diagnosis)) %>%
+  summarytools::freq(mhd.panic_disorder)
+
+```
+
+```{r Panic Attacks vs Lifetime Panic disorder frequencies}
+#Single-item panic attacks frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.panic_attacks) & !is.na(mhd.panic_disorder) & !is.na(pad.diagnosis)) %>%
+  summarytools::freq(mhd.panic_attacks)
+
+```
+
+```{r Agoraphobia frequencies}
+#Algorithm-based agoraphobia frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.agoraphobia) & !is.na(agp.diagnosis)) %>%
+  summarytools::freq(agp.diagnosis)
+
+#Single-item agoraphobia frequencies
+dat.cc %>% 
+  filter(!is.na(mhd.agoraphobia) & !is.na(agp.diagnosis)) %>%
+  summarytools::freq(mhd.agoraphobia)
+```
+
+
+# Number of diagnoses/comorbidities in sample
+Check the number of diagnoses in the sample to see:
+- N ppts with 0 diagnoses
+- N ppts with 1 diagnosis
+- N ppts with 2+ diagnoses
+
+## Single-item diagnoses
+Note: Single-item panic disorder was added partway through data collection. The single-item count variable is therefore not coded as NA for panic disorder missingness to avoid excessive data loss.
+```{r create variable of N single-item diagnoses}
+#Sum all clinical diagnoses and remove NAs (except panic disorder, as this variable was included partway through data collection)
+dat.cc$selfreport_noPanic <- rowSums(dat.cc[,c("mhd.mdd", 
+                                           "mhd.gad", 
+                                           "mhd.specific_phobia", 
+                                           "mhd.social_anxiety", 
+                                           "mhd.agoraphobia")], na.rm=FALSE)
+
+#Add panic only for particpants without NA in above variable
+dat.cc$selfreport.n <- with(dat.cc,
+                          ifelse(
+                            is.na(selfreport_noPanic), 
+                            NA, 
+                            rowSums(dat.cc[,c("selfreport_noPanic", 
+                                            "mhd.panic_disorder")], na.rm = TRUE)
+                                 )
+                          )
+freq(dat.cc$selfreport_noPanic)
+freq(dat.cc$selfreport.n)
+```
+
+```{r get N with 1+ or 2+ single-item diagnosis}
+#N with 1+ SR diagnosis
+table(dat.cc[,c("selfreport.n")]>0)
+
+#N with 2+ SR diagnoses
+table(dat.cc[,c("selfreport.n")]>1)
+
+```
+
+```{r get mean single-item diagnoses}
+
+mean(dat.cc$selfreport.n, na.rm = T)
+
+```
+
+## Algorithm-based diagnoses
+
+```{r create variable of N algorithm-based diagnoses}
+#Sum all algorithm-based diagnoses and include NAs (coded as 0)
+dat.cc$algorithm_based_count_numeric <- rowSums(dat.cc[,c("cidid.diagnosis_numeric", 
+                                                          "cidia.diagnosis_numeric", 
+                                                          "spec.diagnosis_numeric", 
+                                                          "socp.diagnosis_numeric", 
+                                                          "pad.diagnosis_numeric", 
+                                                          "agp.diagnosis_numeric")], 
+                                                na.rm=TRUE)
+
+#Check what it would be if the NAs were excluded
+dat.cc$algorithm_based_noNA.n <- rowSums(dat.cc[,c("cidid.diagnosis_numeric", 
+                                                   "cidia.diagnosis_numeric", 
+                                                   "spec.diagnosis_numeric", 
+                                                   "socp.diagnosis_numeric", 
+                                                   "pad.diagnosis_numeric", 
+                                                   "agp.diagnosis_numeric")], 
+                                         na.rm=FALSE)
+
+#Summarise
+summary(as.factor(dat.cc$algorithm_based_count_numeric))
+summary(as.factor(dat.cc$algorithm_based_noNA.n))
+
+```
+
+```{r NAs in algorithm-based outcomes}
+
+#Do NOT use 'is.na' for these as then you cannot +1 to it. Use the no.info item for NA (below). 
+dat.cc$algorithm_based_NA.n<-0
+
+#MDD
+dat.cc$algorithm_based_NA.n<-with(dat.cc, 
+                         ifelse(is.na(cidid.diagnosis_numeric),
+                                algorithm_based_NA.n + 1, algorithm_based_NA.n))
+#GAD
+dat.cc$algorithm_based_NA.n<-with(dat.cc, 
+                         ifelse(is.na(cidia.diagnosis_numeric),
+                                algorithm_based_NA.n + 1, algorithm_based_NA.n))
+#Specific phobia
+dat.cc$algorithm_based_NA.n<-with(dat.cc, 
+                         ifelse(is.na(spec.diagnosis_numeric),
+                                algorithm_based_NA.n + 1, algorithm_based_NA.n))
+#Social phobia
+dat.cc$algorithm_based_NA.n<-with(dat.cc, 
+                         ifelse(is.na(socp.diagnosis_numeric),
+                                algorithm_based_NA.n + 1, algorithm_based_NA.n))
+#Panic disorder
+dat.cc$algorithm_based_NA.n<-with(dat.cc, 
+                         ifelse(is.na(pad.diagnosis_numeric),
+                                algorithm_based_NA.n + 1, algorithm_based_NA.n))
+#Agoraphobia
+dat.cc$algorithm_based_NA.n<-with(dat.cc, 
+                         ifelse(is.na(agp.diagnosis_numeric),
+                                algorithm_based_NA.n + 1, algorithm_based_NA.n))
+#Check distribution of scores
+summary(as.factor(dat.cc$algorithm_based_NA.n))
+
+
+```
+
+```{r get N with 1+ or 2+ algorithm-based diagnosis}
+
+#N with 1+ algorithm-based diagnosis
+table(dat.cc[,c("algorithm_based_count_numeric")]>0)
+
+#N with 2+ algorithm-based diagnoses
+table(dat.cc[,c("algorithm_based_count_numeric")]>1)
+
+```
+
+```{r get mean algorithm-based diagnoses}
+
+mean(dat.cc$algorithm_based_count_numeric, na.rm = T)
+
+```
+
+## Look at N algorithm-based diagnoses in participants with >=1 single-item diagnoses
+
+```{r subset participants with 1+ single-item diagnosis}
+#Subset
+selfreport_n1 <- subset(dat.cc, selfreport.n > 0)
+#Check correct number of participants
+nrow(selfreport_n1)
+
+```
+
+```{r get subset N with 0, 1 or 2+ algorithm-based diagnosis}
+
+#N with no algorithm-based diagnosis
+table(selfreport_n1[,c("algorithm_based_noNA.n")]==0)
+
+#N with 1 algorithm-based diagnosis
+table(selfreport_n1[,c("algorithm_based_count_numeric")]==1)
+
+#N with 2+ algorithm-based diagnoses
+table(selfreport_n1[,c("algorithm_based_count_numeric")]>1)
+
+```
+
+```{r get mean subset algorithm-based diagnoses}
+mean(selfreport_n1$algorithm_based_count_numeric, na.rm = T)
+```
+
+## Look at N single-item diagnoses in participants with >=1 algorithm-based diagnoses
+
+```{r subset participants with 1+ algorithm-based diagnosis}
+#Subset
+algorithm_based_n1 <- subset(dat.cc, algorithm_based_count_numeric > 0)
+#Check correct number of participants
+nrow(algorithm_based_n1)
+
+```
+
+```{r get subset N with 0, 1 or 2+ single-item diagnosis}
+
+#N with no algorithm-based diagnosis
+table(algorithm_based_n1[,c("selfreport.n")]==0)
+
+#N with 1 algorithm-based diagnosis
+table(algorithm_based_n1[,c("selfreport.n")]==1)
+
+#N with 2+ algorithm-based diagnoses
+table(algorithm_based_n1[,c("selfreport.n")]>1)
+
+```
+
+```{r get mean subset single-item diagnoses}
+mean(algorithm_based_n1$selfreport.n, na.rm = T)
+```
+
+# Agreement frequencies
+## Create function to run concordance
+
+```{r create function to take the sum of ifelse statement: yes is 1 no is 0}
+
+sum_ifelse <- function(x, y) {
+  sum(ifelse(x & y, 1, 0), na.rm=T)
+}
+
+```
+
+## Create table of AB/SI agreements/disagreements for each disorder
+
+```{r create dataframe with agree/disagree results}
+
+## COLUMN ORDER: ##
+#Agreement: No diagnosis (AB NO, SI NO)",
+#Disagreement: AB no, SI yes",
+#Disagreement: AB Yes, SI No",
+#Agreement: diagnosis (AB Yes, SI Yes)"
+
+##Create a blank matrix
+table0.m <- matrix(c(
+                   #Fill in MDD row
+                   sum_ifelse(dat.cc$cidid.diagnosis_numeric == 0, dat.cc$mhd.mdd == 0),  
+                   sum_ifelse(dat.cc$cidid.diagnosis_numeric == 0, dat.cc$mhd.mdd == 1),
+                   sum_ifelse(dat.cc$cidid.diagnosis_numeric == 1, dat.cc$mhd.mdd == 0),
+                   sum_ifelse(dat.cc$cidid.diagnosis_numeric == 1, dat.cc$mhd.mdd == 1),
+                   sum_ifelse(!is.na(dat.cc$cidid.diagnosis_numeric), !is.na(dat.cc$mhd.mdd)),
+                   #Fill in any anxiety row
+                   sum_ifelse(dat.cc$LifetimeAnyAnx.n == 0, dat.cc$ClinicianAnyAnx.n == 0),  
+                   sum_ifelse(dat.cc$LifetimeAnyAnx.n == 0, dat.cc$ClinicianAnyAnx.n == 1),
+                   sum_ifelse(dat.cc$LifetimeAnyAnx.n == 1, dat.cc$ClinicianAnyAnx.n == 0),
+                   sum_ifelse(dat.cc$LifetimeAnyAnx.n == 1, dat.cc$ClinicianAnyAnx.n == 1),
+                   sum_ifelse(!is.na(dat.cc$LifetimeAnyAnx), !is.na(dat.cc$ClinicianAnyAnx)),
+                   #Fill in GAD row
+                   sum_ifelse(dat.cc$cidia.diagnosis_numeric == 0, dat.cc$mhd.gad == 0),               
+                   sum_ifelse(dat.cc$cidia.diagnosis_numeric == 0, dat.cc$mhd.gad == 1),       
+                   sum_ifelse(dat.cc$cidia.diagnosis_numeric == 1, dat.cc$mhd.gad == 0),
+                   sum_ifelse(dat.cc$cidia.diagnosis_numeric == 1, dat.cc$mhd.gad == 1),
+                   sum_ifelse(!is.na(dat.cc$cidia.diagnosis_numeric), !is.na(dat.cc$mhd.gad)),
+                   #Fill in SpecPhob row
+                   sum_ifelse(dat.cc$spec.diagnosis_numeric == 0, dat.cc$mhd.specific_phobia == 0), 
+                   sum_ifelse(dat.cc$spec.diagnosis_numeric == 0, dat.cc$mhd.specific_phobia == 1), 
+                   sum_ifelse(dat.cc$spec.diagnosis_numeric == 1, dat.cc$mhd.specific_phobia == 0),
+                   sum_ifelse(dat.cc$spec.diagnosis_numeric == 1, dat.cc$mhd.specific_phobia == 1), 
+                   sum_ifelse(!is.na(dat.cc$spec.diagnosis_numeric), !is.na(dat.cc$mhd.specific_phobia)),
+                   #Fill in SocialPhob row 
+                   sum_ifelse(dat.cc$socp.diagnosis_numeric == 0, dat.cc$mhd.social_anxiety == 0), 
+                   sum_ifelse(dat.cc$socp.diagnosis_numeric == 0, dat.cc$mhd.social_anxiety == 1), 
+                   sum_ifelse(dat.cc$socp.diagnosis_numeric == 1, dat.cc$mhd.social_anxiety == 0),
+                   sum_ifelse(dat.cc$socp.diagnosis_numeric == 1, dat.cc$mhd.social_anxiety == 1),
+                   sum_ifelse(!is.na(dat.cc$socp.diagnosis_numeric), !is.na(dat.cc$mhd.social_anxiety)),
+                   #Fill in Panic attacks row
+                   sum(ifelse(dat.cc$pad.diagnosis_numeric == 0 & dat.cc$mhd.panic_attacks == 0 & !is.na(dat.cc$mhd.panic_disorder), 1, 0), na.rm=T), 
+                   sum(ifelse(dat.cc$pad.diagnosis_numeric == 0 & dat.cc$mhd.panic_attacks == 1 & !is.na(dat.cc$mhd.panic_disorder), 1, 0), na.rm=T),
+                   sum(ifelse(dat.cc$pad.diagnosis_numeric == 1 & dat.cc$mhd.panic_attacks == 0 & !is.na(dat.cc$mhd.panic_disorder), 1, 0), na.rm=T),
+                   sum(ifelse(dat.cc$pad.diagnosis_numeric == 1 & dat.cc$mhd.panic_attacks == 1 & !is.na(dat.cc$mhd.panic_disorder), 1, 0), na.rm=T), 
+                   sum(ifelse(!is.na(dat.cc$pad.diagnosis_numeric) & !is.na(dat.cc$mhd.panic_attacks) & !is.na(dat.cc$mhd.panic_disorder), 1, 0), na.rm=T),
+                   #Fill in Panic disorder row
+                   sum_ifelse(dat.cc$pad.diagnosis_numeric == 0, dat.cc$mhd.panic_disorder == 0), 
+                   sum_ifelse(dat.cc$pad.diagnosis_numeric == 0, dat.cc$mhd.panic_disorder == 1),
+                   sum_ifelse(dat.cc$pad.diagnosis_numeric == 1, dat.cc$mhd.panic_disorder == 0),
+                   sum_ifelse(dat.cc$pad.diagnosis_numeric == 1, dat.cc$mhd.panic_disorder == 1), 
+                   sum_ifelse(!is.na(dat.cc$pad.diagnosis_numeric), !is.na(dat.cc$mhd.panic_disorder)),
+                   #Fill in Agoraphobia row
+                   sum_ifelse(dat.cc$agp.diagnosis_numeric == 0, dat.cc$mhd.agoraphobia == 0),
+                   sum_ifelse(dat.cc$agp.diagnosis_numeric == 0, dat.cc$mhd.agoraphobia == 1),
+                   sum_ifelse(dat.cc$agp.diagnosis_numeric == 1, dat.cc$mhd.agoraphobia == 0),
+                   sum_ifelse(dat.cc$agp.diagnosis_numeric == 1, dat.cc$mhd.agoraphobia == 1),
+                   sum_ifelse(!is.na(dat.cc$agp.diagnosis_numeric), !is.na(dat.cc$mhd.agoraphobia))
+                   ),
+                   nrow = 8,
+                   ncol = 5,
+                   byrow = T)
+
+##Convert it to a dataframe 
+table0 <- data.frame(table0.m)
+
+##Add column names (clinician diagnoses)
+colnames(table0) <- c("Agreement: No diagnosis (AB NO, SI NO)",
+                      "Disagreement: screened negative, diagnosis (AB no, SI yes)",
+                      "Disagreement: screened positive, no diagnosis (AB Yes, SI No)",
+                      "Agreement: diagnosis (AB Yes, SI Yes)",
+                      "Total (N)")
+
+##Add row names (lifetime diagnoses) - eventually add script to add N per diagnosis to row names
+rownames(table0) <- c("Major depressive disorder", 
+                      "Any anxiety",
+                      "Generalised anxiety disorder", 
+                      "Specific phobia", 
+                      "Social anxiety disorder",
+                      "Panic attacks",
+                      "Panic disorder",
+                      "Agoraphobia")
+
+##Visualise
+table0
+```
+
+# Agreements by sex
+
+## Male-only dataset
+
+```{r dataset by sex}
+
+dat.male <- dat.cc %>% 
+  filter(sex == 0)
+
+```
+
+
+## Male-only table of AB/SI agreements/disagreements for each disorder
+
+```{r create male-only dataframe with agree/disagree results}
+
+## COLUMN ORDER: ##
+#Agreement: No diagnosis (AB NO, SI NO)",
+#Disagreement: AB no, SI yes",
+#Disagreement: AB Yes, SI No",
+#Agreement: diagnosis (AB Yes, SI Yes)"
+
+##Create a blank matrix
+table1.m <- matrix(c(
+                   #Fill in MDD row
+                   sum_ifelse(dat.male$cidid.diagnosis_numeric == 0, dat.male$mhd.mdd == 0),  
+                   sum_ifelse(dat.male$cidid.diagnosis_numeric == 0, dat.male$mhd.mdd == 1),
+                   sum_ifelse(dat.male$cidid.diagnosis_numeric == 1, dat.male$mhd.mdd == 0),
+                   sum_ifelse(dat.male$cidid.diagnosis_numeric == 1, dat.male$mhd.mdd == 1),
+                   sum_ifelse(!is.na(dat.male$cidid.diagnosis_numeric), !is.na(dat.male$mhd.mdd)),
+                   #Fill in any anxiety row
+                   sum_ifelse(dat.male$LifetimeAnyAnx.n == 0, dat.male$ClinicianAnyAnx.n == 0),  
+                   sum_ifelse(dat.male$LifetimeAnyAnx.n == 0, dat.male$ClinicianAnyAnx.n == 1),
+                   sum_ifelse(dat.male$LifetimeAnyAnx.n == 1, dat.male$ClinicianAnyAnx.n == 0),
+                   sum_ifelse(dat.male$LifetimeAnyAnx.n == 1, dat.male$ClinicianAnyAnx.n == 1),
+                   sum_ifelse(!is.na(dat.male$LifetimeAnyAnx), !is.na(dat.male$ClinicianAnyAnx)),
+                   #Fill in GAD row
+                   sum_ifelse(dat.male$cidia.diagnosis_numeric == 0, dat.male$mhd.gad == 0),               
+                   sum_ifelse(dat.male$cidia.diagnosis_numeric == 0, dat.male$mhd.gad == 1),       
+                   sum_ifelse(dat.male$cidia.diagnosis_numeric == 1, dat.male$mhd.gad == 0),
+                   sum_ifelse(dat.male$cidia.diagnosis_numeric == 1, dat.male$mhd.gad == 1),
+                   sum_ifelse(!is.na(dat.male$cidia.diagnosis_numeric), !is.na(dat.male$mhd.gad)),
+                   #Fill in SpecPhob row
+                   sum_ifelse(dat.male$spec.diagnosis_numeric == 0, dat.male$mhd.specific_phobia == 0), 
+                   sum_ifelse(dat.male$spec.diagnosis_numeric == 0, dat.male$mhd.specific_phobia == 1), 
+                   sum_ifelse(dat.male$spec.diagnosis_numeric == 1, dat.male$mhd.specific_phobia == 0),
+                   sum_ifelse(dat.male$spec.diagnosis_numeric == 1, dat.male$mhd.specific_phobia == 1), 
+                   sum_ifelse(!is.na(dat.male$spec.diagnosis_numeric), !is.na(dat.male$mhd.specific_phobia)),
+                   #Fill in SocialPhob row 
+                   sum_ifelse(dat.male$socp.diagnosis_numeric == 0, dat.male$mhd.social_anxiety == 0), 
+                   sum_ifelse(dat.male$socp.diagnosis_numeric == 0, dat.male$mhd.social_anxiety == 1), 
+                   sum_ifelse(dat.male$socp.diagnosis_numeric == 1, dat.male$mhd.social_anxiety == 0),
+                   sum_ifelse(dat.male$socp.diagnosis_numeric == 1, dat.male$mhd.social_anxiety == 1),
+                   sum_ifelse(!is.na(dat.male$socp.diagnosis_numeric), !is.na(dat.male$mhd.social_anxiety)),
+                   #Fill in Panic attacks row
+                   sum(ifelse(dat.male$pad.diagnosis_numeric == 0 & dat.male$mhd.panic_attacks == 0 & !is.na(dat.male$mhd.panic_disorder), 1, 0), na.rm=T), 
+                   sum(ifelse(dat.male$pad.diagnosis_numeric == 0 & dat.male$mhd.panic_attacks == 1 & !is.na(dat.male$mhd.panic_disorder), 1, 0), na.rm=T),
+                   sum(ifelse(dat.male$pad.diagnosis_numeric == 1 & dat.male$mhd.panic_attacks == 0 & !is.na(dat.male$mhd.panic_disorder), 1, 0), na.rm=T),
+                   sum(ifelse(dat.male$pad.diagnosis_numeric == 1 & dat.male$mhd.panic_attacks == 1 & !is.na(dat.male$mhd.panic_disorder), 1, 0), na.rm=T), 
+                   sum(ifelse(!is.na(dat.male$pad.diagnosis_numeric) & !is.na(dat.male$mhd.panic_attacks) & !is.na(dat.male$mhd.panic_disorder), 1, 0), na.rm=T),
+                   #Fill in Panic disorder row
+                   sum_ifelse(dat.male$pad.diagnosis_numeric == 0, dat.male$mhd.panic_disorder == 0), 
+                   sum_ifelse(dat.male$pad.diagnosis_numeric == 0, dat.male$mhd.panic_disorder == 1),
+                   sum_ifelse(dat.male$pad.diagnosis_numeric == 1, dat.male$mhd.panic_disorder == 0),
+                   sum_ifelse(dat.male$pad.diagnosis_numeric == 1, dat.male$mhd.panic_disorder == 1), 
+                   sum_ifelse(!is.na(dat.male$pad.diagnosis_numeric), !is.na(dat.male$mhd.panic_disorder)),
+                   #Fill in Agoraphobia row
+                   sum_ifelse(dat.male$agp.diagnosis_numeric == 0, dat.male$mhd.agoraphobia == 0),
+                   sum_ifelse(dat.male$agp.diagnosis_numeric == 0, dat.male$mhd.agoraphobia == 1),
+                   sum_ifelse(dat.male$agp.diagnosis_numeric == 1, dat.male$mhd.agoraphobia == 0),
+                   sum_ifelse(dat.male$agp.diagnosis_numeric == 1, dat.male$mhd.agoraphobia == 1),
+                   sum_ifelse(!is.na(dat.male$agp.diagnosis_numeric), !is.na(dat.male$mhd.agoraphobia))
+                   ),
+                   nrow = 8,
+                   ncol = 5,
+                   byrow = T)
+
+##Convert it to a dataframe 
+table1 <- data.frame(table1.m)
+
+##Add column names (clinician diagnoses)
+colnames(table1) <- c("Agreement: No diagnosis (AB NO, SI NO)",
+                      "Disagreement: screened negative, diagnosis (AB no, SI yes)",
+                      "Disagreement: screened positive, no diagnosis (AB Yes, SI No)",
+                      "Agreement: diagnosis (AB Yes, SI Yes)",
+                      "Total (N)")
+
+##Add row names (lifetime diagnoses) - eventually add script to add N per diagnosis to row names
+rownames(table1) <- c("Major depressive disorder", 
+                      "Any anxiety",
+                      "Generalised anxiety disorder", 
+                      "Specific phobia", 
+                      "Social anxiety disorder",
+                      "Panic attacks",
+                      "Panic disorder",
+                      "Agoraphobia")
+
+##Visualise
+table1
+```
+
+## Female-only dataset
+
+```{r dataset by sex}
+
+dat.female <- dat.cc %>% 
+  filter(sex == 1)
+
+```
+
+
+## Female-only table of AB/SI agreements/disagreements for each disorder
+
+```{r create female-only dataframe with agree/disagree results}
+
+## COLUMN ORDER: ##
+#Agreement: No diagnosis (AB NO, SI NO)",
+#Disagreement: AB no, SI yes",
+#Disagreement: AB Yes, SI No",
+#Agreement: diagnosis (AB Yes, SI Yes)"
+
+##Create a blank matrix
+table2.m <- matrix(c(
+                   #Fill in MDD row
+                   sum_ifelse(dat.female$cidid.diagnosis_numeric == 0, dat.female$mhd.mdd == 0),  
+                   sum_ifelse(dat.female$cidid.diagnosis_numeric == 0, dat.female$mhd.mdd == 1),
+                   sum_ifelse(dat.female$cidid.diagnosis_numeric == 1, dat.female$mhd.mdd == 0),
+                   sum_ifelse(dat.female$cidid.diagnosis_numeric == 1, dat.female$mhd.mdd == 1),
+                   sum_ifelse(!is.na(dat.female$cidid.diagnosis_numeric), !is.na(dat.female$mhd.mdd)),
+                   #Fill in any anxiety row
+                   sum_ifelse(dat.female$LifetimeAnyAnx.n == 0, dat.female$ClinicianAnyAnx.n == 0),  
+                   sum_ifelse(dat.female$LifetimeAnyAnx.n == 0, dat.female$ClinicianAnyAnx.n == 1),
+                   sum_ifelse(dat.female$LifetimeAnyAnx.n == 1, dat.female$ClinicianAnyAnx.n == 0),
+                   sum_ifelse(dat.female$LifetimeAnyAnx.n == 1, dat.female$ClinicianAnyAnx.n == 1),
+                   sum_ifelse(!is.na(dat.female$LifetimeAnyAnx), !is.na(dat.female$ClinicianAnyAnx)),
+                   #Fill in GAD row
+                   sum_ifelse(dat.female$cidia.diagnosis_numeric == 0, dat.female$mhd.gad == 0),               
+                   sum_ifelse(dat.female$cidia.diagnosis_numeric == 0, dat.female$mhd.gad == 1),       
+                   sum_ifelse(dat.female$cidia.diagnosis_numeric == 1, dat.female$mhd.gad == 0),
+                   sum_ifelse(dat.female$cidia.diagnosis_numeric == 1, dat.female$mhd.gad == 1),
+                   sum_ifelse(!is.na(dat.female$cidia.diagnosis_numeric), !is.na(dat.female$mhd.gad)),
+                   #Fill in SpecPhob row
+                   sum_ifelse(dat.female$spec.diagnosis_numeric == 0, dat.female$mhd.specific_phobia == 0), 
+                   sum_ifelse(dat.female$spec.diagnosis_numeric == 0, dat.female$mhd.specific_phobia == 1), 
+                   sum_ifelse(dat.female$spec.diagnosis_numeric == 1, dat.female$mhd.specific_phobia == 0),
+                   sum_ifelse(dat.female$spec.diagnosis_numeric == 1, dat.female$mhd.specific_phobia == 1), 
+                   sum_ifelse(!is.na(dat.female$spec.diagnosis_numeric), !is.na(dat.female$mhd.specific_phobia)),
+                   #Fill in SocialPhob row 
+                   sum_ifelse(dat.female$socp.diagnosis_numeric == 0, dat.female$mhd.social_anxiety == 0), 
+                   sum_ifelse(dat.female$socp.diagnosis_numeric == 0, dat.female$mhd.social_anxiety == 1), 
+                   sum_ifelse(dat.female$socp.diagnosis_numeric == 1, dat.female$mhd.social_anxiety == 0),
+                   sum_ifelse(dat.female$socp.diagnosis_numeric == 1, dat.female$mhd.social_anxiety == 1),
+                   sum_ifelse(!is.na(dat.female$socp.diagnosis_numeric), !is.na(dat.female$mhd.social_anxiety)),
+                   #Fill in Panic attacks row
+                   sum(ifelse(dat.female$pad.diagnosis_numeric == 0 & dat.female$mhd.panic_attacks == 0 & !is.na(dat.female$mhd.panic_disorder), 1, 0), na.rm=T), 
+                   sum(ifelse(dat.female$pad.diagnosis_numeric == 0 & dat.female$mhd.panic_attacks == 1 & !is.na(dat.female$mhd.panic_disorder), 1, 0), na.rm=T),
+                   sum(ifelse(dat.female$pad.diagnosis_numeric == 1 & dat.female$mhd.panic_attacks == 0 & !is.na(dat.female$mhd.panic_disorder), 1, 0), na.rm=T),
+                   sum(ifelse(dat.female$pad.diagnosis_numeric == 1 & dat.female$mhd.panic_attacks == 1 & !is.na(dat.female$mhd.panic_disorder), 1, 0), na.rm=T), 
+                   sum(ifelse(!is.na(dat.female$pad.diagnosis_numeric) & !is.na(dat.female$mhd.panic_attacks) & !is.na(dat.female$mhd.panic_disorder), 1, 0), na.rm=T),
+                   #Fill in Panic disorder row
+                   sum_ifelse(dat.female$pad.diagnosis_numeric == 0, dat.female$mhd.panic_disorder == 0), 
+                   sum_ifelse(dat.female$pad.diagnosis_numeric == 0, dat.female$mhd.panic_disorder == 1),
+                   sum_ifelse(dat.female$pad.diagnosis_numeric == 1, dat.female$mhd.panic_disorder == 0),
+                   sum_ifelse(dat.female$pad.diagnosis_numeric == 1, dat.female$mhd.panic_disorder == 1), 
+                   sum_ifelse(!is.na(dat.female$pad.diagnosis_numeric), !is.na(dat.female$mhd.panic_disorder)),
+                   #Fill in Agoraphobia row
+                   sum_ifelse(dat.female$agp.diagnosis_numeric == 0, dat.female$mhd.agoraphobia == 0),
+                   sum_ifelse(dat.female$agp.diagnosis_numeric == 0, dat.female$mhd.agoraphobia == 1),
+                   sum_ifelse(dat.female$agp.diagnosis_numeric == 1, dat.female$mhd.agoraphobia == 0),
+                   sum_ifelse(dat.female$agp.diagnosis_numeric == 1, dat.female$mhd.agoraphobia == 1),
+                   sum_ifelse(!is.na(dat.female$agp.diagnosis_numeric), !is.na(dat.female$mhd.agoraphobia))
+                   ),
+                   nrow = 8,
+                   ncol = 5,
+                   byrow = T)
+
+##Convert it to a dataframe 
+table2 <- data.frame(table2.m)
+
+##Add column names (clinician diagnoses)
+colnames(table2) <- c("Agreement: No diagnosis (AB NO, SI NO)",
+                      "Disagreement: screened negative, diagnosis (AB no, SI yes)",
+                      "Disagreement: screened positive, no diagnosis (AB Yes, SI No)",
+                      "Agreement: diagnosis (AB Yes, SI Yes)",
+                      "Total (N)")
+
+##Add row names (lifetime diagnoses) - eventually add script to add N per diagnosis to row names
+rownames(table2) <- c("Major depressive disorder", 
+                      "Any anxiety",
+                      "Generalised anxiety disorder", 
+                      "Specific phobia", 
+                      "Social anxiety disorder",
+                      "Panic attacks",
+                      "Panic disorder",
+                      "Agoraphobia")
+
+##Visualise
+table2
+```
