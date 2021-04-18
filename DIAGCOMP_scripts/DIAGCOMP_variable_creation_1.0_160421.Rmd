@@ -1,0 +1,258 @@
+---
+title: "DIAGCOMP_variable_creation"
+author: "Molly R. Davies"
+date: "30/10/2020"
+output: html_document
+---
+
+This recodes/creates new variables utilised in analyses for the paper "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
+
+Script written by M. R. Davies.
+Email:  molly.davies@kcl.ac.uk
+
+All scripts for the paper can be accessed at:
+https://github.com/mollyrdavies/GLAD-Diagnostic-algorithms.git
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set up
+
+Clear workspace
+```{r clear workspace}
+rm(list = ls())
+```
+
+```{r create GLAD color palette}
+# GLAD color palette:
+
+GLADpalette = c("#efc00b",   # Yellow
+                "#b7dee8",   # Light blue (logo)
+                "#009fb7",   # Turquoise (dropdown menu)
+                "#215968")   # Dark blue (website text)
+```
+
+```{r install packages}
+#install.packages("tidyverse")
+```
+
+```{r import packages}
+library(tidyverse)
+```
+
+# Get data
+
+```{r source file paths}
+source("../../DF1.0_data_path.R")
+```
+
+```{r read data}
+dat.cc <- read_rds(paste0(cleaned_path, "combined_cleaned.rds"))
+```
+
+# Rename and recode diagnostic variables
+
+```{r lifetime MDD as factor}
+
+dat.cc$LifetimeDepression <- recode_factor(dat.cc$cidid.diagnosis_numeric,
+                                            "0" = "Never had MDD",
+                                            "1" = "Lifetime MDD",
+                                           .missing = NULL)
+
+summary(dat.cc$LifetimeDepression)
+
+```
+
+```{r lifetime GAD as factor}
+
+dat.cc$LifetimeGAD <- recode_factor(dat.cc$cidia.diagnosis_numeric,
+                                            "0" = "Never had GAD",
+                                            "1" = "Lifetime GAD",
+                                            .missing = NULL)
+
+
+summary(dat.cc$LifetimeGAD)
+
+```
+
+```{r lifetime specific phobia as factor}
+
+dat.cc$SpecificPhobia <- recode_factor(dat.cc$spec.diagnosis_numeric,
+                                            "0" = "Never had specific phobia",
+                                            "1" = "Lifetime specific phobia")
+
+summary(dat.cc$SpecificPhobia)
+
+```
+
+```{r lifetime social phobia as factor}
+
+dat.cc$SocialPhobia <- recode_factor(dat.cc$socp.diagnosis_numeric,
+                                            "0" = "Never had social phobia",
+                                            "1" = "Lifetime social phobia")
+
+summary(dat.cc$SocialPhobia)
+
+```
+
+```{r lifetime panic disorder as factor}
+
+dat.cc$PanicDisorder <- recode_factor(dat.cc$pad.diagnosis_numeric,
+                                            "0" = "Never had panic disorder",
+                                            "1" = "Lifetime panic disorder")
+
+summary(dat.cc$PanicDisorder)
+
+```
+
+```{r lifetime agoraphobia as factor}
+
+dat.cc$Agoraphobia <- recode_factor(dat.cc$agp.diagnosis_numeric,
+                                            "0" = "Never had agoraphobia",
+                                            "1" = "Lifetime agoraphobia")
+
+summary(dat.cc$Agoraphobia)
+
+```
+
+```{r clinician diagnosis MDD as factor}
+
+dat.cc$ClinicianMDD <- recode_factor(dat.cc$mhd.mdd,
+                                            "0" = "No MDD diagnosis",
+                                            "1" = "MDD diagnosis",
+                                            "-77" = NULL,
+                                            "-88" = NULL,
+                                            "-99" = NULL,
+                                            .missing = NULL)
+
+summary(dat.cc$ClinicianMDD)
+
+```
+
+```{r clinician diagnosis GAD as factor}
+##Recode in dat.cc dataset
+dat.cc$ClinicianGAD <- recode_factor(dat.cc$mhd.gad,
+                                            "0" = "No GAD diagnosis",
+                                            "1" = "GAD diagnosis",
+                                            "-77" = NULL,
+                                            "-88" = NULL,
+                                            "-99" = NULL,
+                                            .missing = NULL)
+
+summary(dat.cc$ClinicianGAD)
+
+```
+
+```{r clinician diagnosis specific phobia as factor}
+
+dat.cc$ClinicianSpecPhob <- recode_factor(dat.cc$mhd.specific_phobia_numeric,
+                                          "0" = "No specific phobia diagnosis",
+                                          "1" = "Specific phobia diagnosis",
+                                          "-77" = NULL,
+                                          "-88" = NULL,
+                                          "-99" = NULL,
+                                          .missing = NULL)
+
+summary(dat.cc$ClinicianSpecPhob)
+
+```
+
+```{r clinician diagnosis social phobia as factor}
+
+dat.cc$ClinicianSocialPhob <- recode_factor(dat.cc$mhd.social_anxiety_numeric,
+                                            "0" = "No social phobia diagnosis",
+                                            "1" = "Social phobia diagnosis",
+                                            "-77" = NULL,
+                                            "-99" = NULL,
+                                            .missing = NULL)
+
+summary(dat.cc$ClinicianSocialPhob)
+
+```
+
+```{r clinician diagnosis panic disorder as factor}
+
+dat.cc$ClinicianPanicDis <- recode_factor(dat.cc$mhd.panic_disorder_numeric,
+                                            "0" = "No panic disorder diagnosis",
+                                            "1" = "Panic disorder diagnosis",
+                                            "-77" = NULL,
+                                            "-88" = NULL,
+                                            "-99" = NULL,
+                                            .missing = NULL)
+
+summary(dat.cc$ClinicianPanicDis)
+
+```
+
+```{r clinician diagnosis panic attacks as factor}
+
+dat.cc$ClinicianPanicAttacks <- recode_factor(dat.cc$mhd.panic_attacks_numeric,
+                                            "0" = "No panic attacks diagnosis",
+                                            "1" = "Panic attacks diagnosis",
+                                            "-77" = NULL,
+                                            "-88" = NULL,
+                                            "-99" = NULL,
+                                            .missing = NULL)
+
+summary(dat.cc$ClinicianPanicAttacks)
+
+```
+
+```{r clinician diagnosis agoraphobia as factor}
+
+dat.cc$ClinicianAgoraphobia <- recode_factor(dat.cc$mhd.agoraphobia_numeric,
+                                            "0" = "No agoraphobia diagnosis",
+                                            "1" = "Agoraphobia diagnosis",
+                                            "-77" = NULL,
+                                            "-88" = NULL,
+                                            "-99" = NULL,
+                                            .missing = NULL)
+
+summary(dat.cc$ClinicianAgoraphobia)
+
+```
+
+## Create any anxiety variables (clinician and lifetime)
+
+```{r create any anxiety variables}
+#Create clinician and lifetime any anxiety variables
+dat.cc <- dat.cc %>% 
+  mutate(ClinicianAnyAnx.n =
+           case_when(
+             mhd.GAD_numeric == 0 & 
+               mhd.specific_phobia_numeric == 0 & mhd.social_anxiety_numeric == 0 &
+               mhd.panic_disorder_numeric == 0 & mhd.agoraphobia_numeric == 0 ~ 0,
+             mhd.GAD_numeric == 1 | mhd.specific_phobia_numeric == 1 | 
+               mhd.social_anxiety_numeric == 1 |
+               mhd.panic_disorder_numeric == 1 | mhd.agoraphobia_numeric == 1 ~ 1
+           ),
+         LifetimeAnyAnx.n = 
+           case_when(
+             cidia.diagnosis_numeric == 0 & spec.diagnosis_numeric == 0 & 
+               socp.diagnosis_numeric == 0 &
+               pad.diagnosis_numeric == 0 & agp.diagnosis_numeric == 0 ~ 0,
+             cidia.diagnosis_numeric == 1 | spec.diagnosis_numeric == 1 |
+               socp.diagnosis_numeric == 1 |
+               pad.diagnosis_numeric == 1 | agp.diagnosis_numeric == 1 ~ 1
+           ))
+
+#Recode as factors
+dat.cc$ClinicianAnyAnx <- recode_factor(dat.cc$ClinicianAnyAnx.n,
+                                        "0" = "No anxiety diagnosis",
+                                        "1" = "Any anxiety diagnosis",
+                                        .missing = NULL)
+
+dat.cc$LifetimeAnyAnx <- recode_factor(dat.cc$LifetimeAnyAnx.n,
+                                        "0" = "Never had anxiety",
+                                        "1" = "Lifetime any anxiety")
+
+#Get frequencies
+freq(dat.cc$ClinicianAnyAnx)
+freq(dat.cc$LifetimeAnyAnx)
+```
+
+```{r Save combined dataset as rds file}
+saveRDS(object = dat.cc, file = paste0(cleaned_path, "combined_cleaned_new_variables.rds"))
+```
+

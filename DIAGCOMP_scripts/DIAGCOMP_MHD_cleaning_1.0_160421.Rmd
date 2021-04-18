@@ -23,7 +23,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Clear workspace
 ```{r clear workspace}
-rm(list = ls())
+#rm(list = ls())
 ```
 
 Select which cohorts to run the cleaning script on by changing the value to TRUE (include) or FALSE (exclude). If multiple cohorts selected, data will be combined into a single dataset.
@@ -100,8 +100,12 @@ if (COPING_NBR == TRUE) {
 coping_nbr_mhd_renamed <- coping_nbr_mhd %>%
   drop_na(subjectid) %>% 
   distinct(subjectid, .keep_all = TRUE) %>% 
-  rename("ID" = "subjectid"
+  rename("ID" = "subjectid",
          #"COPING_ID" = "LoginID", #not exported
+         "mhd.mdd" = "mhd.depression",
+         "mhd.gad" = "mhd.anxiety_nerves_or_generalised_anxiety_disorder",
+         "mhd.bipolar" = "mhd.mania_hypomania_bipolar_or_manicdepression",
+         "mhd.social_anxiety" = "mhd.social_anxiety_or_social_phobia"
          ) %>% 
   mutate_if(is.numeric, ~na_if(., -88)) %>% # Recode missing values to NAs in numeric variables
   mutate_if(is.numeric, ~na_if(., -99)) %>%
