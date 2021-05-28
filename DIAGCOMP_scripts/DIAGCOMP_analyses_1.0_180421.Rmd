@@ -1,0 +1,3144 @@
+---
+title: "DIAGCOMP_sensitivity_specificity: Data freeze 1.0"
+author: "Molly R. Davies"
+date: 18/04/2021
+output:  
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+    number_sections: false
+    highlight: monochrome
+    theme: cerulean
+code_folding: show
+
+html_notebook:
+  theme: cerulean
+toc: yes
+---
+
+This script runs sensitivity and specificity analyses for single-item and algorithm-based major depression and anxiety disorder diagnoses variables on the GLAD Study and COPING NIHR BioResource (NBR) data. 
+
+Results are reported in the paper "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
+
+Script written by M. R. Davies.
+Email:  molly.davies@kcl.ac.uk
+
+All scripts for the paper can be accessed at:
+https://github.com/mollyrdavies/GLAD-Diagnostic-algorithms.git
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set up
+```{r install packages}
+
+#install.packages("reshape2")
+#install.packages("tidyverse")
+#install.packages("knitr")
+#install.packages("kableExtra")
+#install.packages("descr")
+#install.packages("caret")
+#install.packages("irr")
+#install.packages("hablar")
+#install.packages("patchwork")
+#install.packages("car")
+#install.packages("ggpubr")
+#install.packages("epiR")
+
+```
+
+```{r import packages}
+library(caret)
+library(irr)
+library(ggpubr)
+library(descr)
+library(kableExtra)
+library(epiR)
+library(tidyverse)
+```
+
+```{r source file paths}
+source("../../DF1.0_data_path.R")
+```
+
+```{r read data}
+dat <- read_rds(paste0(cleaned_path, "DIAGCOMP_final_dataset.rds"))
+```
+
+# Variables
+Create new dataset with only crosstab variables of interest
+```{r select variables}
+cidi <- dat %>%
+  select("ID",
+         "sample",
+         "mhd.mdd",
+         "mhd.gad",
+         "mhd.specific_phobia",
+         "mhd.social_anxiety",
+         "mhd.panic_attacks",
+         "mhd.panic_disorder",
+         "mhd.agoraphobia",
+         "ClinicianAnyAnx.n",
+         "cidid.diagnosis_numeric",
+         "cidia.diagnosis_numeric",
+         "spec.diagnosis_numeric",
+         "socp.diagnosis_numeric",
+         "pad.diagnosis_numeric",
+         "agp.diagnosis_numeric",
+         "LifetimeAnyAnx.n"
+         )
+```
+
+Ensure that all factor levels are the same for the variables, which is required to conduct the sensitivity/specificity analyses.
+```{r create new factor version of variables}
+
+cidi <- cidi %>% 
+  mutate(ClinicianMDD.f =
+           as.factor(case_when(
+             mhd.mdd == 0 ~ "No diagnosis",
+             mhd.mdd == 1 ~ "Diagnosis"
+           )),
+         ClinicianGAD.f =
+           as.factor(case_when(
+             mhd.gad == 0 ~ "No diagnosis",
+             mhd.gad == 1 ~ "Diagnosis"
+         )),
+         ClinicianSpecPhob.f = 
+           as.factor(case_when(
+             mhd.specific_phobia == 0 ~ "No diagnosis",
+             mhd.specific_phobia == 1 ~ "Diagnosis"
+           )),
+         ClinicianSocialPhob.f = 
+           as.factor(case_when(
+             mhd.social_anxiety == 0 ~ "No diagnosis",
+             mhd.social_anxiety == 1 ~ "Diagnosis"
+           )),
+         ClinicianPanicDis.f = 
+           as.factor(case_when(
+             mhd.panic_disorder == 0 ~ "No diagnosis",
+             mhd.panic_disorder == 1 ~ "Diagnosis"
+           )),
+         ClinicianPanicAttacks.f =
+           as.factor(case_when(
+             mhd.panic_attacks == 0 ~ "No diagnosis",
+             mhd.panic_attacks == 1 ~ "Diagnosis"
+           )),
+         ClinicianAgoraphobia.f = 
+           as.factor(case_when(
+             mhd.agoraphobia == 0 ~ "No diagnosis",
+             mhd.agoraphobia == 1 ~ "Diagnosis"
+           )),
+         ClinicianAnyAnx.f = 
+           as.factor(case_when(
+             ClinicianAnyAnx.n == 0 ~ "No diagnosis",
+             ClinicianAnyAnx.n == 1 ~ "Diagnosis"
+           )),
+         LifetimeMDD.f =
+           as.factor(case_when(
+             cidid.diagnosis_numeric == 0 ~ "No diagnosis",
+             cidid.diagnosis_numeric == 1 ~ "Diagnosis"
+           )),
+         LifetimeGAD.f =
+           as.factor(case_when(
+             cidia.diagnosis_numeric == 0 ~ "No diagnosis",
+             cidia.diagnosis_numeric == 1 ~ "Diagnosis"
+         )),
+         LifetimeSpecPhob.f = 
+           as.factor(case_when(
+             spec.diagnosis_numeric == 0 ~ "No diagnosis",
+             spec.diagnosis_numeric == 1 ~ "Diagnosis"
+           )),
+         LifetimeSocialPhob.f = 
+           as.factor(case_when(
+             socp.diagnosis_numeric == 0 ~ "No diagnosis",
+             socp.diagnosis_numeric == 1 ~ "Diagnosis"
+           )),
+         LifetimePanicDis.f = 
+           as.factor(case_when(
+             pad.diagnosis_numeric == 0 ~ "No diagnosis",
+             pad.diagnosis_numeric == 1 ~ "Diagnosis"
+           )),
+         LifetimeAgoraphobia.f = 
+           as.factor(case_when(
+             agp.diagnosis_numeric == 0 ~ "No diagnosis",
+             agp.diagnosis_numeric == 1 ~ "Diagnosis"
+           )),
+         LifetimeAnyAnx.f = 
+           as.factor(case_when(
+             LifetimeAnyAnx.n == 0 ~ "No diagnosis",
+             LifetimeAnyAnx.n == 1 ~ "Diagnosis"
+           ))
+         )
+      
+```
+
+
+Since single-item panic disorder was added midway through data collection, we want to ensure all comparisons with panic attacks are made with the same participants
+```{r recode SI panic attacks as NA when panic disorder NA}
+#Create variable
+cidi <- cidi %>% 
+  mutate(ClinicianPanicAttacks.n.cc =
+           case_when(is.na(ClinicianPanicDis.f) ~ NA_real_,
+                     !is.na(ClinicianPanicDis.f) ~ mhd.panic_attacks)
+         )
+#Recode as factor
+cidi <- cidi %>% 
+  mutate(ClinicianPanicAttacks.f.cc = 
+           as.factor(case_when(
+             ClinicianPanicAttacks.n.cc == 0 ~ "No diagnosis",
+             ClinicianPanicAttacks.n.cc == 1 ~ "Diagnosis")
+             )
+         )
+```
+
+
+# Cross Tabulations and Agreement
+Run agreement (accuracy), sensitivity, specificity, Cohen's kappa, and McNemar's Test analyses
+
+```{r set unused agreement statistics}
+#These will be removed from the agreements table
+unused_agreement <- c("AccuracyNull", "AccuracyPValue", "Balanced Accuracy",
+                      "Detection Prevalence", "Detection Rate", "F1",
+                      "Neg Pred Value", "Pos Pred Value", "Precision", "Prevalence", "Recall",
+                      "Sensitivity", "Specificity")
+```
+
+
+## Full sample
+
+### Algorithm-based diagnosis as reference point
+
+Major depressive disorder
+```{r Full sample MDD SI-AB crosstabs and agreement}
+si_ab_mdd.cM <- confusionMatrix(cidi$ClinicianMDD.f,
+                            cidi$LifetimeMDD.f,
+                            positive = "Diagnosis",
+                            dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+si_ab_mdd.classes <- as.matrix(si_ab_mdd.cM, what = "classes")
+si_ab_mdd.overall <- as.matrix(si_ab_mdd.cM, what = "overall")
+si_ab_mdd.raw <- as.data.frame(rbind(si_ab_mdd.classes,
+                                     si_ab_mdd.overall))
+colnames(si_ab_mdd.raw) <- "MDD"
+
+#Fromat dataframe
+si_ab_mdd.incomplete <- si_ab_mdd.raw %>%  
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(si_ab_mdd.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+si_ab_mdd.95ci <- summary(epiR::epi.tests(as.table(as.matrix(si_ab_mdd.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "MDD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+si_ab_mdd.df <- merge(si_ab_mdd.incomplete,
+                      si_ab_mdd.95ci)
+
+#Create dataframe of crosstab
+si_ab_mdd.xtabs <- as.data.frame(as.matrix(si_ab_mdd.cM))
+si_ab_mdd.xtabs.df <- si_ab_mdd.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "MDD",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         ) 
+
+si_ab_mdd.df
+si_ab_mdd.xtabs.df
+si_ab_mdd.95ci
+```
+
+Generalised anxiety disorder
+```{r Full sample GAD SI-AB crosstabs and agreement}
+si_ab_gad.cM <- confusionMatrix(cidi$ClinicianGAD.f,
+                                cidi$LifetimeGAD.f,
+                                positive = "Diagnosis",
+                                dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+si_ab_gad.classes<- as.matrix(si_ab_gad.cM, what = "classes")
+si_ab_gad.overall <- as.matrix(si_ab_gad.cM, what = "overall")
+si_ab_gad.raw <- as.data.frame(rbind(si_ab_gad.classes,
+                                     si_ab_gad.overall))
+colnames(si_ab_gad.raw) <- "GAD"
+
+#Fromat dataframe
+si_ab_gad.incomplete <- si_ab_gad.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(si_ab_gad.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+si_ab_gad.95ci <- summary(epiR::epi.tests(as.table(as.matrix(si_ab_gad.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "GAD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+si_ab_gad.df <- merge(si_ab_gad.incomplete,
+                      si_ab_gad.95ci)
+
+#Create dataframe of crosstab
+si_ab_gad.xtabs <- as.data.frame(as.matrix(si_ab_gad.cM))
+si_ab_gad.xtabs.df <- si_ab_gad.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "GAD",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+si_ab_gad.df
+si_ab_gad.xtabs.df
+```
+
+Specific phobia
+```{r Full sample Specific phobia SI-AB crosstabs and agreement}
+si_ab_spec.cM <- confusionMatrix(cidi$ClinicianSpecPhob.f,
+                                 cidi$LifetimeSpecPhob.f,
+                                 positive = "Diagnosis",
+                                 dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+si_ab_spec.classes<- as.matrix(si_ab_spec.cM, what = "classes")
+si_ab_spec.overall <- as.matrix(si_ab_spec.cM, what = "overall")
+si_ab_spec.raw <- as.data.frame(rbind(si_ab_spec.classes,
+                                     si_ab_spec.overall))
+colnames(si_ab_spec.raw) <- "SPEC"
+
+#Fromat dataframe
+si_ab_spec.incomplete <- si_ab_spec.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(si_ab_spec.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+si_ab_spec.95ci <- summary(epiR::epi.tests(as.table(as.matrix(si_ab_spec.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "SPEC") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+si_ab_spec.df <- merge(si_ab_spec.incomplete,
+                      si_ab_spec.95ci)
+
+#Create dataframe of crosstab
+si_ab_spec.xtabs <- as.data.frame(as.matrix(si_ab_spec.cM))
+si_ab_spec.xtabs.df <- si_ab_spec.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "SPEC",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+si_ab_spec.df
+si_ab_spec.xtabs.df
+```
+
+Social anxiety disorder
+```{r Full sample Social anxiety disorder SI-AB crosstabs and agreement}
+si_ab_socp.cM <- confusionMatrix(cidi$ClinicianSocialPhob.f,
+                                  cidi$LifetimeSocialPhob.f,
+                                  positive = "Diagnosis",
+                                  dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+si_ab_socp.classes<- as.matrix(si_ab_socp.cM, what = "classes")
+si_ab_socp.overall <- as.matrix(si_ab_socp.cM, what = "overall")
+si_ab_socp.raw <- as.data.frame(rbind(si_ab_socp.classes,
+                                     si_ab_socp.overall))
+colnames(si_ab_socp.raw) <- "SOCP"
+
+#Fromat dataframe
+si_ab_socp.incomplete <- si_ab_socp.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(si_ab_socp.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+si_ab_socp.95ci <- summary(epiR::epi.tests(as.table(as.matrix(si_ab_socp.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "SOCP") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+si_ab_socp.df <- merge(si_ab_socp.incomplete,
+                      si_ab_socp.95ci)
+
+#Create dataframe of crosstab
+si_ab_socp.xtabs <- as.data.frame(as.matrix(si_ab_socp.cM))
+si_ab_socp.xtabs.df <- si_ab_socp.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "SOCP",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+si_ab_socp.df
+si_ab_socp.xtabs.df
+```
+
+Panic disorder
+```{r Full sample Panic disorder SI-AB crosstabs and agreement}
+si_ab_pad.cM <- confusionMatrix(cidi$ClinicianPanicDis.f,
+                                cidi$LifetimePanicDis.f,
+                                positive = "Diagnosis",
+                                dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+si_ab_pad.classes<- as.matrix(si_ab_pad.cM, what = "classes")
+si_ab_pad.overall <- as.matrix(si_ab_pad.cM, what = "overall")
+si_ab_pad.raw <- as.data.frame(rbind(si_ab_pad.classes,
+                                     si_ab_pad.overall))
+colnames(si_ab_pad.raw) <- "PAD"
+
+#Fromat dataframe
+si_ab_pad.incomplete <- si_ab_pad.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(si_ab_pad.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+si_ab_pad.95ci <- summary(epiR::epi.tests(as.table(as.matrix(si_ab_pad.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "PAD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+si_ab_pad.df <- merge(si_ab_pad.incomplete,
+                      si_ab_pad.95ci)
+
+#Create dataframe of crosstab
+si_ab_pad.xtabs <- as.data.frame(as.matrix(si_ab_pad.cM))
+si_ab_pad.xtabs.df <- si_ab_pad.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "PAD",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+si_ab_pad.df
+si_ab_pad.xtabs.df
+```
+
+Panic attacks
+The single-item panic attack variable here is being compared to lifetime panic disorder.
+```{r Full sample Panic Attacks SI-AB crosstabs and agreement for Panic Disorder}
+si_ab_pattacks.cM <- confusionMatrix(cidi$ClinicianPanicAttacks.f.cc,
+                                cidi$LifetimePanicDis.f, 
+                                positive = "Diagnosis",
+                                dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+si_ab_pattacks.classes<- as.matrix(si_ab_pattacks.cM, what = "classes")
+si_ab_pattacks.overall <- as.matrix(si_ab_pattacks.cM, what = "overall")
+si_ab_pattacks.raw <- as.data.frame(rbind(si_ab_pattacks.classes,
+                                     si_ab_pattacks.overall))
+colnames(si_ab_pattacks.raw) <- "PanicAttacks"
+
+#Fromat dataframe
+si_ab_pattacks.incomplete <- si_ab_pattacks.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(si_ab_pattacks.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+si_ab_pattacks.95ci <- summary(epiR::epi.tests(as.table(as.matrix(si_ab_pattacks.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "PanicAttacks") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+si_ab_pattacks.df <- merge(si_ab_pattacks.incomplete,
+                      si_ab_pattacks.95ci)
+
+#Create dataframe of crosstab
+si_ab_pattacks.xtabs <- as.data.frame(as.matrix(si_ab_pattacks.cM))
+si_ab_pattacks.xtabs.df <- si_ab_pattacks.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "PanicAttacks",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+si_ab_pattacks.df
+si_ab_pattacks.xtabs.df
+```
+
+Agoraphobia
+```{r Full sample Agoraphobia SI-AB crosstabs and agreement}
+si_ab_agp.cM <- confusionMatrix(cidi$ClinicianAgoraphobia.f,
+                                cidi$LifetimeAgoraphobia.f,
+                                positive = "Diagnosis",
+                                dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+si_ab_agp.classes<- as.matrix(si_ab_agp.cM, what = "classes")
+si_ab_agp.overall <- as.matrix(si_ab_agp.cM, what = "overall")
+si_ab_agp.raw <- as.data.frame(rbind(si_ab_agp.classes,
+                                     si_ab_agp.overall))
+colnames(si_ab_agp.raw) <- "AGP"
+
+#Fromat dataframe
+si_ab_agp.incomplete <- si_ab_agp.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(si_ab_agp.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+si_ab_agp.95ci <- summary(epiR::epi.tests(as.table(as.matrix(si_ab_agp.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "AGP") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+si_ab_agp.df <- merge(si_ab_agp.incomplete,
+                      si_ab_agp.95ci)
+
+#Create dataframe of crosstab
+si_ab_agp.xtabs <- as.data.frame(as.matrix(si_ab_agp.cM))
+si_ab_agp.xtabs.df <- si_ab_agp.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "AGP",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+si_ab_agp.df
+si_ab_agp.xtabs.df
+```
+
+Any anxiety
+```{r Full sample Any Anxiety SI-AB crosstabs and agreement}
+si_ab_anyanx.cM <- confusionMatrix(cidi$ClinicianAnyAnx.f, 
+                                cidi$LifetimeAnyAnx.f,
+                                positive = "Diagnosis",
+                                dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+si_ab_anyanx.classes<- as.matrix(si_ab_anyanx.cM, what = "classes")
+si_ab_anyanx.overall <- as.matrix(si_ab_anyanx.cM, what = "overall")
+si_ab_anyanx.raw <- as.data.frame(rbind(si_ab_anyanx.classes,
+                                     si_ab_anyanx.overall))
+colnames(si_ab_anyanx.raw) <- "AnyAnxiety"
+
+#Fromat dataframe
+si_ab_anyanx.incomplete <- si_ab_anyanx.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(si_ab_anyanx.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+si_ab_anyanx.95ci <- summary(epiR::epi.tests(as.table(as.matrix(si_ab_anyanx.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "AnyAnxiety") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+si_ab_anyanx.df <- merge(si_ab_anyanx.incomplete,
+                      si_ab_anyanx.95ci)
+
+#Create dataframe of crosstab
+si_ab_anyanx.xtabs <- as.data.frame(as.matrix(si_ab_anyanx.cM))
+si_ab_anyanx.xtabs.df <- si_ab_anyanx.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "AnyAnxiety",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+si_ab_anyanx.df
+si_ab_anyanx.xtabs.df
+```
+
+```{r Full sample combine SI-AB agreement tables}
+si_ab_all.raw <- bind_rows(si_ab_mdd.df,
+                           si_ab_anyanx.df,
+                           si_ab_gad.df,
+                           si_ab_spec.df,
+                           si_ab_socp.df,
+                           si_ab_pad.df,
+                           si_ab_pattacks.df,
+                           si_ab_agp.df)
+
+si_ab_all <- si_ab_all.raw %>% 
+  rename("Sensitivity SI-AB" = "Sensitivity",
+         "Specificity SI-AB" = "Specificity") %>% 
+  relocate(Kappa, .after = last_col())
+
+si_ab_all
+```
+
+```{r Full sample combine all xtabs tables}
+all_xtabs.raw <- bind_rows(si_ab_mdd.xtabs.df,
+                           si_ab_anyanx.xtabs.df,
+                           si_ab_gad.xtabs.df,
+                           si_ab_spec.xtabs.df,
+                           si_ab_socp.xtabs.df,
+                           si_ab_pad.xtabs.df,
+                           si_ab_pattacks.xtabs.df,
+                           si_ab_agp.xtabs.df)
+
+all_xtabs <- all_xtabs.raw %>%  
+  relocate(Diagnosis)
+
+all_xtabs
+```
+
+### Single-item diagnosis as reference point
+
+Major depressive disorder
+```{r Full sample MDD AB-SI crosstabs and agreement}
+ab_si_mdd.cM <- confusionMatrix(cidi$LifetimeMDD.f,
+                                cidi$ClinicianMDD.f, 
+                                positive = "Diagnosis",
+                                dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+ab_si_mdd.classes<- as.matrix(ab_si_mdd.cM, what = "classes")
+ab_si_mdd.overall <- as.matrix(ab_si_mdd.cM, what = "overall")
+ab_si_mdd.raw <- as.data.frame(rbind(ab_si_mdd.classes,
+                                     ab_si_mdd.overall))
+colnames(ab_si_mdd.raw) <- "MDD"
+
+#Fromat dataframe
+ab_si_mdd.incomplete <- ab_si_mdd.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(ab_si_mdd.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+ab_si_mdd.95ci <- summary(epiR::epi.tests(as.table(as.matrix(ab_si_mdd.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "MDD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+ab_si_mdd.df <- merge(ab_si_mdd.incomplete,
+                      ab_si_mdd.95ci)
+
+ab_si_mdd.df
+```
+
+Generalised anxiety disorder
+```{r Full sample GAD AB-SI crosstabs and agreement}
+ab_si_gad.cM <- confusionMatrix(cidi$LifetimeGAD.f,
+                                cidi$ClinicianGAD.f, 
+                                positive = "Diagnosis",
+                                dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+ab_si_gad.classes<- as.matrix(ab_si_gad.cM, what = "classes")
+ab_si_gad.overall <- as.matrix(ab_si_gad.cM, what = "overall")
+ab_si_gad.raw <- as.data.frame(rbind(ab_si_gad.classes,
+                                     ab_si_gad.overall))
+colnames(ab_si_gad.raw) <- "GAD"
+
+#Fromat dataframe
+ab_si_gad.incomplete <- ab_si_gad.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(ab_si_gad.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+ab_si_gad.95ci <- summary(epiR::epi.tests(as.table(as.matrix(ab_si_gad.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "GAD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+ab_si_gad.df <- merge(ab_si_gad.incomplete,
+                      ab_si_gad.95ci)
+
+ab_si_gad.df
+```
+
+Specific phobia
+```{r Full sample Specific phobia AB-SI crosstabs and agreement}
+ab_si_spec.cM <- confusionMatrix(cidi$LifetimeSpecPhob.f,
+                                 cidi$ClinicianSpecPhob.f, 
+                                 positive = "Diagnosis",
+                                 dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+ab_si_spec.classes<- as.matrix(ab_si_spec.cM, what = "classes")
+ab_si_spec.overall <- as.matrix(ab_si_spec.cM, what = "overall")
+ab_si_spec.raw <- as.data.frame(rbind(ab_si_spec.classes,
+                                     ab_si_spec.overall))
+colnames(ab_si_spec.raw) <- "SPEC"
+
+#Fromat dataframe
+ab_si_spec.incomplete <- ab_si_spec.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(ab_si_spec.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+ab_si_spec.95ci <- summary(epiR::epi.tests(as.table(as.matrix(ab_si_spec.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "SPEC") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+ab_si_spec.df <- merge(ab_si_spec.incomplete,
+                      ab_si_spec.95ci)
+
+ab_si_spec.df
+```
+
+Social anxiety disorder
+```{r Full sample Social anxiety disorder AB-SI crosstabs and agreement}
+ab_si_socp.cM <- confusionMatrix(cidi$LifetimeSocialPhob.f,
+                                 cidi$ClinicianSocialPhob.f, 
+                                 positive = "Diagnosis",
+                                 dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+ab_si_socp.classes<- as.matrix(ab_si_socp.cM, what = "classes")
+ab_si_socp.overall <- as.matrix(ab_si_socp.cM, what = "overall")
+ab_si_socp.raw <- as.data.frame(rbind(ab_si_socp.classes,
+                                     ab_si_socp.overall))
+colnames(ab_si_socp.raw) <- "SOCP"
+
+#Fromat dataframe
+ab_si_socp.incomplete <- ab_si_socp.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(ab_si_socp.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+ab_si_socp.95ci <- summary(epiR::epi.tests(as.table(as.matrix(ab_si_socp.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "SOCP") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+ab_si_socp.df <- merge(ab_si_socp.incomplete,
+                      ab_si_socp.95ci)
+
+ab_si_socp.df
+```
+
+Panic disorder
+```{r Full sample Panic disorder AB-SI crosstabs and agreement}
+ab_si_pad.cM <- confusionMatrix(cidi$LifetimePanicDis.f,
+                                cidi$ClinicianPanicDis.f, 
+                                positive = "Diagnosis",
+                                dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+ab_si_pad.classes<- as.matrix(ab_si_pad.cM, what = "classes")
+ab_si_pad.overall <- as.matrix(ab_si_pad.cM, what = "overall")
+ab_si_pad.raw <- as.data.frame(rbind(ab_si_pad.classes,
+                                     ab_si_pad.overall))
+colnames(ab_si_pad.raw) <- "PAD"
+
+#Fromat dataframe
+ab_si_pad.incomplete <- ab_si_pad.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(ab_si_pad.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+ab_si_pad.95ci <- summary(epiR::epi.tests(as.table(as.matrix(ab_si_pad.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "PAD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+ab_si_pad.df <- merge(ab_si_pad.incomplete,
+                      ab_si_pad.95ci)
+
+ab_si_pad.df
+```
+
+Panic attacks
+Algorithm-based panic disorder is being compared with single-item panic attacks.
+```{r Full sample Panic Attacks AB-SI crosstabs and agreement with Panic Disorder, echo=FALSE}
+ab_si_pattacks.cM <- confusionMatrix(cidi$LifetimePanicDis.f, 
+                                     cidi$ClinicianPanicAttacks.f.cc, 
+                                     positive = "Diagnosis",
+                                     dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+ab_si_pattacks.classes<- as.matrix(ab_si_pattacks.cM, what = "classes")
+ab_si_pattacks.overall <- as.matrix(ab_si_pattacks.cM, what = "overall")
+ab_si_pattacks.raw <- as.data.frame(rbind(ab_si_pattacks.classes,
+                                     ab_si_pattacks.overall))
+colnames(ab_si_pattacks.raw) <- "PanicAttacks"
+
+#Fromat dataframe
+ab_si_pattacks.incomplete <- ab_si_pattacks.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(ab_si_pattacks.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+ab_si_pattacks.95ci <- summary(epiR::epi.tests(as.table(as.matrix(ab_si_pattacks.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "PanicAttacks") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+ab_si_pattacks.df <- merge(ab_si_pattacks.incomplete,
+                      ab_si_pattacks.95ci)
+
+ab_si_pattacks.df
+```
+
+Agoraphobia
+```{r Full sample Agoraphobia AB-SI crosstabs and agreement}
+ab_si_agp.cM <- confusionMatrix(cidi$LifetimeAgoraphobia.f, 
+                                cidi$ClinicianAgoraphobia.f, 
+                                positive = "Diagnosis",
+                                dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+ab_si_agp.classes<- as.matrix(ab_si_agp.cM, what = "classes")
+ab_si_agp.overall <- as.matrix(ab_si_agp.cM, what = "overall")
+ab_si_agp.raw <- as.data.frame(rbind(ab_si_agp.classes,
+                                     ab_si_agp.overall))
+colnames(ab_si_agp.raw) <- "AGP"
+
+#Fromat dataframe
+ab_si_agp.incomplete <- ab_si_agp.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(ab_si_agp.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+ab_si_agp.95ci <- summary(epiR::epi.tests(as.table(as.matrix(ab_si_agp.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "AGP") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+ab_si_agp.df <- merge(ab_si_agp.incomplete,
+                      ab_si_agp.95ci)
+
+ab_si_agp.df
+```
+
+Any anxiety
+```{r Full sample Any Anxiety AB-SI crosstabs and agreement}
+ab_si_anyanx.cM <- confusionMatrix(cidi$LifetimeAnyAnx.f,
+                                   cidi$ClinicianAnyAnx.f, 
+                                   positive = "Diagnosis",
+                                   dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+ab_si_anyanx.classes<- as.matrix(ab_si_anyanx.cM, what = "classes")
+ab_si_anyanx.overall <- as.matrix(ab_si_anyanx.cM, what = "overall")
+ab_si_anyanx.raw <- as.data.frame(rbind(ab_si_anyanx.classes,
+                                     ab_si_anyanx.overall))
+colnames(ab_si_anyanx.raw) <- "AnyAnxiety"
+
+#Fromat dataframe
+ab_si_anyanx.incomplete <- ab_si_anyanx.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(ab_si_anyanx.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+ab_si_anyanx.95ci <- summary(epiR::epi.tests(as.table(as.matrix(ab_si_anyanx.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "AnyAnxiety") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+ab_si_anyanx.df <- merge(ab_si_anyanx.incomplete,
+                      ab_si_anyanx.95ci)
+
+ab_si_anyanx.df
+```
+
+```{r Full sample combine AB-SI agreement tables}
+ab_si_all.raw <- bind_rows(ab_si_mdd.df,
+                           ab_si_anyanx.df,
+                           ab_si_gad.df,
+                           ab_si_spec.df,
+                           ab_si_socp.df,
+                           ab_si_pad.df,
+                           ab_si_pattacks.df,
+                           ab_si_agp.df)
+
+ab_si_all <- ab_si_all.raw %>% 
+  select(Diagnosis,
+         "Sensitivity AB-SI" = "Sensitivity",
+         "Specificity AB-SI" = "Specificity") 
+
+ab_si_all
+```
+
+### Agreement table for all statistics
+
+```{r Full sample combine all agreement tables}
+full_sample_all_agreement <- merge(si_ab_all,
+                       ab_si_all) %>%
+  relocate(Kappa, .after = last_col()) %>% 
+  mutate(Diagnosis = 
+           factor(Diagnosis,
+                  levels = c("MDD", "AnyAnxiety", "GAD", "SPEC", "SOCP", "PanicAttacks", "PAD", "AGP"))
+         ) %>% 
+  arrange(., Diagnosis)
+
+full_sample_all_agreement
+```
+
+```{r Full sample combine agreements and xtabs tables}
+full_sample_all_agreement_xtabs <- merge(all_xtabs,
+                                         full_sample_all_agreement) %>%
+  mutate(Diagnosis = 
+           factor(Diagnosis,
+                  levels = c("MDD", "AnyAnxiety", "GAD", "SPEC", "SOCP", "PanicAttacks", "PAD", "AGP")),
+         Sample = "Full sample"
+         ) %>% 
+  arrange(., Diagnosis) %>% 
+  relocate(Sample)
+
+full_sample_all_agreement_xtabs
+```
+
+
+## By sample
+
+```{r create sample datasets}
+cidi.glad <- cidi %>% 
+  filter(sample == "GLAD")
+
+cidi.nbr <- cidi %>% 
+  filter(sample == "NBR")
+```
+
+
+### GLAD
+
+#### Algorithm-based diagnosis as reference point
+
+Major depressive disorder
+```{r GLAD MDD SI-AB crosstabs and agreement}
+glad_si_ab_mdd.cM <- confusionMatrix(cidi.glad$ClinicianMDD.f,
+                            cidi.glad$LifetimeMDD.f,
+                            positive = "Diagnosis",
+                            dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+glad_si_ab_mdd.classes <- as.matrix(glad_si_ab_mdd.cM, what = "classes")
+glad_si_ab_mdd.overall <- as.matrix(glad_si_ab_mdd.cM, what = "overall")
+glad_si_ab_mdd.raw <- as.data.frame(rbind(glad_si_ab_mdd.classes,
+                                     glad_si_ab_mdd.overall))
+colnames(glad_si_ab_mdd.raw) <- "MDD"
+
+#Fromat dataframe
+glad_si_ab_mdd.incomplete <- glad_si_ab_mdd.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(glad_si_ab_mdd.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+glad_si_ab_mdd.95ci <- summary(epiR::epi.tests(as.table(as.matrix(glad_si_ab_mdd.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "MDD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+glad_si_ab_mdd.df <- merge(glad_si_ab_mdd.incomplete,
+                      glad_si_ab_mdd.95ci)
+
+#Create dataframe of crosstab
+glad_si_ab_mdd.xtabs <- as.data.frame(as.matrix(glad_si_ab_mdd.cM))
+glad_si_ab_mdd.xtabs.df <- glad_si_ab_mdd.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "MDD",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+glad_si_ab_mdd.df
+glad_si_ab_mdd.xtabs.df
+```
+
+Generalised anxiety disorder
+```{r GLAD GAD SI-AB crosstabs and agreement}
+glad_si_ab_gad.cM <- confusionMatrix(cidi.glad$ClinicianGAD.f,
+                                cidi.glad$LifetimeGAD.f,
+                                positive = "Diagnosis",
+                                dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+glad_si_ab_gad.classes<- as.matrix(glad_si_ab_gad.cM, what = "classes")
+glad_si_ab_gad.overall <- as.matrix(glad_si_ab_gad.cM, what = "overall")
+glad_si_ab_gad.raw <- as.data.frame(rbind(glad_si_ab_gad.classes,
+                                     glad_si_ab_gad.overall))
+colnames(glad_si_ab_gad.raw) <- "GAD"
+
+#Fromat dataframe
+glad_si_ab_gad.incomplete <- glad_si_ab_gad.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(glad_si_ab_gad.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+glad_si_ab_gad.95ci <- summary(epiR::epi.tests(as.table(as.matrix(glad_si_ab_gad.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "GAD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+glad_si_ab_gad.df <- merge(glad_si_ab_gad.incomplete,
+                      glad_si_ab_gad.95ci)
+
+#Create dataframe of crosstab
+glad_si_ab_gad.xtabs <- as.data.frame(as.matrix(glad_si_ab_gad.cM))
+glad_si_ab_gad.xtabs.df <- glad_si_ab_gad.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "GAD",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+glad_si_ab_gad.df
+glad_si_ab_gad.xtabs.df
+```
+
+Specific phobia
+```{r GLAD Specific phobia SI-AB crosstabs and agreement}
+glad_si_ab_spec.cM <- confusionMatrix(cidi.glad$ClinicianSpecPhob.f,
+                                 cidi.glad$LifetimeSpecPhob.f,
+                                 positive = "Diagnosis",
+                                 dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+glad_si_ab_spec.classes<- as.matrix(glad_si_ab_spec.cM, what = "classes")
+glad_si_ab_spec.overall <- as.matrix(glad_si_ab_spec.cM, what = "overall")
+glad_si_ab_spec.raw <- as.data.frame(rbind(glad_si_ab_spec.classes,
+                                     glad_si_ab_spec.overall))
+colnames(glad_si_ab_spec.raw) <- "SPEC"
+
+#Fromat dataframe
+glad_si_ab_spec.incomplete <- glad_si_ab_spec.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(glad_si_ab_spec.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+glad_si_ab_spec.95ci <- summary(epiR::epi.tests(as.table(as.matrix(glad_si_ab_spec.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "SPEC") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+glad_si_ab_spec.df <- merge(glad_si_ab_spec.incomplete,
+                      glad_si_ab_spec.95ci)
+
+#Create dataframe of crosstab
+glad_si_ab_spec.xtabs <- as.data.frame(as.matrix(glad_si_ab_spec.cM))
+glad_si_ab_spec.xtabs.df <- glad_si_ab_spec.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "SPEC",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+glad_si_ab_spec.df
+glad_si_ab_spec.xtabs.df
+```
+
+Social anxiety disorder
+```{r GLAD Social anxiety disorder SI-AB crosstabs and agreement}
+glad_si_ab_socp.cM <- confusionMatrix(cidi.glad$ClinicianSocialPhob.f,
+                                  cidi.glad$LifetimeSocialPhob.f,
+                                  positive = "Diagnosis",
+                                  dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+glad_si_ab_socp.classes<- as.matrix(glad_si_ab_socp.cM, what = "classes")
+glad_si_ab_socp.overall <- as.matrix(glad_si_ab_socp.cM, what = "overall")
+glad_si_ab_socp.raw <- as.data.frame(rbind(glad_si_ab_socp.classes,
+                                     glad_si_ab_socp.overall))
+colnames(glad_si_ab_socp.raw) <- "SOCP"
+
+#Fromat dataframe
+glad_si_ab_socp.incomplete <- glad_si_ab_socp.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(glad_si_ab_socp.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+glad_si_ab_socp.95ci <- summary(epiR::epi.tests(as.table(as.matrix(glad_si_ab_socp.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "SOCP") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+glad_si_ab_socp.df <- merge(glad_si_ab_socp.incomplete,
+                      glad_si_ab_socp.95ci)
+
+#Create dataframe of crosstab
+glad_si_ab_socp.xtabs <- as.data.frame(as.matrix(glad_si_ab_socp.cM))
+glad_si_ab_socp.xtabs.df <- glad_si_ab_socp.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "SOCP",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+glad_si_ab_socp.df
+glad_si_ab_socp.xtabs.df
+```
+
+Panic disorder
+```{r GLAD Panic disorder SI-AB crosstabs and agreement}
+glad_si_ab_pad.cM <- confusionMatrix(cidi.glad$ClinicianPanicDis.f,
+                                cidi.glad$LifetimePanicDis.f,
+                                positive = "Diagnosis",
+                                dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+glad_si_ab_pad.classes<- as.matrix(glad_si_ab_pad.cM, what = "classes")
+glad_si_ab_pad.overall <- as.matrix(glad_si_ab_pad.cM, what = "overall")
+glad_si_ab_pad.raw <- as.data.frame(rbind(glad_si_ab_pad.classes,
+                                     glad_si_ab_pad.overall))
+colnames(glad_si_ab_pad.raw) <- "PAD"
+
+#Fromat dataframe
+glad_si_ab_pad.incomplete <- glad_si_ab_pad.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(glad_si_ab_pad.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+glad_si_ab_pad.95ci <- summary(epiR::epi.tests(as.table(as.matrix(glad_si_ab_pad.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "PAD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+glad_si_ab_pad.df <- merge(glad_si_ab_pad.incomplete,
+                      glad_si_ab_pad.95ci)
+
+#Create dataframe of crosstab
+glad_si_ab_pad.xtabs <- as.data.frame(as.matrix(glad_si_ab_pad.cM))
+glad_si_ab_pad.xtabs.df <- glad_si_ab_pad.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "PAD",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+glad_si_ab_pad.df
+glad_si_ab_pad.xtabs.df
+```
+
+Panic attacks
+The single-item panic attack variable here is being compared to lifetime panic disorder.
+```{r GLAD Panic Attacks SI-AB crosstabs and agreement for Panic Disorder}
+glad_si_ab_pattacks.cM <- confusionMatrix(cidi.glad$ClinicianPanicAttacks.f.cc,
+                                cidi.glad$LifetimePanicDis.f, 
+                                positive = "Diagnosis",
+                                dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+glad_si_ab_pattacks.classes<- as.matrix(glad_si_ab_pattacks.cM, what = "classes")
+glad_si_ab_pattacks.overall <- as.matrix(glad_si_ab_pattacks.cM, what = "overall")
+glad_si_ab_pattacks.raw <- as.data.frame(rbind(glad_si_ab_pattacks.classes,
+                                     glad_si_ab_pattacks.overall))
+colnames(glad_si_ab_pattacks.raw) <- "PanicAttacks"
+
+#Fromat dataframe
+glad_si_ab_pattacks.incomplete <- glad_si_ab_pattacks.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(glad_si_ab_pattacks.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+glad_si_ab_pattacks.95ci <- summary(epiR::epi.tests(as.table(as.matrix(glad_si_ab_pattacks.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "PanicAttacks") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+glad_si_ab_pattacks.df <- merge(glad_si_ab_pattacks.incomplete,
+                      glad_si_ab_pattacks.95ci)
+
+#Create dataframe of crosstab
+glad_si_ab_pattacks.xtabs <- as.data.frame(as.matrix(glad_si_ab_pattacks.cM))
+glad_si_ab_pattacks.xtabs.df <- glad_si_ab_pattacks.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "PanicAttacks",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+glad_si_ab_pattacks.df
+glad_si_ab_pattacks.xtabs.df
+```
+
+Agoraphobia
+```{r GLAD Agoraphobia SI-AB crosstabs and agreement}
+glad_si_ab_agp.cM <- confusionMatrix(cidi.glad$ClinicianAgoraphobia.f,
+                                cidi.glad$LifetimeAgoraphobia.f,
+                                positive = "Diagnosis",
+                                dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+glad_si_ab_agp.classes<- as.matrix(glad_si_ab_agp.cM, what = "classes")
+glad_si_ab_agp.overall <- as.matrix(glad_si_ab_agp.cM, what = "overall")
+glad_si_ab_agp.raw <- as.data.frame(rbind(glad_si_ab_agp.classes,
+                                     glad_si_ab_agp.overall))
+colnames(glad_si_ab_agp.raw) <- "AGP"
+
+#Fromat dataframe
+glad_si_ab_agp.incomplete <- glad_si_ab_agp.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(glad_si_ab_agp.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+glad_si_ab_agp.95ci <- summary(epiR::epi.tests(as.table(as.matrix(glad_si_ab_agp.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "AGP") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+glad_si_ab_agp.df <- merge(glad_si_ab_agp.incomplete,
+                      glad_si_ab_agp.95ci)
+
+#Create dataframe of crosstab
+glad_si_ab_agp.xtabs <- as.data.frame(as.matrix(glad_si_ab_agp.cM))
+glad_si_ab_agp.xtabs.df <- glad_si_ab_agp.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "AGP",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+glad_si_ab_agp.df
+glad_si_ab_agp.xtabs.df
+```
+
+Any anxiety
+```{r GLAD Any Anxiety SI-AB crosstabs and agreement}
+glad_si_ab_anyanx.cM <- confusionMatrix(cidi.glad$ClinicianAnyAnx.f, 
+                                cidi.glad$LifetimeAnyAnx.f,
+                                positive = "Diagnosis",
+                                dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+glad_si_ab_anyanx.classes<- as.matrix(glad_si_ab_anyanx.cM, what = "classes")
+glad_si_ab_anyanx.overall <- as.matrix(glad_si_ab_anyanx.cM, what = "overall")
+glad_si_ab_anyanx.raw <- as.data.frame(rbind(glad_si_ab_anyanx.classes,
+                                     glad_si_ab_anyanx.overall))
+colnames(glad_si_ab_anyanx.raw) <- "AnyAnxiety"
+
+#Fromat dataframe
+glad_si_ab_anyanx.incomplete <- glad_si_ab_anyanx.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(glad_si_ab_anyanx.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+glad_si_ab_anyanx.95ci <- summary(epiR::epi.tests(as.table(as.matrix(glad_si_ab_anyanx.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "AnyAnxiety") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+glad_si_ab_anyanx.df <- merge(glad_si_ab_anyanx.incomplete,
+                      glad_si_ab_anyanx.95ci)
+
+#Create dataframe of crosstab
+glad_si_ab_anyanx.xtabs <- as.data.frame(as.matrix(glad_si_ab_anyanx.cM))
+glad_si_ab_anyanx.xtabs.df <- glad_si_ab_anyanx.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "AnyAnxiety",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+glad_si_ab_anyanx.df
+glad_si_ab_anyanx.xtabs.df
+```
+
+```{r GLAD combine SI-AB agreement tables}
+glad_si_ab_all.raw <- bind_rows(glad_si_ab_mdd.df,
+                           glad_si_ab_anyanx.df,
+                           glad_si_ab_gad.df,
+                           glad_si_ab_spec.df,
+                           glad_si_ab_socp.df,
+                           glad_si_ab_pad.df,
+                           glad_si_ab_pattacks.df,
+                           glad_si_ab_agp.df)
+
+glad_si_ab_all <- glad_si_ab_all.raw %>% 
+  rename("Sensitivity SI-AB" = "Sensitivity",
+         "Specificity SI-AB" = "Specificity") %>% 
+  relocate(Kappa, .after = last_col())
+
+glad_si_ab_all
+```
+
+```{r GLAD combine all xtabs tables}
+glad_all_xtabs.raw <- bind_rows(glad_si_ab_mdd.xtabs.df,
+                           glad_si_ab_anyanx.xtabs.df,
+                           glad_si_ab_gad.xtabs.df,
+                           glad_si_ab_spec.xtabs.df,
+                           glad_si_ab_socp.xtabs.df,
+                           glad_si_ab_pad.xtabs.df,
+                           glad_si_ab_pattacks.xtabs.df,
+                           glad_si_ab_agp.xtabs.df)
+
+glad_all_xtabs <- glad_all_xtabs.raw %>%  
+  relocate(Diagnosis)
+
+glad_all_xtabs
+```
+
+####Single-item diagnosis as reference point
+
+Major depressive disorder
+```{r GLAD MDD AB-SI crosstabs and agreement}
+glad_ab_si_mdd.cM <- confusionMatrix(cidi.glad$LifetimeMDD.f,
+                                cidi.glad$ClinicianMDD.f, 
+                                positive = "Diagnosis",
+                                dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+glad_ab_si_mdd.classes<- as.matrix(glad_ab_si_mdd.cM, what = "classes")
+glad_ab_si_mdd.overall <- as.matrix(glad_ab_si_mdd.cM, what = "overall")
+glad_ab_si_mdd.raw <- as.data.frame(rbind(glad_ab_si_mdd.classes,
+                                     glad_ab_si_mdd.overall))
+colnames(glad_ab_si_mdd.raw) <- "MDD"
+
+#Fromat dataframe
+glad_ab_si_mdd.incomplete <- glad_ab_si_mdd.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(glad_ab_si_mdd.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+glad_ab_si_mdd.95ci <- summary(epiR::epi.tests(as.table(as.matrix(glad_ab_si_mdd.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "MDD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+glad_ab_si_mdd.df <- merge(glad_ab_si_mdd.incomplete,
+                      glad_ab_si_mdd.95ci)
+
+glad_ab_si_mdd.df
+```
+
+Generalised anxiety disorder
+```{r GLAD GAD AB-SI crosstabs and agreement}
+glad_ab_si_gad.cM <- confusionMatrix(cidi.glad$LifetimeGAD.f,
+                                cidi.glad$ClinicianGAD.f, 
+                                positive = "Diagnosis",
+                                dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+glad_ab_si_gad.classes<- as.matrix(glad_ab_si_gad.cM, what = "classes")
+glad_ab_si_gad.overall <- as.matrix(glad_ab_si_gad.cM, what = "overall")
+glad_ab_si_gad.raw <- as.data.frame(rbind(glad_ab_si_gad.classes,
+                                     glad_ab_si_gad.overall))
+colnames(glad_ab_si_gad.raw) <- "GAD"
+
+#Fromat dataframe
+glad_ab_si_gad.incomplete <- glad_ab_si_gad.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(glad_ab_si_gad.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+glad_ab_si_gad.95ci <- summary(epiR::epi.tests(as.table(as.matrix(glad_ab_si_gad.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "GAD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+glad_ab_si_gad.df <- merge(glad_ab_si_gad.incomplete,
+                      glad_ab_si_gad.95ci)
+
+glad_ab_si_gad.df
+```
+
+Specific phobia
+```{r GLAD Specific phobia AB-SI crosstabs and agreement}
+glad_ab_si_spec.cM <- confusionMatrix(cidi.glad$LifetimeSpecPhob.f,
+                                 cidi.glad$ClinicianSpecPhob.f, 
+                                 positive = "Diagnosis",
+                                 dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+glad_ab_si_spec.classes<- as.matrix(glad_ab_si_spec.cM, what = "classes")
+glad_ab_si_spec.overall <- as.matrix(glad_ab_si_spec.cM, what = "overall")
+glad_ab_si_spec.raw <- as.data.frame(rbind(glad_ab_si_spec.classes,
+                                     glad_ab_si_spec.overall))
+colnames(glad_ab_si_spec.raw) <- "SPEC"
+
+#Fromat dataframe
+glad_ab_si_spec.incomplete <- glad_ab_si_spec.raw %>%  
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(glad_ab_si_spec.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+glad_ab_si_spec.95ci <- summary(epiR::epi.tests(as.table(as.matrix(glad_ab_si_spec.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "SPEC") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+glad_ab_si_spec.df <- merge(glad_ab_si_spec.incomplete,
+                      glad_ab_si_spec.95ci)
+
+glad_ab_si_spec.df
+```
+
+Social anxiety disorder
+```{r GLAD Social anxiety disorder AB-SI crosstabs and agreement}
+glad_ab_si_socp.cM <- confusionMatrix(cidi.glad$LifetimeSocialPhob.f,
+                                 cidi.glad$ClinicianSocialPhob.f, 
+                                 positive = "Diagnosis",
+                                 dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+glad_ab_si_socp.classes<- as.matrix(glad_ab_si_socp.cM, what = "classes")
+glad_ab_si_socp.overall <- as.matrix(glad_ab_si_socp.cM, what = "overall")
+glad_ab_si_socp.raw <- as.data.frame(rbind(glad_ab_si_socp.classes,
+                                     glad_ab_si_socp.overall))
+colnames(glad_ab_si_socp.raw) <- "SOCP"
+
+#Fromat dataframe
+glad_ab_si_socp.incomplete <- glad_ab_si_socp.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(glad_ab_si_socp.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+glad_ab_si_socp.95ci <- summary(epiR::epi.tests(as.table(as.matrix(glad_ab_si_socp.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "SOCP") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+glad_ab_si_socp.df <- merge(glad_ab_si_socp.incomplete,
+                      glad_ab_si_socp.95ci)
+
+glad_ab_si_socp.df
+```
+
+Panic disorder
+```{r GLAD Panic disorder AB-SI crosstabs and agreement}
+glad_ab_si_pad.cM <- confusionMatrix(cidi.glad$LifetimePanicDis.f,
+                                cidi.glad$ClinicianPanicDis.f, 
+                                positive = "Diagnosis",
+                                dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+glad_ab_si_pad.classes<- as.matrix(glad_ab_si_pad.cM, what = "classes")
+glad_ab_si_pad.overall <- as.matrix(glad_ab_si_pad.cM, what = "overall")
+glad_ab_si_pad.raw <- as.data.frame(rbind(glad_ab_si_pad.classes,
+                                     glad_ab_si_pad.overall))
+colnames(glad_ab_si_pad.raw) <- "PAD"
+
+#Fromat dataframe
+glad_ab_si_pad.incomplete <- glad_ab_si_pad.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(glad_ab_si_pad.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+glad_ab_si_pad.95ci <- summary(epiR::epi.tests(as.table(as.matrix(glad_ab_si_pad.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "PAD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+glad_ab_si_pad.df <- merge(glad_ab_si_pad.incomplete,
+                      glad_ab_si_pad.95ci)
+
+glad_ab_si_pad.df
+```
+
+Panic attacks
+Algorithm-based panic disorder is being compared with single-item panic attacks.
+```{r GLAD Panic Attacks AB-SI crosstabs and agreement with Panic Disorder, echo=FALSE}
+glad_ab_si_pattacks.cM <- confusionMatrix(cidi.glad$LifetimePanicDis.f, 
+                                     cidi.glad$ClinicianPanicAttacks.f.cc, 
+                                     positive = "Diagnosis",
+                                     dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+glad_ab_si_pattacks.classes<- as.matrix(glad_ab_si_pattacks.cM, what = "classes")
+glad_ab_si_pattacks.overall <- as.matrix(glad_ab_si_pattacks.cM, what = "overall")
+glad_ab_si_pattacks.raw <- as.data.frame(rbind(glad_ab_si_pattacks.classes,
+                                     glad_ab_si_pattacks.overall))
+colnames(glad_ab_si_pattacks.raw) <- "PanicAttacks"
+
+#Fromat dataframe
+glad_ab_si_pattacks.incomplete <- glad_ab_si_pattacks.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(glad_ab_si_pattacks.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+glad_ab_si_pattacks.95ci <- summary(epiR::epi.tests(as.table(as.matrix(glad_ab_si_pattacks.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "PanicAttacks") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+glad_ab_si_pattacks.df <- merge(glad_ab_si_pattacks.incomplete,
+                      glad_ab_si_pattacks.95ci)
+
+glad_ab_si_pattacks.df
+```
+
+Agoraphobia
+```{r GLAD Agoraphobia AB-SI crosstabs and agreement}
+glad_ab_si_agp.cM <- confusionMatrix(cidi.glad$LifetimeAgoraphobia.f, 
+                                cidi.glad$ClinicianAgoraphobia.f, 
+                                positive = "Diagnosis",
+                                dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+glad_ab_si_agp.classes<- as.matrix(glad_ab_si_agp.cM, what = "classes")
+glad_ab_si_agp.overall <- as.matrix(glad_ab_si_agp.cM, what = "overall")
+glad_ab_si_agp.raw <- as.data.frame(rbind(glad_ab_si_agp.classes,
+                                     glad_ab_si_agp.overall))
+colnames(glad_ab_si_agp.raw) <- "AGP"
+
+#Fromat dataframe
+glad_ab_si_agp.incomplete <- glad_ab_si_agp.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(glad_ab_si_agp.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+glad_ab_si_agp.95ci <- summary(epiR::epi.tests(as.table(as.matrix(glad_ab_si_agp.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "AGP") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+glad_ab_si_agp.df <- merge(glad_ab_si_agp.incomplete,
+                      glad_ab_si_agp.95ci)
+
+glad_ab_si_agp.df
+```
+
+Any anxiety
+```{r GLAD Any Anxiety AB-SI crosstabs and agreement}
+glad_ab_si_anyanx.cM <- confusionMatrix(cidi.glad$LifetimeAnyAnx.f,
+                                   cidi.glad$ClinicianAnyAnx.f, 
+                                   positive = "Diagnosis",
+                                   dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+glad_ab_si_anyanx.classes<- as.matrix(glad_ab_si_anyanx.cM, what = "classes")
+glad_ab_si_anyanx.overall <- as.matrix(glad_ab_si_anyanx.cM, what = "overall")
+glad_ab_si_anyanx.raw <- as.data.frame(rbind(glad_ab_si_anyanx.classes,
+                                     glad_ab_si_anyanx.overall))
+colnames(glad_ab_si_anyanx.raw) <- "AnyAnxiety"
+
+#Fromat dataframe
+glad_ab_si_anyanx.incomplete <- glad_ab_si_anyanx.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(glad_ab_si_anyanx.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+glad_ab_si_anyanx.95ci <- summary(epiR::epi.tests(as.table(as.matrix(glad_ab_si_anyanx.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "AnyAnxiety") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+glad_ab_si_anyanx.df <- merge(glad_ab_si_anyanx.incomplete,
+                      glad_ab_si_anyanx.95ci)
+
+glad_ab_si_anyanx.df
+```
+
+```{r GLAD combine AB-SI agreement tables}
+glad_ab_si_all.raw <- bind_rows(glad_ab_si_mdd.df,
+                           glad_ab_si_anyanx.df,
+                           glad_ab_si_gad.df,
+                           glad_ab_si_spec.df,
+                           glad_ab_si_socp.df,
+                           glad_ab_si_pad.df,
+                           glad_ab_si_pattacks.df,
+                           glad_ab_si_agp.df)
+
+glad_ab_si_all <- glad_ab_si_all.raw %>% 
+  select(Diagnosis,
+         "Sensitivity AB-SI" = "Sensitivity",
+         "Specificity AB-SI" = "Specificity") 
+
+glad_ab_si_all
+```
+
+#### Agreement table for all statistics
+
+```{r GLAD combine all agreement tables}
+glad_all_agreement <- merge(glad_si_ab_all,
+                       glad_ab_si_all) %>%
+  relocate(Kappa, .after = last_col()) %>% 
+  mutate(Diagnosis = 
+           factor(Diagnosis,
+                  levels = c("MDD", "AnyAnxiety", "GAD", "SPEC", "SOCP", "PanicAttacks", "PAD", "AGP"))
+         ) %>% 
+  arrange(., Diagnosis)
+
+glad_all_agreement
+```
+
+```{r GLAD combine agreements and xtabs tables}
+glad_all_agreement_xtabs <- merge(glad_all_xtabs,
+                             glad_all_agreement) %>%
+  mutate(Diagnosis = 
+           factor(Diagnosis,
+                  levels = c("MDD", "AnyAnxiety", "GAD", "SPEC", "SOCP", "PanicAttacks", "PAD", "AGP")),
+         Sample = "GLAD"
+         ) %>% 
+  arrange(., Diagnosis) %>% 
+  relocate(Sample)
+
+glad_all_agreement_xtabs
+```
+
+### COPING NBR
+
+#### Algorithm-based diagnosis as reference point
+
+Major depressive disorder
+```{r COPING NBR MDD SI-AB crosstabs and agreement}
+nbr_si_ab_mdd.cM <- confusionMatrix(cidi.nbr$ClinicianMDD.f,
+                            cidi.nbr$LifetimeMDD.f,
+                            positive = "Diagnosis",
+                            dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+nbr_si_ab_mdd.classes <- as.matrix(nbr_si_ab_mdd.cM, what = "classes")
+nbr_si_ab_mdd.overall <- as.matrix(nbr_si_ab_mdd.cM, what = "overall")
+nbr_si_ab_mdd.raw <- as.data.frame(rbind(nbr_si_ab_mdd.classes,
+                                     nbr_si_ab_mdd.overall))
+colnames(nbr_si_ab_mdd.raw) <- "MDD"
+
+#Fromat dataframe
+nbr_si_ab_mdd.incomplete <- nbr_si_ab_mdd.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(nbr_si_ab_mdd.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+nbr_si_ab_mdd.95ci <- summary(epiR::epi.tests(as.table(as.matrix(nbr_si_ab_mdd.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "MDD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+nbr_si_ab_mdd.df <- merge(nbr_si_ab_mdd.incomplete,
+                      nbr_si_ab_mdd.95ci)
+
+#Create dataframe of crosstab
+nbr_si_ab_mdd.xtabs <- as.data.frame(as.matrix(nbr_si_ab_mdd.cM))
+nbr_si_ab_mdd.xtabs.df <- nbr_si_ab_mdd.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "MDD",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+nbr_si_ab_mdd.df
+nbr_si_ab_mdd.xtabs.df
+```
+
+Generalised anxiety disorder
+```{r COPING NBR GAD SI-AB crosstabs and agreement}
+nbr_si_ab_gad.cM <- confusionMatrix(cidi.nbr$ClinicianGAD.f,
+                                cidi.nbr$LifetimeGAD.f,
+                                positive = "Diagnosis",
+                                dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+nbr_si_ab_gad.classes<- as.matrix(nbr_si_ab_gad.cM, what = "classes")
+nbr_si_ab_gad.overall <- as.matrix(nbr_si_ab_gad.cM, what = "overall")
+nbr_si_ab_gad.raw <- as.data.frame(rbind(nbr_si_ab_gad.classes,
+                                     nbr_si_ab_gad.overall))
+colnames(nbr_si_ab_gad.raw) <- "GAD"
+
+#Fromat dataframe
+nbr_si_ab_gad.incomplete <- nbr_si_ab_gad.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(nbr_si_ab_gad.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+nbr_si_ab_gad.95ci <- summary(epiR::epi.tests(as.table(as.matrix(nbr_si_ab_gad.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "GAD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+nbr_si_ab_gad.df <- merge(nbr_si_ab_gad.incomplete,
+                      nbr_si_ab_gad.95ci)
+
+#Create dataframe of crosstab
+nbr_si_ab_gad.xtabs <- as.data.frame(as.matrix(nbr_si_ab_gad.cM))
+nbr_si_ab_gad.xtabs.df <- nbr_si_ab_gad.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "GAD",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+nbr_si_ab_gad.df
+nbr_si_ab_gad.xtabs.df
+```
+
+Specific phobia
+```{r COPING NBR Specific phobia SI-AB crosstabs and agreement}
+nbr_si_ab_spec.cM <- confusionMatrix(cidi.nbr$ClinicianSpecPhob.f,
+                                 cidi.nbr$LifetimeSpecPhob.f,
+                                 positive = "Diagnosis",
+                                 dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+nbr_si_ab_spec.classes<- as.matrix(nbr_si_ab_spec.cM, what = "classes")
+nbr_si_ab_spec.overall <- as.matrix(nbr_si_ab_spec.cM, what = "overall")
+nbr_si_ab_spec.raw <- as.data.frame(rbind(nbr_si_ab_spec.classes,
+                                     nbr_si_ab_spec.overall))
+colnames(nbr_si_ab_spec.raw) <- "SPEC"
+
+#Fromat dataframe
+nbr_si_ab_spec.incomplete <- nbr_si_ab_spec.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(nbr_si_ab_spec.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+nbr_si_ab_spec.95ci <- summary(epiR::epi.tests(as.table(as.matrix(nbr_si_ab_spec.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "SPEC") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+nbr_si_ab_spec.df <- merge(nbr_si_ab_spec.incomplete,
+                      nbr_si_ab_spec.95ci)
+
+#Create dataframe of crosstab
+nbr_si_ab_spec.xtabs <- as.data.frame(as.matrix(nbr_si_ab_spec.cM))
+nbr_si_ab_spec.xtabs.df <- nbr_si_ab_spec.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "SPEC",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+nbr_si_ab_spec.df
+nbr_si_ab_spec.xtabs.df
+```
+
+Social anxiety disorder
+```{r COPING NBR Social anxiety disorder SI-AB crosstabs and agreement}
+nbr_si_ab_socp.cM <- confusionMatrix(cidi.nbr$ClinicianSocialPhob.f,
+                                  cidi.nbr$LifetimeSocialPhob.f,
+                                  positive = "Diagnosis",
+                                  dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+nbr_si_ab_socp.classes<- as.matrix(nbr_si_ab_socp.cM, what = "classes")
+nbr_si_ab_socp.overall <- as.matrix(nbr_si_ab_socp.cM, what = "overall")
+nbr_si_ab_socp.raw <- as.data.frame(rbind(nbr_si_ab_socp.classes,
+                                     nbr_si_ab_socp.overall))
+colnames(nbr_si_ab_socp.raw) <- "SOCP"
+
+#Fromat dataframe
+nbr_si_ab_socp.incomplete <- nbr_si_ab_socp.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(nbr_si_ab_socp.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+nbr_si_ab_socp.95ci <- summary(epiR::epi.tests(as.table(as.matrix(nbr_si_ab_socp.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "SOCP") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+nbr_si_ab_socp.df <- merge(nbr_si_ab_socp.incomplete,
+                      nbr_si_ab_socp.95ci)
+
+#Create dataframe of crosstab
+nbr_si_ab_socp.xtabs <- as.data.frame(as.matrix(nbr_si_ab_socp.cM))
+nbr_si_ab_socp.xtabs.df <- nbr_si_ab_socp.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "SOCP",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+nbr_si_ab_socp.df
+nbr_si_ab_socp.xtabs.df
+```
+
+Panic disorder
+```{r COPING NBR Panic disorder SI-AB crosstabs and agreement}
+nbr_si_ab_pad.cM <- confusionMatrix(cidi.nbr$ClinicianPanicDis.f,
+                                cidi.nbr$LifetimePanicDis.f,
+                                positive = "Diagnosis",
+                                dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+nbr_si_ab_pad.classes<- as.matrix(nbr_si_ab_pad.cM, what = "classes")
+nbr_si_ab_pad.overall <- as.matrix(nbr_si_ab_pad.cM, what = "overall")
+nbr_si_ab_pad.raw <- as.data.frame(rbind(nbr_si_ab_pad.classes,
+                                     nbr_si_ab_pad.overall))
+colnames(nbr_si_ab_pad.raw) <- "PAD"
+
+#Fromat dataframe
+nbr_si_ab_pad.incomplete <- nbr_si_ab_pad.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(nbr_si_ab_pad.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+nbr_si_ab_pad.95ci <- summary(epiR::epi.tests(as.table(as.matrix(nbr_si_ab_pad.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "PAD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+nbr_si_ab_pad.df <- merge(nbr_si_ab_pad.incomplete,
+                      nbr_si_ab_pad.95ci)
+
+#Create dataframe of crosstab
+nbr_si_ab_pad.xtabs <- as.data.frame(as.matrix(nbr_si_ab_pad.cM))
+nbr_si_ab_pad.xtabs.df <- nbr_si_ab_pad.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "PAD",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+nbr_si_ab_pad.df
+nbr_si_ab_pad.xtabs.df
+```
+
+Panic attacks
+The single-item panic attack variable here is being compared to lifetime panic disorder.
+```{r COPING NBR Panic Attacks SI-AB crosstabs and agreement for Panic Disorder}
+nbr_si_ab_pattacks.cM <- confusionMatrix(cidi.nbr$ClinicianPanicAttacks.f.cc,
+                                cidi.nbr$LifetimePanicDis.f, 
+                                positive = "Diagnosis",
+                                dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+nbr_si_ab_pattacks.classes<- as.matrix(nbr_si_ab_pattacks.cM, what = "classes")
+nbr_si_ab_pattacks.overall <- as.matrix(nbr_si_ab_pattacks.cM, what = "overall")
+nbr_si_ab_pattacks.raw <- as.data.frame(rbind(nbr_si_ab_pattacks.classes,
+                                     nbr_si_ab_pattacks.overall))
+colnames(nbr_si_ab_pattacks.raw) <- "PanicAttacks"
+
+#Fromat dataframe
+nbr_si_ab_pattacks.incomplete <- nbr_si_ab_pattacks.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(nbr_si_ab_pattacks.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+nbr_si_ab_pattacks.95ci <- summary(epiR::epi.tests(as.table(as.matrix(nbr_si_ab_pattacks.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "PanicAttacks") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+nbr_si_ab_pattacks.df <- merge(nbr_si_ab_pattacks.incomplete,
+                      nbr_si_ab_pattacks.95ci)
+
+#Create dataframe of crosstab
+nbr_si_ab_pattacks.xtabs <- as.data.frame(as.matrix(nbr_si_ab_pattacks.cM))
+nbr_si_ab_pattacks.xtabs.df <- nbr_si_ab_pattacks.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "PanicAttacks",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+nbr_si_ab_pattacks.df
+nbr_si_ab_pattacks.xtabs.df
+```
+
+Agoraphobia
+```{r COPING NBR Agoraphobia SI-AB crosstabs and agreement}
+nbr_si_ab_agp.cM <- confusionMatrix(cidi.nbr$ClinicianAgoraphobia.f,
+                                cidi.nbr$LifetimeAgoraphobia.f,
+                                positive = "Diagnosis",
+                                dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+nbr_si_ab_agp.classes<- as.matrix(nbr_si_ab_agp.cM, what = "classes")
+nbr_si_ab_agp.overall <- as.matrix(nbr_si_ab_agp.cM, what = "overall")
+nbr_si_ab_agp.raw <- as.data.frame(rbind(nbr_si_ab_agp.classes,
+                                     nbr_si_ab_agp.overall))
+colnames(nbr_si_ab_agp.raw) <- "AGP"
+
+#Fromat dataframe
+nbr_si_ab_agp.incomplete <- nbr_si_ab_agp.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(nbr_si_ab_agp.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+nbr_si_ab_agp.95ci <- summary(epiR::epi.tests(as.table(as.matrix(nbr_si_ab_agp.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "AGP") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+nbr_si_ab_agp.df <- merge(nbr_si_ab_agp.incomplete,
+                      nbr_si_ab_agp.95ci)
+
+#Create dataframe of crosstab
+nbr_si_ab_agp.xtabs <- as.data.frame(as.matrix(nbr_si_ab_agp.cM))
+nbr_si_ab_agp.xtabs.df <- nbr_si_ab_agp.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "AGP",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+nbr_si_ab_agp.df
+nbr_si_ab_agp.xtabs.df
+```
+
+Any anxiety
+```{r COPING NBR Any Anxiety SI-AB crosstabs and agreement}
+nbr_si_ab_anyanx.cM <- confusionMatrix(cidi.nbr$ClinicianAnyAnx.f, 
+                                cidi.nbr$LifetimeAnyAnx.f,
+                                positive = "Diagnosis",
+                                dnn = c("Single-item", "Algorithm-based"))
+
+#Create dataframe of agreements
+nbr_si_ab_anyanx.classes<- as.matrix(nbr_si_ab_anyanx.cM, what = "classes")
+nbr_si_ab_anyanx.overall <- as.matrix(nbr_si_ab_anyanx.cM, what = "overall")
+nbr_si_ab_anyanx.raw <- as.data.frame(rbind(nbr_si_ab_anyanx.classes,
+                                     nbr_si_ab_anyanx.overall))
+colnames(nbr_si_ab_anyanx.raw) <- "AnyAnxiety"
+
+#Fromat dataframe
+nbr_si_ab_anyanx.incomplete <- nbr_si_ab_anyanx.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(nbr_si_ab_anyanx.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+nbr_si_ab_anyanx.95ci <- summary(epiR::epi.tests(as.table(as.matrix(nbr_si_ab_anyanx.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "AnyAnxiety") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+nbr_si_ab_anyanx.df <- merge(nbr_si_ab_anyanx.incomplete,
+                      nbr_si_ab_anyanx.95ci)
+
+#Create dataframe of crosstab
+nbr_si_ab_anyanx.xtabs <- as.data.frame(as.matrix(nbr_si_ab_anyanx.cM))
+nbr_si_ab_anyanx.xtabs.df <- nbr_si_ab_anyanx.xtabs %>% 
+  rownames_to_column() %>% 
+  rename("AB Yes" =
+           "Diagnosis",
+         "AB No" = "No diagnosis",
+        "Crosstab"  = "rowname") %>% 
+  mutate(Diagnosis = "AnyAnxiety",
+         Crosstab = recode_factor(Crosstab,
+                                 "Diagnosis" = "SI Yes",
+                                 "No diagnosis" = "SI No")
+         )
+
+nbr_si_ab_anyanx.df
+nbr_si_ab_anyanx.xtabs.df
+```
+
+```{r COPING NBR combine SI-AB agreement tables}
+nbr_si_ab_all.raw <- bind_rows(nbr_si_ab_mdd.df,
+                           nbr_si_ab_anyanx.df,
+                           nbr_si_ab_gad.df,
+                           nbr_si_ab_spec.df,
+                           nbr_si_ab_socp.df,
+                           nbr_si_ab_pad.df,
+                           nbr_si_ab_pattacks.df,
+                           nbr_si_ab_agp.df)
+
+nbr_si_ab_all <- nbr_si_ab_all.raw %>% 
+  rename("Sensitivity SI-AB" = "Sensitivity",
+         "Specificity SI-AB" = "Specificity") %>% 
+  relocate(Kappa, .after = last_col())
+
+nbr_si_ab_all
+```
+
+```{r COPING NBR combine all xtabs tables}
+nbr_all_xtabs.raw <- bind_rows(nbr_si_ab_mdd.xtabs.df,
+                           nbr_si_ab_anyanx.xtabs.df,
+                           nbr_si_ab_gad.xtabs.df,
+                           nbr_si_ab_spec.xtabs.df,
+                           nbr_si_ab_socp.xtabs.df,
+                           nbr_si_ab_pad.xtabs.df,
+                           nbr_si_ab_pattacks.xtabs.df,
+                           nbr_si_ab_agp.xtabs.df)
+
+nbr_all_xtabs <- nbr_all_xtabs.raw %>%  
+  relocate(Diagnosis)
+
+nbr_all_xtabs
+```
+
+#### Single-item diagnosis as reference point
+
+Major depressive disorder
+```{r COPING NBR MDD AB-SI crosstabs and agreement}
+nbr_ab_si_mdd.cM <- confusionMatrix(cidi.nbr$LifetimeMDD.f,
+                                cidi.nbr$ClinicianMDD.f, 
+                                positive = "Diagnosis",
+                                dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+nbr_ab_si_mdd.classes<- as.matrix(nbr_ab_si_mdd.cM, what = "classes")
+nbr_ab_si_mdd.overall <- as.matrix(nbr_ab_si_mdd.cM, what = "overall")
+nbr_ab_si_mdd.raw <- as.data.frame(rbind(nbr_ab_si_mdd.classes,
+                                     nbr_ab_si_mdd.overall))
+colnames(nbr_ab_si_mdd.raw) <- "MDD"
+
+#Fromat dataframe
+nbr_ab_si_mdd.incomplete <- nbr_ab_si_mdd.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(nbr_ab_si_mdd.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+nbr_ab_si_mdd.95ci <- summary(epiR::epi.tests(as.table(as.matrix(nbr_ab_si_mdd.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "MDD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+nbr_ab_si_mdd.df <- merge(nbr_ab_si_mdd.incomplete,
+                      nbr_ab_si_mdd.95ci)
+
+nbr_ab_si_mdd.df
+```
+
+Generalised anxiety disorder
+```{r COPING NBR GAD AB-SI crosstabs and agreement}
+nbr_ab_si_gad.cM <- confusionMatrix(cidi.nbr$LifetimeGAD.f,
+                                cidi.nbr$ClinicianGAD.f, 
+                                positive = "Diagnosis",
+                                dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+nbr_ab_si_gad.classes<- as.matrix(nbr_ab_si_gad.cM, what = "classes")
+nbr_ab_si_gad.overall <- as.matrix(nbr_ab_si_gad.cM, what = "overall")
+nbr_ab_si_gad.raw <- as.data.frame(rbind(nbr_ab_si_gad.classes,
+                                     nbr_ab_si_gad.overall))
+colnames(nbr_ab_si_gad.raw) <- "GAD"
+
+#Fromat dataframe
+nbr_ab_si_gad.incomplete <- nbr_ab_si_gad.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(nbr_ab_si_gad.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+nbr_ab_si_gad.95ci <- summary(epiR::epi.tests(as.table(as.matrix(nbr_ab_si_gad.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "GAD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+nbr_ab_si_gad.df <- merge(nbr_ab_si_gad.incomplete,
+                      nbr_ab_si_gad.95ci)
+
+nbr_ab_si_gad.df
+```
+
+Specific phobia
+```{r COPING NBR Specific phobia AB-SI crosstabs and agreement}
+nbr_ab_si_spec.cM <- confusionMatrix(cidi.nbr$LifetimeSpecPhob.f,
+                                 cidi.nbr$ClinicianSpecPhob.f, 
+                                 positive = "Diagnosis",
+                                 dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+nbr_ab_si_spec.classes<- as.matrix(nbr_ab_si_spec.cM, what = "classes")
+nbr_ab_si_spec.overall <- as.matrix(nbr_ab_si_spec.cM, what = "overall")
+nbr_ab_si_spec.raw <- as.data.frame(rbind(nbr_ab_si_spec.classes,
+                                     nbr_ab_si_spec.overall))
+colnames(nbr_ab_si_spec.raw) <- "SPEC"
+
+#Fromat dataframe
+nbr_ab_si_spec.incomplete <- nbr_ab_si_spec.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(nbr_ab_si_spec.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+nbr_ab_si_spec.95ci <- summary(epiR::epi.tests(as.table(as.matrix(nbr_ab_si_spec.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "SPEC") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+nbr_ab_si_spec.df <- merge(nbr_ab_si_spec.incomplete,
+                      nbr_ab_si_spec.95ci)
+
+nbr_ab_si_spec.df
+```
+
+Social anxiety disorder
+```{r COPING NBR Social anxiety disorder AB-SI crosstabs and agreement}
+nbr_ab_si_socp.cM <- confusionMatrix(cidi.nbr$LifetimeSocialPhob.f,
+                                 cidi.nbr$ClinicianSocialPhob.f, 
+                                 positive = "Diagnosis",
+                                 dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+nbr_ab_si_socp.classes<- as.matrix(nbr_ab_si_socp.cM, what = "classes")
+nbr_ab_si_socp.overall <- as.matrix(nbr_ab_si_socp.cM, what = "overall")
+nbr_ab_si_socp.raw <- as.data.frame(rbind(nbr_ab_si_socp.classes,
+                                     nbr_ab_si_socp.overall))
+colnames(nbr_ab_si_socp.raw) <- "SOCP"
+
+#Fromat dataframe
+nbr_ab_si_socp.incomplete <- nbr_ab_si_socp.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(nbr_ab_si_socp.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+nbr_ab_si_socp.95ci <- summary(epiR::epi.tests(as.table(as.matrix(nbr_ab_si_socp.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "SOCP") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+nbr_ab_si_socp.df <- merge(nbr_ab_si_socp.incomplete,
+                      nbr_ab_si_socp.95ci)
+
+nbr_ab_si_socp.df
+```
+
+Panic disorder
+```{r COPING NBR Panic disorder AB-SI crosstabs and agreement}
+nbr_ab_si_pad.cM <- confusionMatrix(cidi.nbr$LifetimePanicDis.f,
+                                cidi.nbr$ClinicianPanicDis.f, 
+                                positive = "Diagnosis",
+                                dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+nbr_ab_si_pad.classes<- as.matrix(nbr_ab_si_pad.cM, what = "classes")
+nbr_ab_si_pad.overall <- as.matrix(nbr_ab_si_pad.cM, what = "overall")
+nbr_ab_si_pad.raw <- as.data.frame(rbind(nbr_ab_si_pad.classes,
+                                     nbr_ab_si_pad.overall))
+colnames(nbr_ab_si_pad.raw) <- "PAD"
+
+#Fromat dataframe
+nbr_ab_si_pad.incomplete <- nbr_ab_si_pad.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(nbr_ab_si_pad.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+nbr_ab_si_pad.95ci <- summary(epiR::epi.tests(as.table(as.matrix(nbr_ab_si_pad.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "PAD") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+nbr_ab_si_pad.df <- merge(nbr_ab_si_pad.incomplete,
+                      nbr_ab_si_pad.95ci)
+
+nbr_ab_si_pad.df
+```
+
+Panic attacks
+Algorithm-based panic disorder is being compared with single-item panic attacks.
+```{r COPING NBR Panic Attacks AB-SI crosstabs and agreement with Panic Disorder, echo=FALSE}
+nbr_ab_si_pattacks.cM <- confusionMatrix(cidi.nbr$LifetimePanicDis.f, 
+                                     cidi.nbr$ClinicianPanicAttacks.f.cc, 
+                                     positive = "Diagnosis",
+                                     dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+nbr_ab_si_pattacks.classes<- as.matrix(nbr_ab_si_pattacks.cM, what = "classes")
+nbr_ab_si_pattacks.overall <- as.matrix(nbr_ab_si_pattacks.cM, what = "overall")
+nbr_ab_si_pattacks.raw <- as.data.frame(rbind(nbr_ab_si_pattacks.classes,
+                                     nbr_ab_si_pattacks.overall))
+colnames(nbr_ab_si_pattacks.raw) <- "PanicAttacks"
+
+#Fromat dataframe
+nbr_ab_si_pattacks.incomplete <- nbr_ab_si_pattacks.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(nbr_ab_si_pattacks.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+nbr_ab_si_pattacks.95ci <- summary(epiR::epi.tests(as.table(as.matrix(nbr_ab_si_pattacks.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "PanicAttacks") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+nbr_ab_si_pattacks.df <- merge(nbr_ab_si_pattacks.incomplete,
+                      nbr_ab_si_pattacks.95ci)
+
+nbr_ab_si_pattacks.df
+```
+
+Agoraphobia
+```{r COPING NBR Agoraphobia AB-SI crosstabs and agreement}
+nbr_ab_si_agp.cM <- confusionMatrix(cidi.nbr$LifetimeAgoraphobia.f, 
+                                cidi.nbr$ClinicianAgoraphobia.f, 
+                                positive = "Diagnosis",
+                                dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+nbr_ab_si_agp.classes<- as.matrix(nbr_ab_si_agp.cM, what = "classes")
+nbr_ab_si_agp.overall <- as.matrix(nbr_ab_si_agp.cM, what = "overall")
+nbr_ab_si_agp.raw <- as.data.frame(rbind(nbr_ab_si_agp.classes,
+                                     nbr_ab_si_agp.overall))
+colnames(nbr_ab_si_agp.raw) <- "AGP"
+
+#Fromat dataframe
+nbr_ab_si_agp.incomplete <- nbr_ab_si_agp.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(nbr_ab_si_agp.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+nbr_ab_si_agp.95ci <- summary(epiR::epi.tests(as.table(as.matrix(nbr_ab_si_agp.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "AGP") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+nbr_ab_si_agp.df <- merge(nbr_ab_si_agp.incomplete,
+                      nbr_ab_si_agp.95ci)
+
+nbr_ab_si_agp.df
+```
+
+Any anxiety
+```{r COPING NBR Any Anxiety AB-SI crosstabs and agreement}
+nbr_ab_si_anyanx.cM <- confusionMatrix(cidi.nbr$LifetimeAnyAnx.f,
+                                   cidi.nbr$ClinicianAnyAnx.f, 
+                                   positive = "Diagnosis",
+                                   dnn = c("Algorithm-based", "Single-item"))
+
+#Create dataframe of agreements
+nbr_ab_si_anyanx.classes<- as.matrix(nbr_ab_si_anyanx.cM, what = "classes")
+nbr_ab_si_anyanx.overall <- as.matrix(nbr_ab_si_anyanx.cM, what = "overall")
+nbr_ab_si_anyanx.raw <- as.data.frame(rbind(nbr_ab_si_anyanx.classes,
+                                     nbr_ab_si_anyanx.overall))
+colnames(nbr_ab_si_anyanx.raw) <- "AnyAnxiety"
+
+#Fromat dataframe
+nbr_ab_si_anyanx.incomplete <- nbr_ab_si_anyanx.raw %>% 
+  rownames_to_column() %>% 
+  mutate(rowname = rownames(nbr_ab_si_anyanx.raw)) %>% 
+  gather(Diagnosis, value, -rowname) %>% 
+  spread(rowname, value) %>% 
+  select(-unused_agreement)
+
+#Calculate sensitivity and specificity with 95% CI
+nbr_ab_si_anyanx.95ci <- summary(epiR::epi.tests(as.table(as.matrix(nbr_ab_si_anyanx.cM)), conf.level = 0.95)) %>%
+  round(., 2) %>% 
+  rownames_to_column() %>% 
+  filter(rowname == "se" | rowname == "sp") %>% 
+  mutate(combined =
+           sprintf("%.2f (%.2f, %.2f)", 
+                   est,
+                   lower,
+                   upper),
+         Diagnosis = "AnyAnxiety") %>% 
+  select(-c(est, lower, upper)) %>% 
+  pivot_wider(names_from = rowname, values_from = combined) %>% 
+  rename("Sensitivity" = "se",
+         "Specificity" = "sp")
+
+#Combine dataframe with sensitivity/specificity
+nbr_ab_si_anyanx.df <- merge(nbr_ab_si_anyanx.incomplete,
+                      nbr_ab_si_anyanx.95ci)
+
+nbr_ab_si_anyanx.df
+```
+
+```{r COPING NBR combine AB-SI agreement tables}
+nbr_ab_si_all.raw <- bind_rows(nbr_ab_si_mdd.df,
+                           nbr_ab_si_anyanx.df,
+                           nbr_ab_si_gad.df,
+                           nbr_ab_si_spec.df,
+                           nbr_ab_si_socp.df,
+                           nbr_ab_si_pad.df,
+                           nbr_ab_si_pattacks.df,
+                           nbr_ab_si_agp.df)
+
+nbr_ab_si_all <- nbr_ab_si_all.raw %>% 
+  select(Diagnosis,
+         "Sensitivity AB-SI" = "Sensitivity",
+         "Specificity AB-SI" = "Specificity") 
+
+nbr_ab_si_all
+```
+
+#### Agreement table for all statistics
+
+```{r COPING NBR combine all agreement tables}
+nbr_all_agreement <- merge(nbr_si_ab_all,
+                       nbr_ab_si_all) %>%
+  relocate(Kappa, .after = last_col()) %>% 
+  mutate(Diagnosis = 
+           factor(Diagnosis,
+                  levels = c("MDD", "AnyAnxiety", "GAD", "SPEC", "SOCP", "PanicAttacks", "PAD", "AGP"))
+         ) %>% 
+  arrange(., Diagnosis)
+
+nbr_all_agreement
+```
+
+```{r COPING NBR combine agreements and xtabs tables}
+nbr_all_agreement_xtabs <- merge(nbr_all_xtabs,
+                             nbr_all_agreement) %>%
+  mutate(Diagnosis = 
+           factor(Diagnosis,
+                  levels = c("MDD", "AnyAnxiety", "GAD", "SPEC", "SOCP", "PanicAttacks", "PAD", "AGP")),
+         Sample = "COPING NBR"
+         ) %>% 
+  arrange(., Diagnosis) %>% 
+  relocate(Sample)
+
+nbr_all_agreement_xtabs
+```
+
+## Full sample and by sample combined table
+
+```{r combine all agreement tables}
+all_agreement_xtabs <- rbind(full_sample_all_agreement_xtabs,
+                             glad_all_agreement_xtabs,
+                             nbr_all_agreement_xtabs) %>% 
+  mutate(Accuracy = 
+           sprintf("%.2f (%.2f, %.2f)",
+                   Accuracy*100,
+                   AccuracyLower*100,
+                   AccuracyUpper*100)) %>% 
+  select(-c(AccuracyLower, AccuracyUpper)) %>%
+  arrange(., Diagnosis) %>% 
+  mutate(Diagnosis = 
+           case_when(
+             Diagnosis == "MDD" ~ "MDD",
+             Diagnosis == "GAD" ~ "GAD",
+             Diagnosis == "AnyAnxiety" ~ "Any anxiety",
+             Diagnosis == "SPEC" ~ "Specific phobia",
+             Diagnosis == "SOCP" ~ "Social anxiety disorder",
+             Diagnosis == "PAD" ~ "Panic disorder",
+             Diagnosis == "PanicAttacks" ~ "Panic attacks",
+             Diagnosis == "AGP" ~ "Agoraphobia"
+           ),
+         Diagnosis = 
+           case_when(
+             Crosstab == "SI Yes" ~ Diagnosis,
+             Crosstab == "SI No" ~ ""
+           ),
+         Sample = 
+           case_when(
+             Crosstab == "SI Yes" ~ Sample,
+             Crosstab == "SI No" ~ ""
+           ),
+         SI = 
+           case_when(
+             Crosstab == "SI Yes" ~ "Single-item (SI)",
+             Crosstab == "SI No" ~ ""
+           ),
+         Accuracy = 
+           case_when(
+             Crosstab == "SI Yes" ~ Accuracy,
+             Crosstab == "SI No" ~ ""
+           ),
+         `Sensitivity SI-AB` = 
+           case_when(
+             Crosstab == "SI Yes" ~ `Sensitivity SI-AB`,
+             Crosstab == "SI No" ~ ""
+           ),
+         `Specificity SI-AB` = 
+           case_when(
+             Crosstab == "SI Yes" ~ `Specificity SI-AB`,
+             Crosstab == "SI No" ~ ""
+           ),
+         `Sensitivity AB-SI` = 
+           case_when(
+             Crosstab == "SI Yes" ~ `Sensitivity AB-SI`,
+             Crosstab == "SI No" ~ ""
+           ),
+         `Specificity AB-SI` = 
+           case_when(
+             Crosstab == "SI Yes" ~ `Specificity AB-SI`,
+             Crosstab == "SI No" ~ ""
+           ),
+         Kappa = 
+           case_when(
+             Crosstab == "SI Yes" ~ as.character(round(Kappa, 2)),
+             Crosstab == "SI No" ~ ""
+           ),
+         McnemarPValue = 
+           case_when(
+             Crosstab == "SI Yes" & 
+               McnemarPValue < 0.001 ~ "p < 0.001",
+             Crosstab == "SI Yes" & 
+               McnemarPValue > 0.001 & McnemarPValue < 0.01 ~ "p < 0.01",
+             Crosstab == "SI Yes" & 
+               McnemarPValue > 0.01 & McnemarPValue < 0.05 ~ "p < 0.05",
+             Crosstab == "SI Yes" & 
+               McnemarPValue > 0.05 ~ paste0("p ~ ", round(McnemarPValue, 2)),
+             Crosstab == "SI No" ~ ""
+           ),
+         Crosstab = 
+           case_when(
+             Crosstab == "SI Yes" ~ "Yes",
+             Crosstab == "SI No" ~ "No"
+           )
+           ) %>% 
+  rename("Accuracy (%)" = "Accuracy",
+         "Cohort" = "Sample",
+         "Disorder" = "Diagnosis",
+         "Mcnemar's test" = "McnemarPValue") %>%
+  relocate(c(Disorder, Cohort, SI)) %>% 
+  relocate(`Mcnemar's test`, .after = last_col())
+
+kable(all_agreement_xtabs)
+```
+
+
+# Analyses of difference
+
+## GLAD vs COPING sample characteristics
+    Cohort as grouping variable with the different characteristics
+    Chi-square if dichotomous; independent t-test for continuous variables
+
+Indendent samples t-test to assess differences in age between GLAD vs COPING cohorts
+```{r t-test age}
+
+```
+
+
+Chi-square tests to assess differences between GLAD vs COPING cohorts in:
+- Sex
+- Ethnicity
+- Highest education
+
+```{r chi-square sex}
+
+```
+
+```{r chi-square ethnicity}
+
+```
+
+```{r chi-square highest education}
+
+```
+
+## Male vs female diagnostic agreements
+    Chi-square test (Female: Yes/No)
+
+```{r}
+
+```
+

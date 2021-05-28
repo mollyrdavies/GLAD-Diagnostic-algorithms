@@ -83,6 +83,7 @@ glad_dem_renamed <- glad_dem %>%
   distinct(externalDataReference, .keep_all = TRUE) %>% 
   rename("ID" = "externalDataReference",
          "sex" = "dem.select_questionnaire_items_medical",
+         "age.unc" = "dem.how_old_are_you_now.txt",
          "Birthday_numeric" = "dem.day",
          "Birthmonth_numeric" = "dem.month",
          "Birthyear_numeric" = "dem.year",
@@ -159,7 +160,7 @@ coping_nbr_employ_renamed <- coping_nbr_employ %>%
          "dem.education_other_numeric" = "employ.other_professional_qualifications_e.g._nursing_teaching",
           "dem.employment_numeric" = "employ.fulltime_employed" 
          ) %>% 
-  mutate(employ.college_or_university_degree =
+  mutate(dem.university_numeric =
            case_when(
              employ.phd == 1 |
                employ.masters_degree_or_equivalent == 1 | 
@@ -309,12 +310,6 @@ DEM <- DEM_renamed.combined %>%
          "Birthday_numeric.unc" = "Birthday_numeric",
          "Birthmonth_numeric.unc" = "Birthmonth_numeric",
          "Birthyear_numeric.unc" = "Birthyear_numeric",
-         "dem.university_numeric.unc" = "dem.university_numeric",
-         "dem.alevels_numeric.unc" = "dem.alevels_numeric",
-         "dem.gcse_numeric.unc" = "dem.gcse_numeric",
-         "dem.cse_numeric.unc" = "dem.cse_numeric",
-         "dem.NVQ_numeric.unc" = "dem.NVQ_numeric",
-         "dem.education_other_numeric.unc" = "dem.education_other_numeric",
          "dem.ethnicity_numeric.unc" = "dem.ethnicity_numeric",
          "dem.employment_numeric.unc" = "dem.employment_numeric"
          ) 
@@ -331,7 +326,7 @@ head(DEM)
 
 # Age
 
-## Calculating age from birthdates
+## Calculating age from birthdates for NBR
 
 ### Clean birthyear
 
@@ -377,13 +372,21 @@ DEM$endDate_dateformat <- as.Date(DEM$endDate,
 ages <- age_calc(na.omit(DEM$Birthdate), enddate = DEM$endDate_dateformat, units = "years")
 
 #Create dem.age column
-DEM$age.unc <- NA
+DEM$age.calc.unc <- NA
 
 #Populate with values (excluding NAs)
-DEM$age.unc.decimal <- ages
+DEM$age.calc.unc <- ages
 
 #Round age down
-DEM$age.unc <- floor(DEM$age.unc.decimal)
+DEM$age.calc <- floor(DEM$age.calc.unc)
+
+#Create cleaned age column
+#Only use calculated age in cases where self-reported age is unavailable
+DEM <- DEM %>% 
+  mutate(age.combined.unc = 
+           case_when(is.na(age.unc) ~ age.calc,
+                     !is.na(age.unc) ~ age.unc)
+  )
 
 ```
 
@@ -391,10 +394,10 @@ DEM$age.unc <- floor(DEM$age.unc.decimal)
 
 ```{r checking outliers: density plot Age}
 ##Get summary to see range
-summary(DEM$age.unc)
+summary(DEM$age.combined.unc)
 
 ## Create a variable for the mean to add the mean line in the graph
-age.clean <- DEM$age.unc
+age.clean <- DEM$age.combined.unc
 m <- mean(age.clean, na.rm = TRUE)
 
 ## Create version of dataset with only unique column names (to fix an error with ggplot)
@@ -403,7 +406,7 @@ colnames(DEM.plot) <- make.unique(names(DEM.plot))
 
 ## Create a density plot of Age, with a mean line
 
-adens <- ggplot(data = DEM.plot, aes(x=age.unc, color="variable")) +
+adens <- ggplot(data = DEM.plot, aes(x=age.combined.unc, color="variable")) +
   geom_density() +
   scale_x_continuous(limits = c(0.00, 105)) +
   geom_vline(xintercept=mean(m),
@@ -415,16 +418,16 @@ adens
 ## Alternatively, you can just tell R that the dataset contains NA so it can properly calculate the mean
 ## You can also add lines around the SD
 
-adens.imp <- ggplot(DEM.plot, aes(x=age.unc, color="variable")) +
+adens.imp <- ggplot(DEM.plot, aes(x=age.combined.unc, color="variable")) +
   geom_density() +
   scale_color_manual(values = "#E69F00") +
   scale_x_continuous(limits = c(0.00, 105)) +
-  geom_vline(xintercept = mean(DEM.plot$age.unc, na.rm = T), 
+  geom_vline(xintercept = mean(DEM.plot$age.combined.unc, na.rm = T), 
              color = "blue") +  
-  geom_vline(xintercept = mean(DEM.plot$age.unc, na.rm = T) + sd(DEM.plot$age.unc, na.rm = T),
+  geom_vline(xintercept = mean(DEM.plot$age.combined.unc, na.rm = T) + sd(DEM.plot$age.combined.unc, na.rm = T),
              color = "blue",
              linetype = "dashed") +
-  geom_vline(xintercept = mean(DEM.plot$age.unc, na.rm = T) - sd(DEM.plot$age.unc, na.rm = T),
+  geom_vline(xintercept = mean(DEM.plot$age.combined.unc, na.rm = T) - sd(DEM.plot$age.combined.unc, na.rm = T),
              color = "blue",
              linetype = "dashed")
 
@@ -433,16 +436,16 @@ print(adens.imp)
 
 ```{r checking outliers: Scatterplot}
 
-ggplot(data = subset(DEM.plot, !is.na(age.unc)),
-       aes(x = seq_along(age.unc), y = age.unc)) +
+ggplot(data = subset(DEM.plot, !is.na(age.combined.unc)),
+       aes(x = seq_along(age.combined.unc), y = age.combined.unc)) +
        geom_point(color="grey") +
   labs(x = "Index",
        y = "Age",
        title = "Age (self-report, sex-combined, uncleaned)",
        subtitle = paste("Dashed line represents mean and dotted lines represent ± 1 standard deviation\n",
-                        "n = ", sum(!is.na(DEM.plot$age.unc)),
-                        "; NA = ", sum(is.na(DEM.plot$age.unc)),
-                        "; n(total) = ", length(DEM.plot$age.unc), sep = ""),       
+                        "n = ", sum(!is.na(DEM.plot$age.combined.unc)),
+                        "; NA = ", sum(is.na(DEM.plot$age.combined.unc)),
+                        "; n(total) = ", length(DEM.plot$age.combined.unc), sep = ""),       
        color = "black") +
   theme(panel.grid.major.y = element_line(size = 0.5,
                                         linetype = 'dashed',
@@ -453,33 +456,33 @@ ggplot(data = subset(DEM.plot, !is.na(age.unc)),
         axis.ticks.x = element_blank(),
         axis.ticks.y = element_blank(),
         panel.background = element_blank()) +
-  geom_hline(data = DEM.plot, aes(yintercept = mean(age.unc, na.rm = T)), size = 0.5, linetype = "dashed") +
-  geom_hline(data = DEM.plot, aes(yintercept = mean(age.unc, na.rm = T) + sd(age.unc, na.rm = T)), size = 0.5, linetype = "dotted") +
-  geom_hline(data = DEM.plot, aes(yintercept = mean(age.unc, na.rm = T) - sd(age.unc, na.rm = T)), size = 0.5, linetype = "dotted")
+  geom_hline(data = DEM.plot, aes(yintercept = mean(age.combined.unc, na.rm = T)), size = 0.5, linetype = "dashed") +
+  geom_hline(data = DEM.plot, aes(yintercept = mean(age.combined.unc, na.rm = T) + sd(age.combined.unc, na.rm = T)), size = 0.5, linetype = "dotted") +
+  geom_hline(data = DEM.plot, aes(yintercept = mean(age.combined.unc, na.rm = T) - sd(age.combined.unc, na.rm = T)), size = 0.5, linetype = "dotted")
 
 ```
 
 ```{r set Age limits}
 
-# Set upper limit for age (no lower limit, as all are >= 16)
-
+# Set limits for age (add in <16 in case of incorrectly entered ages)
+age.m_lower = 16
 age.m_upper = 100
 
 # Check how many participants have outlier values in height
 
-age.n_upper <- which(DEM$age.unc > age.m_upper)
+age.n_outliers <- which(age.m_lower > DEM$age.combined.unc | DEM$age.combined.unc > age.m_upper)
 
-length(age.n_upper)
+length(age.n_outliers)
 
 ```
 
 ```{r remove Age outliers}
 
-if(length(age.n_upper)>0){
+if(length(age.n_outliers)>0){
   
 # Remove outliers
 
-DEM$age <- with(data = DEM, ifelse(age.unc > age.m_upper, NA, age.unc))
+DEM$age <- with(data = DEM, ifelse(age.m_lower > age.combined.unc | age.combined.unc > age.m_upper, NA, age.combined.unc))
 
 # Overwrite dataset with clean data, make col names unique for plotting
 DEM.plot <- DEM
@@ -497,7 +500,7 @@ ggplot(data = subset(DEM.plot, !is.na(age)),
                         "n = ", sum(!is.na(DEM.plot$age)),
                         "; NA = ", sum(is.na(DEM.plot$age)),
                         "; n(total) = ", length(DEM.plot$age),
-                        "; n(outlier) removed = ", length(age.n_upper), sep = ""),
+                        "; n(outlier) removed = ", length(age.n_outliers), sep = ""),
        color = "black") +
   theme(panel.grid.major.y = element_line(size = 0.5,
                                         linetype = 'dashed',
@@ -526,11 +529,9 @@ ggplot(data = subset(DEM.plot, !is.na(age)),
 ```{r mean age}
 #Get mean of cleaned age variable
 mean(DEM$age, na.rm = T)
-
 ```
 
 # Sex
-
 Sex variable is pre-cleaned. Rename to remove .unc.
 ```{r rename sex}
 DEM$sex <- DEM$sex.unc
@@ -547,70 +548,32 @@ Proceed along qualifications fields
 If field is not blank, take that as highest qual
 If field is blank, check next field
 If all fields are blank, NA
-Assumes Degree > A level > O level > CSE
-NVQ and other professional are disregarded
 
-```{r code education as characters}
+Assumes Degree > A level > NVQ > CSE/GCSE
+Other professional are disregarded
 
-#Recode as factors to add text, then change class to character
-DEM$College <- as.character(recode_factor(DEM$dem.university_numeric.unc,
-                              "1" = "College or university degree",
-                              "0" = "No",
-                              "-77" = NULL,
-                              .missing = NULL))
+```{r create highest education variable}
+#Create numeric variable
+DEM <- DEM %>% 
+  mutate(
+    highest_education_numeric = 
+           case_when(dem.university_numeric == 1 ~ 4,
+                     dem.alevels_numeric == 1 ~ 3,
+                     dem.NVQ_numeric == 1 ~ 2,
+                     dem.gcse_numeric == 1 ~ 1,
+                     dem.cse_numeric == 1 ~ 1))
 
-DEM$A_levels <-as.character(recode_factor(DEM$dem.alevels_numeric.unc,
-                              "1" = "A levels/AS levels or equivalent",
-                              "0" = "No",
-                              "-77" = NULL,
-                              .missing = NULL))
+#Create factor variable from numeric version
+DEM <- DEM %>% 
+  mutate(
+    highest_education =
+      recode_factor(highest_education_numeric,
+        `1` = "GCSE/CSE",
+        `2` = "NVQ",
+        `3` = "A-levels",
+        `4` = "University"))
 
-DEM$GCSE_edu <- as.character(recode_factor(DEM$dem.gcse_numeric.unc,
-                                  "1" = "O levels/GCSEs or equivalent",
-                                  "0" = "No",
-                                  "-77" = NULL,
-                                  .missing = NULL))
-
-DEM$CSE <- as.character(recode_factor(DEM$dem.cse_numeric.unc,
-                          "1" = "CSEs or equivalent",
-                          "0" = "No",
-                          "-77" = NULL,
-                          .missing = NULL))
-
-```
-
-```{r define highest education}
-DEM$Highest.Education<-NA
-DEM$Highest.Education<-ordered(case_when(DEM$College=="College or university degree" ~ DEM$College,
-                                          DEM$A_levels=="A levels/AS levels or equivalent" ~ DEM$A_levels,
-                                          DEM$GCSE_edu == "O levels/GCSEs or equivalent" ~ DEM$GCSE_edu,
-                                          DEM$CSE== "CSEs or equivalent" ~ DEM$CSE,
-                                          TRUE ~ as.character(NA)),
-                                          c("College or university degree","A levels/AS levels or equivalent","O levels/GCSEs or equivalent", "CSEs or equivalent"))
-
-DEM$Degree<-ifelse(!is.na(DEM$Highest.Education) & DEM$Highest.Education == "College or university degree", "Degree", "No degree")
-
-DEM$GCSE<-ifelse((!is.na(DEM$Highest.Education) & DEM$Highest.Education == "CSEs or equivalent") | is.na(DEM$Highest.Education), "No GCSE equivalent", "At least GCSE equivalent")
-
-head(DEM$Highest.Education)
-
-```
-
-
-```{r run checks for new variable}
-table(DEM$Highest.Education, DEM$College, useNA = "a")
-table(DEM$Highest.Education, DEM$A_levels, useNA = "a")
-table(DEM$Highest.Education, DEM$GCSE_edu, useNA = "a")
-table(DEM$Highest.Education, DEM$CSE, useNA = "a")
-#NVD or HND or NHC or equivalent
-table(DEM$Highest.Education, DEM$dem.NVQ_numeric.unc, useNA = "a")
-#Other professional qualification
-table(DEM$Highest.Education, DEM$dem.education_other_numeric.unc, useNA = "a")
-```
-
-```{r higher education freq}
-#Get frequencies of higher education
-freq(DEM$Highest.Education)
+freq(DEM$highest_education)
 ```
 
 # Ethnicity

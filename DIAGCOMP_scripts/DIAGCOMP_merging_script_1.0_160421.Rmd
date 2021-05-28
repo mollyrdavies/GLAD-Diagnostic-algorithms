@@ -145,22 +145,24 @@ dat <- list(
 
 ```{r check merge worked as expected}
 #Check that the NAs for a diagnosis remain the same in the combined datasets (there will be more NAs for NBR SPEC because the questionnaire was optional)
+##The DEM file has more participants overall so NAs will differ, but shouldn't be hugely different
 sum(ifelse(SPEC$sample == "NBR" & is.na(SPEC$spec.diagnosis), 1, 0))
 sum(ifelse(dat$sample == "NBR" & is.na(dat$spec.diagnosis), 1, 0))
 sum(ifelse(SPEC$sample == "GLAD" & is.na(SPEC$spec.diagnosis), 1, 0))
 sum(ifelse(dat$sample == "GLAD" & is.na(dat$spec.diagnosis), 1, 0))
 
-#Check for PAD (waiting for updated SPEC dataset)
+#Check for PAD (waiting for updated SPEC dataset) 
+##The DEM file has more participants overall so NAs will differ, but shouldn't be hugely different
 sum(ifelse(PAD$sample == "NBR" & is.na(PAD$pad.diagnosis), 1, 0))
 sum(ifelse(dat$sample == "NBR" & is.na(dat$pad.diagnosis), 1, 0))
 sum(ifelse(PAD$sample == "GLAD" & is.na(PAD$pad.diagnosis), 1, 0))
 sum(ifelse(dat$sample == "GLAD" & is.na(dat$pad.diagnosis), 1, 0))
 
 #Check that the NAs for one of the demographics variables remain the same in the combined datasets
-sum(ifelse(dem$sample == "NBR" & is.na(dem$Highest.Education), 1, 0))
-sum(ifelse(dat$sample == "NBR" & is.na(dat$Highest.Education), 1, 0))
-sum(ifelse(dem$sample == "GLAD" & is.na(dem$Highest.Education), 1, 0))
-sum(ifelse(dat$sample == "GLAD" & is.na(dat$Highest.Education), 1, 0))
+sum(ifelse(dem$sample == "NBR" & is.na(dem$highest_education), 1, 0))
+sum(ifelse(dat$sample == "NBR" & is.na(dat$highest_education), 1, 0))
+sum(ifelse(dem$sample == "GLAD" & is.na(dem$highest_education), 1, 0))
+sum(ifelse(dat$sample == "GLAD" & is.na(dat$highest_education), 1, 0))
 
 sum(ifelse(dem$sample == "NBR" & is.na(dem$age), 1, 0))
 sum(ifelse(dat$sample == "NBR" & is.na(dat$age), 1, 0))
@@ -171,7 +173,7 @@ sum(ifelse(dat$sample == "GLAD" & is.na(dat$age), 1, 0))
 
 ```{r Skim data}
 #look at the data
-skimr::skim(dat)
+#skimr::skim(dat)
 ```
 
 ```{r Save combined dataset as rds file}

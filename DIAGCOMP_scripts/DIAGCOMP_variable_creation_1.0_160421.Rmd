@@ -146,7 +146,7 @@ summary(dat.cc$ClinicianGAD)
 
 ```{r clinician diagnosis specific phobia as factor}
 
-dat.cc$ClinicianSpecPhob <- recode_factor(dat.cc$mhd.specific_phobia_numeric,
+dat.cc$ClinicianSpecPhob <- recode_factor(dat.cc$mhd.specific_phobia,
                                           "0" = "No specific phobia diagnosis",
                                           "1" = "Specific phobia diagnosis",
                                           "-77" = NULL,
@@ -160,7 +160,7 @@ summary(dat.cc$ClinicianSpecPhob)
 
 ```{r clinician diagnosis social phobia as factor}
 
-dat.cc$ClinicianSocialPhob <- recode_factor(dat.cc$mhd.social_anxiety_numeric,
+dat.cc$ClinicianSocialPhob <- recode_factor(dat.cc$mhd.social_anxiety,
                                             "0" = "No social phobia diagnosis",
                                             "1" = "Social phobia diagnosis",
                                             "-77" = NULL,
@@ -173,7 +173,7 @@ summary(dat.cc$ClinicianSocialPhob)
 
 ```{r clinician diagnosis panic disorder as factor}
 
-dat.cc$ClinicianPanicDis <- recode_factor(dat.cc$mhd.panic_disorder_numeric,
+dat.cc$ClinicianPanicDis <- recode_factor(dat.cc$mhd.panic_disorder,
                                             "0" = "No panic disorder diagnosis",
                                             "1" = "Panic disorder diagnosis",
                                             "-77" = NULL,
@@ -187,7 +187,7 @@ summary(dat.cc$ClinicianPanicDis)
 
 ```{r clinician diagnosis panic attacks as factor}
 
-dat.cc$ClinicianPanicAttacks <- recode_factor(dat.cc$mhd.panic_attacks_numeric,
+dat.cc$ClinicianPanicAttacks <- recode_factor(dat.cc$mhd.panic_attacks,
                                             "0" = "No panic attacks diagnosis",
                                             "1" = "Panic attacks diagnosis",
                                             "-77" = NULL,
@@ -201,7 +201,7 @@ summary(dat.cc$ClinicianPanicAttacks)
 
 ```{r clinician diagnosis agoraphobia as factor}
 
-dat.cc$ClinicianAgoraphobia <- recode_factor(dat.cc$mhd.agoraphobia_numeric,
+dat.cc$ClinicianAgoraphobia <- recode_factor(dat.cc$mhd.agoraphobia,
                                             "0" = "No agoraphobia diagnosis",
                                             "1" = "Agoraphobia diagnosis",
                                             "-77" = NULL,
@@ -220,12 +220,12 @@ summary(dat.cc$ClinicianAgoraphobia)
 dat.cc <- dat.cc %>% 
   mutate(ClinicianAnyAnx.n =
            case_when(
-             mhd.GAD_numeric == 0 & 
-               mhd.specific_phobia_numeric == 0 & mhd.social_anxiety_numeric == 0 &
-               mhd.panic_disorder_numeric == 0 & mhd.agoraphobia_numeric == 0 ~ 0,
-             mhd.GAD_numeric == 1 | mhd.specific_phobia_numeric == 1 | 
-               mhd.social_anxiety_numeric == 1 |
-               mhd.panic_disorder_numeric == 1 | mhd.agoraphobia_numeric == 1 ~ 1
+             mhd.gad == 0 & 
+               mhd.specific_phobia == 0 & mhd.social_anxiety == 0 &
+               mhd.panic_disorder == 0 & mhd.agoraphobia == 0 ~ 0,
+             mhd.gad == 1 | mhd.specific_phobia == 1 | 
+               mhd.social_anxiety == 1 |
+               mhd.panic_disorder == 1 | mhd.agoraphobia == 1 ~ 1
            ),
          LifetimeAnyAnx.n = 
            case_when(

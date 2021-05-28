@@ -1,7 +1,7 @@
 ---
-title: "DIAGCOMP_descriptives_frequencies"
+title: "DIAGCOMP_descriptives_frequencies: Data freeze 1.0"
 author: "Molly R. Davies"
-date: 30/10/2020
+date: 18/04/2021
 output:  
   html_document:
     df_print: paged
@@ -19,7 +19,7 @@ html_notebook:
 toc: yes
 ---
 
-This is the script to run demographic descriptives and frequencies of the single-item/algorithm-based diagnoses of the GLAD Study sample. Results are reported in the paper titled "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
+This is the script to run demographic descriptives and frequencies of the single-item/algorithm-based diagnoses of the GLAD Study and COPING NIHR BioResource (NBR) samples. Results are reported in the paper titled "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort" - Davies et al (in prep).
 
 Script written by M. R. Davies.
 Email:  molly.davies@kcl.ac.uk
@@ -32,210 +32,867 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # Set up
+Clear workspace
+```{r clear workspace}
+#rm(list = ls())
+```
+
 ```{r install packages}
 #install.packages("summarytools")
 #install.packages("tidyverse")
 #install.packages("descr")
+#install.packages("janitor")
+#install.packages("kableExtra")
 ```
 
 ```{r import packages}
 library(descr)
 library(summarytools)
+library(janitor)
+library(kableExtra)
 library(tidyverse)
 ```
+
+```{r set GLAD palette}
+GLADpalette = c("#efc00b",   # Yellow
+                "#b7dee8",   # Light blue (logo)
+                "#009fb7",   # Turquoise (dropdown menu)
+                "#215968")   # Dark blue (website text)
+```
+
 
 ```{r source file paths}
 source("../../DF1.0_data_path.R")
 ```
 
 ```{r read data}
-dat.cc <- read_rds(paste0(cleaned_path, "combined_cleaned_new_variables.rds"))
+dat.unc <- read_rds(paste0(cleaned_path, "combined_cleaned_new_variables.rds"))
 ```
 
-```{r visualise dataset}
-dim(dat.cc)
-head(dat.cc)
+# Filtering for Data freeze 1.0
+Some datasets include data from later timepoints due to errors in the data extraction process that needed correcting. However, data freeze 1.0 should only include data collected prior to December 10th, 2020. Data collected after that date are filtered out and not included in this paper.
+
+Participants must also have data for "sex" to be included.
+
+```{r filter data collected after DF 1.0}
+dat.df1 <- dat.unc %>% 
+  filter(endDate_dateformat < as.Date("2020-12-10", "%Y-%m-%d"))
+
+#Check N
+dim(dat.df1)
 ```
 
-# Demographics of GLAD sample
+# Frequencies of GLAD vs NBR
 
-## Mean age
-
-```{r mean age}                        
-mean(dat.cc$age, na.rm = T)
+N of each sample
+```{r frequencies of sample}
+dat.df1 %>% 
+  count(sample)
 ```
 
-## Sex frequencies
+# NBR cohort breakdown
 
-```{r sex freq}                        
-freq(dat.cc$sex)
+```{r nbr cohorts}
+dat.df1 %>% 
+  filter(sample == "NBR") %>% 
+  count(cohort)
 ```
 
-## Ethnicity frequencies
+```{r N eligible}
+#N with sex as NA
+dat.df1 %>% 
+  group_by(sample) %>% 
+  count(is.na(sex))
 
-```{r ethnicity freq}
-freq(dat.cc$Ethnicity)
+#N with age as NA
+dat.df1 %>% 
+  group_by(sample) %>% 
+  count(is.na(age))
+
+#Filter dataset with complete sex & age
+dat <- dat.df1 %>%
+  filter(!is.na(sex), !is.na(age))
+
+#Check N eligible
+dim(dat)
+
+#Check N by sample
+dat %>% 
+  group_by(sample) %>% 
+  count()
 ```
 
-## Highest Education frequencies
+# Sample characteristics
 
-```{r higher education freq}
-freq(dat.cc$Highest.Education)
+```{r create GLAD vs NBR datasets}
+dat.glad <- dat %>% 
+  filter(sample == "GLAD")
+dat.nbr <- dat %>% 
+  filter(sample == "NBR")
 ```
+
+```{r descriptives table for age}
+continuous_age_descriptives_raw <- dat %>%
+  drop_na(age) %>% 
+  group_by(sample) %>%
+  summarise(mean = mean(age), sd = sd(age), min = min(age), max = max(age)) %>%
+  pivot_longer(cols = c("mean", "sd", "min", "max")) %>%
+  rename(descriptive = name) %>%
+  pivot_wider(names_from = sample, values_from = value) %>%
+  mutate(Total = 
+           c(mean(dat$age), sd(dat$age), min(dat$age), max(dat$age))) %>% 
+#         sd_glad = c(sd(dat.glad$age), NA_real_, NA_real_, NA_real_),
+#         sd_nbr = c(sd(dat.nbr$age), NA_real_, NA_real_, NA_real_),
+#         sd_total = c(sd(dat$age), NA_real_, NA_real_, NA_real_)) %>%
+  select(
+    "Descriptive" = descriptive,
+    "GLAD" = GLAD,
+    #"% GLAD" = sd_glad,
+    "COPING NBR" = NBR,
+    #"% COPING NBR" = sd_nbr,
+    "Total" = Total)
+    #"% Total" = sd_total) 
+  
+continuous_age_descriptives <- continuous_age_descriptives_raw#[-c(2), ]
+
+continuous_age_descriptives
+```
+
+```{r descriptives for sex}
+sex_descriptives <- dat %>% #create object to bind later on
+  mutate(sex_factor =
+           recode_factor(sex,
+                         `0` = "Male",
+                         `1` = "Female")) %>%
+  count(sample, sex_factor) %>%
+  mutate(Prop_all = round(n/sum(n)*100, 2)) %>%
+  group_by(sample) %>% 
+  mutate(Prop = round(n/sum(n)*100, 2)) %>% 
+  pivot_wider(names_from = sample, values_from = c(n, Prop_all, Prop)) %>%
+  mutate_if(is.numeric, ~replace(., is.na(.), 0)) %>% 
+  mutate(Total = n_GLAD + n_NBR,
+         Prop_total = Prop_all_GLAD + Prop_all_NBR) %>% 
+  select(-Prop_all_GLAD, -Prop_all_NBR,
+    "Descriptive" = sex_factor,
+    "GLAD" = n_GLAD,
+    "% GLAD" = Prop_GLAD,
+    "COPING NBR" = n_NBR,
+    "% COPING NBR" = Prop_NBR,
+    "Total" = Total,
+    "% Total" = Prop_total)
+  
+
+sex_descriptives
+```
+
+```{r descriptives for highest education}
+highest_education_descriptives.raw <- dat %>% #create object to bind later on
+  drop_na(highest_education) %>% 
+  count(sample, highest_education) %>%
+  mutate(Prop_all = round(n/sum(n)*100, 2)) %>%
+  group_by(sample) %>% 
+  mutate(Prop = round(n/sum(n)*100, 2)) %>% 
+  pivot_wider(names_from = sample, values_from = c(n, Prop_all, Prop)) %>%
+  mutate_if(is.numeric, ~replace(., is.na(.), 0)) %>% 
+  mutate(Total = n_GLAD + n_NBR,
+         Prop_total = Prop_all_GLAD + Prop_all_NBR) %>% 
+  select(-Prop_all_GLAD, -Prop_all_NBR,
+    "Descriptive" = highest_education,
+    "GLAD" = n_GLAD,
+    "% GLAD" = Prop_GLAD,
+    "COPING NBR" = n_NBR,
+    "% COPING NBR" = Prop_NBR,
+    "Total" = Total,
+    "% Total" = Prop_total)
+highest_education_descriptives <- highest_education_descriptives.raw
+
+highest_education_descriptives
+```
+
+```{r descriptives for ethnicity }
+ethnicity_descriptives.raw <- dat %>% #create object to bind later on
+  drop_na(dem.ethnicity) %>% 
+  count(sample, dem.ethnicity) %>%
+  mutate(Prop_all = round(n/sum(n)*100, 2)) %>%
+  group_by(sample) %>% 
+  mutate(Prop = round(n/sum(n)*100, 2)) %>% 
+  pivot_wider(names_from = sample, values_from = c(n, Prop_all, Prop)) %>%
+  mutate_if(is.numeric, ~replace(., is.na(.), 0)) %>% 
+  mutate(Total = n_GLAD + n_NBR,
+         Prop_total = Prop_all_GLAD + Prop_all_NBR) %>% 
+  select(-Prop_all_GLAD, -Prop_all_NBR,
+    "Descriptive" = dem.ethnicity,
+    "GLAD" = n_GLAD,
+    "% GLAD" = Prop_GLAD,
+    "COPING NBR" = n_NBR,
+    "% COPING NBR" = Prop_NBR,
+    "Total" = Total,
+    "% Total" = Prop_total)
+
+#Transfer data
+ethnicity_descriptives <- ethnicity_descriptives.raw
+
+ethnicity_descriptives
+```
+
+```{r bind all descriptives together}
+descriptives.raw <- bind_rows(
+  continuous_age_descriptives,
+  sex_descriptives,
+  ethnicity_descriptives,
+  highest_education_descriptives
+)
+
+#Change column order
+col_order <- c("Descriptive", "GLAD", "% GLAD",
+               "COPING NBR", "% COPING NBR",
+               "Total", "% Total")
+descriptives <- descriptives.raw[, col_order]
+
+#add in column to show which descriptives they are
+descriptives <- descriptives %>%
+  mutate(
+    Category = 
+      c("Age", "Age", "Age", "Age",
+        "Sex", "Sex",
+        "Ethnicity", "Ethnicity", "Ethnicity", "Ethnicity", "Ethnicity", "Ethnicity",
+        "Highest education level", "Highest education level", "Highest education level", "Highest education level"),
+    GLAD = round(GLAD, 0),
+    `COPING NBR` = round(`COPING NBR`, 0),
+    Total = round(Total, 0),
+    `% GLAD`= round(`% GLAD`, 2),
+    `% COPING NBR`= round(`% COPING NBR`, 2),
+    `% Total`= round(`% Total`, 2)) %>%
+select(
+    Category,
+    Descriptive,
+    GLAD,
+    `% GLAD`,
+    `COPING NBR`,
+    `% COPING NBR`,
+    `Full sample` = Total,
+    `% Full sample` = `% Total`) 
+#final table to be viewed in word
+kable(descriptives) 
+```
+
 
 # Diagnosis: Frequencies and proportions
 Frequencies of diagnoses calculated for participants with values in BOTH single-item and algorithm-based diagnosis per disorder.
 Participants with NAs for one measure were excluded for that diagnosis.
 
-# Get frequencies for each diagnosis, excluding NAs per disorder
-
 ```{r MDD frequencies}
 #Algorithm-based MDD frequencies
-dat.cc %>% 
+dat %>% 
   filter(!is.na(mhd.mdd) & !is.na(cidid.diagnosis)) %>%
+  group_by(sample) %>% 
   summarytools::freq(cidid.diagnosis, report.NAs = T) 
 
 #Single-item MDD frequencies
-dat.cc %>% 
+dat %>% 
   filter(!is.na(mhd.mdd) & !is.na(cidid.diagnosis)) %>%
+  group_by(sample) %>% 
   summarytools::freq(mhd.mdd)
+
+#Check N missing algorithm-based
+dat %>% 
+  filter(is.na(cidid.diagnosis)) %>%
+  group_by(sample) %>% 
+  summarise(n = n())
+
+#Check N missing single-item
+dat %>% 
+  filter(is.na(mhd.mdd)) %>%
+  group_by(sample) %>% 
+  summarise(n = n())
 
 ```
 
 ```{r Any Anxiety frequencies}
 #Algorithm-based any anxiety frequencies
-dat.cc %>% 
+dat %>% 
   filter(!is.na(LifetimeAnyAnx) & !is.na(ClinicianAnyAnx)) %>%
+  group_by(sample) %>%
   summarytools::freq(LifetimeAnyAnx)
 
 #Single-item any anxiety frequencies
-dat.cc %>% 
+dat %>% 
   filter(!is.na(LifetimeAnyAnx) & !is.na(ClinicianAnyAnx)) %>%
+  group_by(sample) %>%
   summarytools::freq(ClinicianAnyAnx)
+
+#Check N missing algorithm-based
+dat %>% 
+  filter(is.na(LifetimeAnyAnx)) %>%
+  group_by(sample) %>% 
+  summarise(n = n())
+
+#Check N missing single-item
+dat %>% 
+  filter(is.na(ClinicianAnyAnx)) %>%
+  group_by(sample) %>% 
+  summarise(n = n())
+
 
 ```
 
 ```{r GAD frequencies}
 #Algorithm-based GAD frequencies
-dat.cc %>% 
+dat %>% 
   filter(!is.na(mhd.gad) & !is.na(cidia.diagnosis)) %>%
+  group_by(sample) %>%
   summarytools::freq(cidia.diagnosis)
 
 #Single-item GAD frequencies
-dat.cc %>% 
+dat %>% 
   filter(!is.na(mhd.gad) & !is.na(cidia.diagnosis)) %>%
+  group_by(sample) %>%
   summarytools::freq(mhd.gad)
+
+#Check N missing algorithm-based
+dat %>% 
+  filter(is.na(cidia.diagnosis)) %>%
+  group_by(sample) %>% 
+  summarise(n = n())
+
+#Check N missing single-item
+dat %>% 
+  filter(is.na(mhd.gad)) %>%
+  group_by(sample) %>% 
+  summarise(n = n())
+
 
 ```
 
 ```{r Specific phobia frequencies}
 #Algorithm-based specific phobia frequencies
-dat.cc %>% 
+dat %>% 
   filter(!is.na(mhd.specific_phobia) & !is.na(spec.diagnosis)) %>%
+  group_by(sample) %>%
   summarytools::freq(spec.diagnosis)
 
 #Single-item specific phobia frequencies
-dat.cc %>% 
+dat %>% 
   filter(!is.na(mhd.specific_phobia) & !is.na(spec.diagnosis)) %>%
+  group_by(sample) %>%
   summarytools::freq(mhd.specific_phobia)
+
+#Check N missing algorithm-based
+dat %>% 
+  filter(is.na(spec.diagnosis)) %>%
+  group_by(sample) %>% 
+  summarise(n = n())
+
+#Check N missing single-item
+dat %>% 
+  filter(is.na(mhd.specific_phobia)) %>%
+  group_by(sample) %>% 
+  summarise(n = n())
+
 ```
 
 ```{r Social anxiety disorder frequencies}
 #Algorithm-based social anxiety frequencies
-dat.cc %>% 
+dat %>% 
   filter(!is.na(mhd.social_anxiety) & !is.na(socp.diagnosis)) %>%
+  group_by(sample) %>%
   summarytools::freq(socp.diagnosis)
 
 #Single-item social anxiety frequencies
-dat.cc %>% 
+dat %>% 
   filter(!is.na(mhd.social_anxiety) & !is.na(socp.diagnosis)) %>%
+  group_by(sample) %>%
   summarytools::freq(mhd.social_anxiety)
+
+#Check N missing algorithm-based
+dat %>% 
+  filter(is.na(socp.diagnosis)) %>%
+  group_by(sample) %>% 
+  summarise(n = n())
+
+#Check N missing single-item
+dat %>% 
+  filter(is.na(mhd.social_anxiety)) %>%
+  group_by(sample) %>% 
+  summarise(n = n())
 
 ```
 
 ```{r Panic disorder frequencies}
 #Algorithm-based panic disorder frequencies
-dat.cc %>% 
+dat %>% 
   filter(!is.na(mhd.panic_disorder) & !is.na(pad.diagnosis)) %>%
+  group_by(sample) %>%
   summarytools::freq(pad.diagnosis)
 
 #Single-item panic disorder frequencies
-dat.cc %>% 
+dat %>% 
   filter(!is.na(mhd.panic_disorder) & !is.na(pad.diagnosis)) %>%
+  group_by(sample) %>%
   summarytools::freq(mhd.panic_disorder)
+
+#Check N missing algorithm-based
+dat %>% 
+  filter(is.na(pad.diagnosis)) %>%
+  group_by(sample) %>% 
+  summarise(n = n())
+
+#Check N missing single-item
+dat %>% 
+  filter(is.na(mhd.panic_disorder)) %>%
+  group_by(sample) %>% 
+  summarise(n = n())
 
 ```
 
 ```{r Panic Attacks vs Lifetime Panic disorder frequencies}
 #Single-item panic attacks frequencies
-dat.cc %>% 
+dat %>% 
   filter(!is.na(mhd.panic_attacks) & !is.na(mhd.panic_disorder) & !is.na(pad.diagnosis)) %>%
+  group_by(sample) %>%
   summarytools::freq(mhd.panic_attacks)
+
+#Check N missing single-item
+dat %>% 
+  filter(is.na(mhd.panic_attacks)) %>%
+  group_by(sample) %>% 
+  summarise(n = n())
 
 ```
 
 ```{r Agoraphobia frequencies}
 #Algorithm-based agoraphobia frequencies
-dat.cc %>% 
+dat %>% 
   filter(!is.na(mhd.agoraphobia) & !is.na(agp.diagnosis)) %>%
+  group_by(sample) %>%
   summarytools::freq(agp.diagnosis)
 
 #Single-item agoraphobia frequencies
-dat.cc %>% 
+dat %>% 
   filter(!is.na(mhd.agoraphobia) & !is.na(agp.diagnosis)) %>%
+  group_by(sample) %>%
   summarytools::freq(mhd.agoraphobia)
+
+#Check N missing algorithm-based
+dat %>% 
+  filter(is.na(agp.diagnosis)) %>%
+  group_by(sample) %>% 
+  summarise(n = n())
+
+#Check N missing single-item
+dat %>% 
+  filter(is.na(mhd.agoraphobia)) %>%
+  group_by(sample) %>% 
+  summarise(n = n())
 ```
 
+# Barchart of diagnoses
+
+Only count diagnoses where neither single-item nor algorithm-based have NA
+```{r remove NAs by diagnosis}
+dat_plot <- dat %>% 
+  mutate(mhd.mdd =
+           case_when(
+             is.na(cidid.diagnosis) ~ NA_real_,
+             !is.na(cidid.diagnosis_numeric) ~ mhd.mdd
+           ),
+         cidid.diagnosis_numeric = 
+           case_when(
+             is.na(mhd.mdd) ~ NA_real_,
+             !is.na(mhd.mdd) ~ cidid.diagnosis_numeric
+           ),
+         mhd.gad = 
+           case_when(
+             is.na(cidia.diagnosis_numeric) ~ NA_real_,
+             !is.na(cidia.diagnosis_numeric) ~ mhd.gad
+           ),
+         cidia.diagnosis_numeric = 
+           case_when(
+             is.na(mhd.gad) ~ NA_real_,
+             !is.na(mhd.gad) ~ cidia.diagnosis_numeric
+           ),
+         mhd.specific_phobia = 
+           case_when(
+             is.na(spec.diagnosis_numeric) ~ NA_real_,
+             !is.na(spec.diagnosis_numeric) ~ mhd.specific_phobia
+           ),
+         spec.diagnosis_numeric = 
+           case_when(
+             is.na(mhd.specific_phobia) ~ NA_real_,
+             !is.na(mhd.specific_phobia) ~ spec.diagnosis_numeric
+           ),
+         mhd.social_anxiety = 
+           case_when(
+             is.na(socp.diagnosis_numeric) ~ NA_real_,
+             !is.na(socp.diagnosis_numeric) ~ mhd.social_anxiety
+           ),
+         socp.diagnosis_numeric = 
+           case_when(
+             is.na(mhd.social_anxiety) ~ NA_real_,
+             !is.na(mhd.social_anxiety) ~ socp.diagnosis_numeric
+           ),
+         mhd.panic_disorder = 
+           case_when(
+             is.na(pad.diagnosis_numeric) ~ NA_real_,
+             !is.na(pad.diagnosis_numeric) ~ mhd.panic_disorder
+           ),
+         mhd.panic_attacks = 
+           case_when(
+             is.na(pad.diagnosis_numeric) ~ NA_real_,
+             is.na(mhd.panic_disorder) ~ NA_real_,
+             !is.na(pad.diagnosis_numeric) & !is.na(mhd.panic_disorder) ~ mhd.panic_attacks
+           ),
+         pad.diagnosis_numeric =
+           case_when(
+             is.na(mhd.panic_disorder) ~ NA_real_,
+             !is.na(mhd.panic_disorder) ~ pad.diagnosis_numeric
+           ),
+         mhd.agoraphobia = 
+           case_when(
+             is.na(agp.diagnosis_numeric) ~ NA_real_,
+             !is.na(agp.diagnosis_numeric) ~ mhd.agoraphobia
+           ),
+         agp.diagnosis_numeric =
+           case_when(
+             is.na(mhd.agoraphobia) ~ NA_real_,
+             !is.na(mhd.agoraphobia) ~ agp.diagnosis_numeric
+           )
+         )
+```
+
+
+```{r diagnosis data in long format by sample}
+dat.long_by_sample <- dat_plot %>%
+  mutate(panic_attacks.diagnosis_numeric =
+           pad.diagnosis_numeric,
+         sample = recode_factor(sample,
+                                "GLAD" = "GLAD",
+                                "NBR" = "COPING NBR")) %>% 
+  select(sample, 
+         ends_with("diagnosis_numeric"), c(LifetimeAnyAnx.n, mhd.mdd, mhd.gad, mhd.specific_phobia, mhd.social_anxiety, mhd.panic_attacks, mhd.panic_disorder, mhd.agoraphobia, ClinicianAnyAnx.n), 
+         -c(spec.environment_phobia_diagnosis_numeric, spec.situation_phobia_diagnosis_numeric, spec.animal_phobia_diagnosis_numeric, spec.blood_injection_phobia_diagnosis_numeric, spec.other_phobia_diagnosis_numeric)) %>%
+  gather(
+    key = "Diagnosis.unc",
+    value = "Response",
+    cidid.diagnosis_numeric:ClinicianAnyAnx.n
+    ) %>% 
+  mutate(Response_factor =
+           recode_factor(Response,
+             "1" = "Diagnosis",
+             "0" = "No diagnosis"
+           ),
+         Method = 
+           case_when(
+             endsWith(Diagnosis.unc, "diagnosis_numeric") ~ "Algorithm-based",
+             startsWith(Diagnosis.unc, "Lifetime") ~ "Algorithm-based",
+             startsWith(Diagnosis.unc, "mhd") ~ "Single-item",
+             startsWith(Diagnosis.unc, "Clinician") ~ "Single-item"
+           ),
+         Diagnosis = 
+           recode_factor(Diagnosis.unc,
+             "cidid.diagnosis_numeric" = "MDD",
+             "LifetimeAnyAnx.n" = "Any anxiety*",
+             "cidia.diagnosis_numeric" = "GAD",
+             "spec.diagnosis_numeric" = "Specific phobia",
+             "socp.diagnosis_numeric" = "Social anxiety disorder",
+             "panic_attacks.diagnosis_numeric" = "Panic attacks**",
+             "pad.diagnosis_numeric" = "Panic disorder",
+             "agp.diagnosis_numeric" = "Agoraphobia",
+             "mhd.mdd" = "MDD",
+             "ClinicianAnyAnx.n" = "Any anxiety*",
+             "mhd.gad" = "GAD",
+             "mhd.specific_phobia" = "Specific phobia",
+             "mhd.social_anxiety" = "Social anxiety disorder",
+             "mhd.panic_attacks" = "Panic attacks**",
+             "mhd.panic_disorder" = "Panic disorder",
+             "mhd.agoraphobia" = "Agoraphobia"
+           )
+         )
+
+head(dat.long_by_sample)
+tail(dat.long_by_sample)
+```
+
+```{r long format for full sample}
+
+#Put in long format without sample column
+dat.long_full <- dat_plot %>%
+  mutate(panic_attacks.diagnosis_numeric =
+           pad.diagnosis_numeric) %>% 
+  select(ends_with("diagnosis_numeric"), c(LifetimeAnyAnx.n, mhd.mdd, mhd.gad, mhd.specific_phobia, mhd.social_anxiety, mhd.panic_attacks, mhd.panic_disorder, mhd.agoraphobia, ClinicianAnyAnx.n), 
+         -c(spec.environment_phobia_diagnosis_numeric, spec.situation_phobia_diagnosis_numeric, spec.animal_phobia_diagnosis_numeric, spec.blood_injection_phobia_diagnosis_numeric, spec.other_phobia_diagnosis_numeric)) %>%
+  gather(
+    key = "Diagnosis.unc",
+    value = "Response",
+    cidid.diagnosis_numeric:ClinicianAnyAnx.n
+    ) %>% 
+  mutate(Response_factor =
+           recode_factor(Response,
+             "1" = "Diagnosis",
+             "0" = "No diagnosis"
+           ),
+         Method = 
+           case_when(
+             endsWith(Diagnosis.unc, "diagnosis_numeric") ~ "Algorithm-based",
+             startsWith(Diagnosis.unc, "Lifetime") ~ "Algorithm-based",
+             startsWith(Diagnosis.unc, "mhd") ~ "Single-item",
+             startsWith(Diagnosis.unc, "Clinician") ~ "Single-item"
+           ),
+         Diagnosis = 
+           recode_factor(Diagnosis.unc,
+             "cidid.diagnosis_numeric" = "MDD",
+             "LifetimeAnyAnx.n" = "Any anxiety*",
+             "cidia.diagnosis_numeric" = "GAD",
+             "spec.diagnosis_numeric" = "Specific phobia",
+             "socp.diagnosis_numeric" = "Social anxiety disorder",
+             "panic_attacks.diagnosis_numeric" = "Panic attacks**",
+             "pad.diagnosis_numeric" = "Panic disorder",
+             "agp.diagnosis_numeric" = "Agoraphobia",
+             "mhd.mdd" = "MDD",
+             "ClinicianAnyAnx.n" = "Any anxiety*",
+             "mhd.gad" = "GAD",
+             "mhd.specific_phobia" = "Specific phobia",
+             "mhd.social_anxiety" = "Social anxiety disorder",
+             "mhd.panic_attacks" = "Panic attacks**",
+             "mhd.panic_disorder" = "Panic disorder",
+             "mhd.agoraphobia" = "Agoraphobia"
+           )
+         )
+
+#Add sample column with "full sample" label
+dat.long_full <- dat.long_full %>% 
+  mutate(sample = "Full sample")
+
+head(dat.long_full)
+```
+
+```{r merge both long format datasets}
+#Merge
+dat.long <- bind_rows(dat.long_by_sample, 
+                      dat.long_full)
+
+#Set sample factor order for graph
+dat.long$sample <- fct_relevel(dat.long$sample, 
+                                            c("Full sample", "GLAD", "COPING NBR"))
+```
+
+
+```{r counts of diagnoses}
+counts_diagnoses <- dat.long %>%
+  group_by(sample, Diagnosis, Method, Response_factor) %>% 
+  drop_na() %>% 
+  summarise(count = n())
+
+counts_diagnoses
+```
+
+```{r counts with %}
+
+counts_diagnoses_percents <- counts_diagnoses %>% 
+  group_by(sample, Diagnosis, Method) %>% 
+  mutate(per=as.numeric(paste0(round(count/sum(count), 3)))) %>% 
+  ungroup
+
+counts_diagnoses_percents
+```
+
+```{r counts with % drop no diagnosis}
+counts_diagnosis_only <- counts_diagnoses_percents %>% 
+  filter(Response_factor == "Diagnosis")
+
+counts_diagnosis_only
+```
+
+```{r counts with % drop no diagnosis}
+counts_diagnosis_only <- counts_diagnoses_percents %>% 
+  filter(Response_factor == "Diagnosis") %>% 
+  mutate(Method_reverse = 
+           relevel(as.factor(Method), "Single-item"))
+
+counts_diagnosis_only
+```
+
+```{r diagnoses barchart full sample}
+
+bar_diagnoses <- ggplot(counts_diagnosis_only, aes(y = per, x = reorder(Diagnosis, desc(Diagnosis)))) + 
+  geom_bar(aes(fill = Method_reverse), #Use reverse factor so Algorithm-based is the top bar
+           stat = "identity", 
+           position = "dodge",
+           width = 0.85) +
+  geom_text(aes(label = scales::percent(per,accuracy=0.1), group = Method_reverse),
+            size = 2, 
+            position = position_dodge(width = 1),
+            hjust = -0.1,
+            vjust = 0.5) + #Add % labels on top of bars
+  labs(#title = "Title",
+       #subtitle = paste0("Full sample (N = ", nrow(dat),"), ",
+       #                  "GLAD (N = ", 
+       #                  nrow(filter(dat, sample=="GLAD")), "), ",
+       #                  "COPING NBR (N = ", 
+       #                  nrow(filter(dat, sample=="NBR")), ")"),
+       #y = "Percent of sample",
+       fill = element_blank()) + #Remove legend title
+  coord_flip() + #Flip x and y axis
+  theme(
+    #plot.title = element_text(face = "bold",
+                                  #size = 12),
+    #plot.subtitle = element_text(face = "italic",
+    #                                 size = 10),
+    text = element_text(color = "black",
+                        size = 8),
+    #axis.title = element_text(color = "black"),
+    axis.text = element_text(color = "black",
+                             margin = 0),
+    #axis.ticks.x.margin = unit(0, "cm"),
+    axis.title = element_blank(),
+    axis.ticks = element_blank(),
+    legend.background = element_blank(),
+    legend.box.background = element_blank(),
+    legend.position = "bottom",
+    plot.margin = margin(0, 20, 0, 5),
+    panel.background = element_blank(), 
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.major.x = element_line(
+      colour = "gray",
+      linetype = "dashed",
+      size = 0.2
+      )
+    ) +
+  guides(fill = guide_legend(reverse=TRUE)) + #Make the legend match the factor ordering
+  scale_color_manual(values = GLADpalette) +
+  scale_fill_manual(values = GLADpalette) +
+  scale_y_continuous(limits = c(0, 1), #Y-axis goes from 0-1
+                     breaks=seq(0,1, 0.1), #Y-axis goes from 0 - 1, with tick marks every 0.1
+                     labels = scales::percent_format(accuracy = 5L), #Makes y-axis % and removes decimals
+                     expand = c(0,0)) + #Removes extra space after 0 on x axis
+  facet_wrap(~sample,
+             ncol = 1,
+             nrow = 3)
+
+
+
+bar_diagnoses
+```
+
+```{r look at total sample size}
+paste0("Full sample (N = ", nrow(dat),"), ",
+                         "GLAD (N = ", 
+                         nrow(filter(dat, sample=="GLAD")), "), ",
+                         "COPING NBR (N = ", 
+                         nrow(filter(dat, sample=="NBR")), ")")
+```
+
+
+```{r save diagnosis barchart}
+#grDevices::dev.set(1)
+
+#Save jpeg of diagnosis barchart
+#ggsave(paste0("barchart_diagnoses_", Sys.Date(), ".jpeg"),
+#       path = "/Users/mollydavies/OneDrive - King's College London/PhD/GLAD Diagnosis paper/Figures/2021-04 SECOND #SUBMISSION",
+#       plot = bar_diagnoses,
+#       width = 6,
+#       height = 5.5,
+#       dpi = 150,
+#       units = "in")
+#
+##Save tiff of diagnosis barchart
+#ggsave(paste0("barchart_diagnoses_", Sys.Date(), ".tiff"),
+#       path = "/Users/mollydavies/OneDrive - King's College London/PhD/GLAD Diagnosis paper/Figures/2021-04 SECOND #SUBMISSION",
+#       plot = bar_diagnoses,
+#       width = 6,
+#       height = 5.5,
+#       dpi = 150,
+#       units = "in")
+```
 
 # Number of diagnoses/comorbidities in sample
 Check the number of diagnoses in the sample to see:
 - N ppts with 0 diagnoses
 - N ppts with 1 diagnosis
-- N ppts with 2+ diagnoses
+- N ppts with 2 diagnoses
+- N pppts with 3+ diagnoses
 
 ## Single-item diagnoses
 Note: Single-item panic disorder was added partway through data collection. The single-item count variable is therefore not coded as NA for panic disorder missingness to avoid excessive data loss.
 ```{r create variable of N single-item diagnoses}
 #Sum all clinical diagnoses and remove NAs (except panic disorder, as this variable was included partway through data collection)
-dat.cc$selfreport_noPanic <- rowSums(dat.cc[,c("mhd.mdd", 
+dat$single_item_count_noPD <- rowSums(dat[,c("mhd.mdd", 
                                            "mhd.gad", 
                                            "mhd.specific_phobia", 
                                            "mhd.social_anxiety", 
                                            "mhd.agoraphobia")], na.rm=FALSE)
 
-#Add panic only for particpants without NA in above variable
-dat.cc$selfreport.n <- with(dat.cc,
+#Add panic only for particpants without NA in count variable
+dat$single_item_count_numeric_noNA <- with(dat,
                           ifelse(
-                            is.na(selfreport_noPanic), 
+                            is.na(single_item_count_noPD), 
                             NA, 
-                            rowSums(dat.cc[,c("selfreport_noPanic", 
+                            rowSums(dat[,c("single_item_count_noPD", 
                                             "mhd.panic_disorder")], na.rm = TRUE)
                                  )
                           )
-freq(dat.cc$selfreport_noPanic)
-freq(dat.cc$selfreport.n)
+
+freq(dat$single_item_count_noPD)
+freq(dat$single_item_count_numeric)
 ```
 
-```{r get N with 1+ or 2+ single-item diagnosis}
-#N with 1+ SR diagnosis
-table(dat.cc[,c("selfreport.n")]>0)
+```{r NAs in single-item outcomes}
 
-#N with 2+ SR diagnoses
-table(dat.cc[,c("selfreport.n")]>1)
+#Do NOT use 'is.na' for these as then you cannot +1 to it. Use the no.info item for NA (below). 
+dat$single_item_NA_count_numeric<-0
 
+#MDD
+dat$single_item_NA_count_numeric<-with(dat, 
+                         ifelse(is.na(mhd.mdd),
+                                single_item_NA_count_numeric + 1, single_item_NA_count_numeric))
+#GAD
+dat$single_item_NA_count_numeric<-with(dat, 
+                         ifelse(is.na(mhd.gad),
+                                single_item_NA_count_numeric + 1, single_item_NA_count_numeric))
+#Specific phobia
+dat$single_item_NA_count_numeric<-with(dat, 
+                         ifelse(is.na(mhd.specific_phobia),
+                                single_item_NA_count_numeric + 1, single_item_NA_count_numeric))
+#Social phobia
+dat$single_item_NA_count_numeric<-with(dat, 
+                         ifelse(is.na(mhd.social_anxiety),
+                                single_item_NA_count_numeric + 1, single_item_NA_count_numeric))
+#Agoraphobia
+dat$single_item_NA_count_numeric<-with(dat, 
+                         ifelse(is.na(mhd.agoraphobia),
+                                single_item_NA_count_numeric + 1, single_item_NA_count_numeric))
+#Check distribution of scores
+summary(as.factor(dat$single_item_NA_count_numeric))
+
+#Check N of full sample with NA > 1
+sum(ifelse(dat$single_item_NA_count_numeric > 0, 1, 0))
+
+#Check N of GLAD sample with NA > 1
+sum(ifelse(dat$single_item_NA_count_numeric > 0 & dat$sample == "GLAD", 1, 0))
+
+#Check N of COPING NBR sample with NA > 1
+sum(ifelse(dat$single_item_NA_count_numeric > 0 & dat$sample == "NBR", 1, 0))
+
+#Check N with NA single-item panic disorder
+sum(ifelse(is.na(dat$mhd.panic_disorder) & dat$sample == "GLAD", 1, 0))
 ```
 
-```{r get mean single-item diagnoses}
-
-mean(dat.cc$selfreport.n, na.rm = T)
-
+```{r create factor variable for 1 2 or 3+ single-item diagnosis}
+#Create factor version of N single-item diagnoses
+dat <- dat %>% 
+  mutate(single_item_factor = 
+           case_when(single_item_count_numeric_noNA == 0 ~ 0,
+                     single_item_count_numeric == 1 ~ 1,
+                     single_item_count_numeric == 2 ~ 2,
+                     single_item_count_numeric >= 3 ~ 3))
 ```
 
 ## Algorithm-based diagnoses
 
 ```{r create variable of N algorithm-based diagnoses}
 #Sum all algorithm-based diagnoses and include NAs (coded as 0)
-dat.cc$algorithm_based_count_numeric <- rowSums(dat.cc[,c("cidid.diagnosis_numeric", 
+dat$algorithm_based_count_numeric <- rowSums(dat[,c("cidid.diagnosis_numeric", 
                                                           "cidia.diagnosis_numeric", 
                                                           "spec.diagnosis_numeric", 
                                                           "socp.diagnosis_numeric", 
@@ -244,7 +901,7 @@ dat.cc$algorithm_based_count_numeric <- rowSums(dat.cc[,c("cidid.diagnosis_numer
                                                 na.rm=TRUE)
 
 #Check what it would be if the NAs were excluded
-dat.cc$algorithm_based_noNA.n <- rowSums(dat.cc[,c("cidid.diagnosis_numeric", 
+dat$algorithm_based_noNA.n <- rowSums(dat[,c("cidid.diagnosis_numeric", 
                                                    "cidia.diagnosis_numeric", 
                                                    "spec.diagnosis_numeric", 
                                                    "socp.diagnosis_numeric", 
@@ -253,114 +910,438 @@ dat.cc$algorithm_based_noNA.n <- rowSums(dat.cc[,c("cidid.diagnosis_numeric",
                                          na.rm=FALSE)
 
 #Summarise
-summary(as.factor(dat.cc$algorithm_based_count_numeric))
-summary(as.factor(dat.cc$algorithm_based_noNA.n))
+summary(as.factor(dat$algorithm_based_count_numeric))
+summary(as.factor(dat$algorithm_based_noNA.n))
 
+#Check NAs by sample
+sum(ifelse(is.na(dat$algorithm_based_noNA.n) & dat$sample == "GLAD", 1, 0))
+sum(ifelse(is.na(dat$algorithm_based_noNA.n) & dat$sample == "NBR", 1, 0))
 ```
 
 ```{r NAs in algorithm-based outcomes}
 
 #Do NOT use 'is.na' for these as then you cannot +1 to it. Use the no.info item for NA (below). 
-dat.cc$algorithm_based_NA.n<-0
+dat$algorithm_based_NA_count_numeric<-0
 
 #MDD
-dat.cc$algorithm_based_NA.n<-with(dat.cc, 
+dat$algorithm_based_NA_count_numeric<-with(dat, 
                          ifelse(is.na(cidid.diagnosis_numeric),
-                                algorithm_based_NA.n + 1, algorithm_based_NA.n))
+                                algorithm_based_NA_count_numeric + 1, algorithm_based_NA_count_numeric))
 #GAD
-dat.cc$algorithm_based_NA.n<-with(dat.cc, 
+dat$algorithm_based_NA_count_numeric<-with(dat, 
                          ifelse(is.na(cidia.diagnosis_numeric),
-                                algorithm_based_NA.n + 1, algorithm_based_NA.n))
+                                algorithm_based_NA_count_numeric + 1, algorithm_based_NA_count_numeric))
 #Specific phobia
-dat.cc$algorithm_based_NA.n<-with(dat.cc, 
+dat$algorithm_based_NA_count_numeric<-with(dat, 
                          ifelse(is.na(spec.diagnosis_numeric),
-                                algorithm_based_NA.n + 1, algorithm_based_NA.n))
+                                algorithm_based_NA_count_numeric + 1, algorithm_based_NA_count_numeric))
 #Social phobia
-dat.cc$algorithm_based_NA.n<-with(dat.cc, 
+dat$algorithm_based_NA_count_numeric<-with(dat, 
                          ifelse(is.na(socp.diagnosis_numeric),
-                                algorithm_based_NA.n + 1, algorithm_based_NA.n))
+                                algorithm_based_NA_count_numeric + 1, algorithm_based_NA_count_numeric))
 #Panic disorder
-dat.cc$algorithm_based_NA.n<-with(dat.cc, 
+dat$algorithm_based_NA_count_numeric<-with(dat, 
                          ifelse(is.na(pad.diagnosis_numeric),
-                                algorithm_based_NA.n + 1, algorithm_based_NA.n))
+                                algorithm_based_NA_count_numeric + 1, algorithm_based_NA_count_numeric))
 #Agoraphobia
-dat.cc$algorithm_based_NA.n<-with(dat.cc, 
+dat$algorithm_based_NA_count_numeric<-with(dat, 
                          ifelse(is.na(agp.diagnosis_numeric),
-                                algorithm_based_NA.n + 1, algorithm_based_NA.n))
+                                algorithm_based_NA_count_numeric + 1, algorithm_based_NA_count_numeric))
 #Check distribution of scores
-summary(as.factor(dat.cc$algorithm_based_NA.n))
+summary(as.factor(dat$algorithm_based_NA_count_numeric))
 
+#Check N of full sample with NA > 1
+sum(ifelse(dat$algorithm_based_NA_count_numeric > 0, 1, 0))
+
+#Check N of GLAD sample with NA > 1
+sum(ifelse(dat$algorithm_based_NA_count_numeric > 0 & dat$sample == "GLAD", 1, 0))
+
+#Check N of COPING NBR sample with NA > 1
+sum(ifelse(dat$algorithm_based_NA_count_numeric > 0 & dat$sample == "NBR", 1, 0))
+```
+
+```{r create factor variable for 1 2 or 3+ algorithm-based diagnosis}
+#Create factor version of N algorithm-based diagnoses
+dat <- dat %>% 
+  mutate(algorithm_based_factor = 
+           case_when(algorithm_based_noNA.n == 0 ~ 0,
+                     algorithm_based_count_numeric == 1 ~ 1,
+                     algorithm_based_count_numeric == 2 ~ 2,
+                     algorithm_based_count_numeric >= 3 ~ 3))
 
 ```
 
-```{r get N with 1+ or 2+ algorithm-based diagnosis}
+## Descriptives tables for diagnosis counts
 
-#N with 1+ algorithm-based diagnosis
-table(dat.cc[,c("algorithm_based_count_numeric")]>0)
+```{r datasets by sample and 1+ single-item or algorithm-based}
+#Overwrite datasets by cohort from above
+dat.glad <- dat %>% 
+  filter(sample == "GLAD")
 
-#N with 2+ algorithm-based diagnoses
-table(dat.cc[,c("algorithm_based_count_numeric")]>1)
+dat.nbr <- dat %>% 
+  filter(sample == "NBR")
+
+dat.si1 <- dat %>% 
+  filter(single_item_count_numeric > 0)
+
+dat.ab1 <- dat %>% 
+  filter(algorithm_based_count_numeric > 0)
+```
+
+```{r full sample descriptives for single-item count}
+#Create frequency table of single-item diagnosis counts
+full_sample_single_item_freq.raw <- dat %>% #create object to bind later on
+  count(single_item_factor) %>%
+  mutate(Prop = round(n/sum(n)*100, 2),
+         Sample = "Full sample",
+         single_item_factor = 
+           recode_factor(single_item_factor,
+                         "0" = "0 single-item",
+                         "1" = "1 single-item",
+                         "2" = "2 single-item",
+                         "3" = "3+ single-item",
+                         .missing = "NA single-item")) %>% 
+  rename(Descriptive = single_item_factor,
+         value = n)
+
+#View frequency table
+full_sample_single_item_freq.raw
+
+#Mean by sample
+full_sample_single_item_means.raw <- dat %>% 
+  summarise(`mean single-item` = round(mean(single_item_count_numeric, na.rm = T), 2)) %>% 
+  pivot_longer(cols = c(`mean single-item`)) %>%
+  mutate(Sample = "Full sample") %>% 
+  rename(Descriptive = name) 
+
+#View means table
+full_sample_single_item_means.raw
+
+#Bind together
+full_sample_single_item_descriptives.raw <- bind_rows(full_sample_single_item_freq.raw,
+                                          full_sample_single_item_means.raw)
+
+#View single-item descriptives table
+full_sample_single_item_descriptives.raw
+```
+
+```{r full sample descriptives for algorithm-based count}
+#Create frequency table of algorithm-based diagnosis counts
+full_sample_algorithm_based_freq.raw <- dat %>% #create object to bind later on
+  count(algorithm_based_factor) %>%
+  mutate(Prop = round(n/sum(n)*100, 2),
+         Sample = "Full sample",
+         algorithm_based_factor = 
+           recode_factor(algorithm_based_factor,
+                         "0" = "0 algorithm-based",
+                         "1" = "1 algorithm-based",
+                         "2" = "2 algorithm-based",
+                         "3" = "3+ algorithm-based",
+                         .missing = "NA algorithm-based")) %>% 
+  rename(Descriptive = algorithm_based_factor,
+         value = n)
+
+#View frequency table
+full_sample_algorithm_based_freq.raw
+
+#Mean by sample
+full_sample_algorithm_based_means.raw <- dat %>% 
+  summarise(`mean algorithm-based` = round(mean(algorithm_based_count_numeric, na.rm = T), 2)) %>% 
+  pivot_longer(cols = c(`mean algorithm-based`)) %>%
+  mutate(Sample = "Full sample") %>% 
+  rename(Descriptive = name) 
+
+#View means table
+full_sample_algorithm_based_means.raw
+
+#Bind together
+full_sample_algorithm_based_descriptives.raw <- bind_rows(full_sample_algorithm_based_freq.raw,
+                                          full_sample_algorithm_based_means.raw)
+
+#View algorithm-based descriptives table
+full_sample_algorithm_based_descriptives.raw
+```
+
+```{r GLAD descriptives for single-item count}
+#Create frequency table of single-item diagnosis counts
+glad_single_item_freq.raw <- dat.glad %>% #create object to bind later on
+  count(single_item_factor) %>%
+  mutate(Prop = round(n/sum(n)*100, 2),
+         Sample = "GLAD",
+         single_item_factor = 
+           recode_factor(single_item_factor,
+                         "0" = "0 single-item",
+                         "1" = "1 single-item",
+                         "2" = "2 single-item",
+                         "3" = "3+ single-item",
+                         .missing = "NA single-item")) %>% 
+  rename(Descriptive = single_item_factor,
+         value = n)
+
+#View frequency table
+glad_single_item_freq.raw
+
+#Mean by sample
+glad_single_item_means.raw <- dat.glad %>% 
+  summarise(`mean single-item` = round(mean(single_item_count_numeric, na.rm = T), 2)) %>% 
+  pivot_longer(cols = c(`mean single-item`)) %>%
+  mutate(Sample = "GLAD") %>% 
+  rename(Descriptive = name) 
+
+#View means table
+glad_single_item_means.raw
+
+#Bind together
+glad_single_item_descriptives.raw <- bind_rows(glad_single_item_freq.raw,
+                                          glad_single_item_means.raw)
+
+#View single-item descriptives table
+glad_single_item_descriptives.raw
+```
+
+```{r GLAD descriptives for algorithm-based count}
+#Create frequency table of algorithm-based diagnosis counts
+glad_algorithm_based_freq.raw <- dat.glad %>% #create object to bind later on
+  count(algorithm_based_factor) %>%
+  mutate(Prop = round(n/sum(n)*100, 2),
+         Sample = "GLAD",
+         algorithm_based_factor = 
+           recode_factor(algorithm_based_factor,
+                         "0" = "0 algorithm-based",
+                         "1" = "1 algorithm-based",
+                         "2" = "2 algorithm-based",
+                         "3" = "3+ algorithm-based",
+                         .missing = "NA algorithm-based")) %>% 
+  rename(Descriptive = algorithm_based_factor,
+         value = n)
+
+#View frequency table
+glad_algorithm_based_freq.raw
+
+#Mean by sample
+glad_algorithm_based_means.raw <- dat.glad %>% 
+  summarise(`mean algorithm-based` = round(mean(algorithm_based_count_numeric, na.rm = T), 2)) %>% 
+  pivot_longer(cols = c(`mean algorithm-based`)) %>%
+  mutate(Sample = "GLAD") %>% 
+  rename(Descriptive = name) 
+
+#View means table
+glad_algorithm_based_means.raw
+
+#Bind together
+glad_algorithm_based_descriptives.raw <- bind_rows(glad_algorithm_based_freq.raw,
+                                          glad_algorithm_based_means.raw)
+
+#View algorithm-based descriptives table
+glad_algorithm_based_descriptives.raw
+```
+
+```{r COPING NBR descriptives for single-item count}
+#Create frequency table of single-item diagnosis counts
+nbr_single_item_freq.raw <- dat.nbr %>% #create object to bind later on
+  count(single_item_factor) %>%
+  mutate(Prop = round(n/sum(n)*100, 2),
+         Sample = "COPING NBR",
+         single_item_factor = 
+           recode_factor(single_item_factor,
+                         "0" = "0 single-item",
+                         "1" = "1 single-item",
+                         "2" = "2 single-item",
+                         "3" = "3+ single-item",
+                         .missing = "NA single-item")) %>% 
+  rename(Descriptive = single_item_factor,
+         value = n)
+
+#View frequency table
+nbr_single_item_freq.raw
+
+#Mean by sample
+nbr_single_item_means.raw <- dat.nbr %>% 
+  summarise(`mean single-item` = round(mean(single_item_count_numeric, na.rm = T), 2)) %>% 
+  pivot_longer(cols = c(`mean single-item`)) %>%
+  mutate(Sample = "COPING NBR") %>% 
+  rename(Descriptive = name) 
+
+#View means table
+nbr_single_item_means.raw
+
+#Bind together
+nbr_single_item_descriptives.raw <- bind_rows(nbr_single_item_freq.raw,
+                                          nbr_single_item_means.raw)
+
+#View single-item descriptives table
+nbr_single_item_descriptives.raw
+```
+
+```{r COPING NBR descriptives for algorithm-based count}
+#Create frequency table of algorithm-based diagnosis counts
+nbr_algorithm_based_freq.raw <- dat.nbr %>% #create object to bind later on
+  count(algorithm_based_factor) %>%
+  mutate(Prop = round(n/sum(n)*100, 2),
+         Sample = "COPING NBR",
+         algorithm_based_factor = 
+           recode_factor(algorithm_based_factor,
+                         "0" = "0 algorithm-based",
+                         "1" = "1 algorithm-based",
+                         "2" = "2 algorithm-based",
+                         "3" = "3+ algorithm-based",
+                         .missing = "NA algorithm-based")) %>% 
+  rename(Descriptive = algorithm_based_factor,
+         value = n)
+
+#View frequency table
+nbr_algorithm_based_freq.raw
+
+#Mean by sample
+nbr_algorithm_based_means.raw <- dat.nbr %>% 
+  summarise(`mean algorithm-based` = round(mean(algorithm_based_count_numeric, na.rm = T), 2)) %>% 
+  pivot_longer(cols = c(`mean algorithm-based`)) %>%
+  mutate(Sample = "COPING NBR") %>% 
+  rename(Descriptive = name) 
+
+#View means table
+nbr_algorithm_based_means.raw
+
+#Bind together
+nbr_algorithm_based_descriptives.raw <- bind_rows(nbr_algorithm_based_freq.raw,
+                                          nbr_algorithm_based_means.raw)
+
+#View algorithm-based descriptives table
+nbr_algorithm_based_descriptives.raw
+```
+
+```{r 1+ algorithm-based diagnosis descriptives for single-item count}
+#Create frequency table of single-item diagnosis counts
+ab1_single_item_freq.raw <- dat.ab1 %>% #create object to bind later on
+  count(single_item_factor) %>%
+  mutate(Prop = round(n/sum(n)*100, 2),
+         Sample = "One or more algorithm-based diagnosis",
+         single_item_factor = 
+           recode_factor(single_item_factor,
+                         "0" = "0 single-item",
+                         "1" = "1 single-item",
+                         "2" = "2 single-item",
+                         "3" = "3+ single-item",
+                         .missing = "NA single-item")) %>% 
+  rename(Descriptive = single_item_factor,
+         value = n)
+
+#View frequency table
+ab1_single_item_freq.raw
+
+#Mean by sample
+ab1_single_item_means.raw <- dat.ab1 %>% 
+  summarise(`mean single-item` = round(mean(single_item_count_numeric, na.rm = T), 2)) %>% 
+  pivot_longer(cols = c(`mean single-item`)) %>%
+  mutate(Sample = "One or more algorithm-based diagnosis") %>% 
+  rename(Descriptive = name) 
+
+#View means table
+ab1_single_item_means.raw
+
+#Bind together
+ab1_single_item_descriptives.raw <- bind_rows(ab1_single_item_freq.raw,
+                                          ab1_single_item_means.raw)
+
+#View single-item descriptives table
+ab1_single_item_descriptives.raw
+```
+
+```{r 1+ single-item diagnosis descriptives for algorithm-based count}
+#Create frequency table of algorithm-based diagnosis counts
+si1_algorithm_based_freq.raw <- dat.si1 %>% #create object to bind later on
+  count(algorithm_based_factor) %>%
+  mutate(Prop = round(n/sum(n)*100, 2),
+         Sample = "One or more single-item diagnosis",
+         algorithm_based_factor = 
+           recode_factor(algorithm_based_factor,
+                         "0" = "0 algorithm-based",
+                         "1" = "1 algorithm-based",
+                         "2" = "2 algorithm-based",
+                         "3" = "3+ algorithm-based",
+                         .missing = "NA algorithm-based")) %>% 
+  rename(Descriptive = algorithm_based_factor,
+         value = n)
+
+#View frequency table
+si1_algorithm_based_freq.raw
+
+#Mean by sample
+si1_algorithm_based_means.raw <- dat.si1 %>% 
+  summarise(`mean algorithm-based` = round(mean(algorithm_based_count_numeric, na.rm = T), 2)) %>% 
+  pivot_longer(cols = c(`mean algorithm-based`)) %>%
+  mutate(Sample = "One or more single-item diagnosis") %>% 
+  rename(Descriptive = name) 
+
+#View means table
+si1_algorithm_based_means.raw
+
+#Bind together
+si1_algorithm_based_descriptives.raw <- bind_rows(si1_algorithm_based_freq.raw,
+                                          si1_algorithm_based_means.raw)
+
+#View algorithm-based descriptives table
+si1_algorithm_based_descriptives.raw
+```
+
+```{r combine diagnosis count tables}
+
+diagnosis_count_descriptives.raw <- bind_rows(
+  full_sample_single_item_descriptives.raw,
+  full_sample_algorithm_based_descriptives.raw,
+  glad_single_item_descriptives.raw,
+  glad_algorithm_based_descriptives.raw,
+  nbr_single_item_descriptives.raw,
+  nbr_algorithm_based_descriptives.raw,
+  ab1_single_item_descriptives.raw,
+  si1_algorithm_based_descriptives.raw
+)
+
+diagnosis_count_descriptives.raw
 
 ```
 
-```{r get mean algorithm-based diagnoses}
+```{r format combined diagnosis count table}
 
-mean(dat.cc$algorithm_based_count_numeric, na.rm = T)
+#Change column order
+col_order <- c("Sample", "Descriptive", "value", "Prop")
 
+diagnosis_count_descriptives.format <- diagnosis_count_descriptives.raw[, col_order]
+
+#Add % to Prop column
+diagnosis_count_descriptives.format$Prop <- paste0(diagnosis_count_descriptives.format$Prop, "%", sep = "")
+
+#Combine value and prop column and drop originals
+diagnosis_count_descriptives.long <- diagnosis_count_descriptives.format %>% 
+  mutate(N_percent = 
+           case_when(
+             Prop == "NA%" ~ as.character(value),
+             Prop != "NA%" ~ sprintf("%s (%s)", 
+                                         diagnosis_count_descriptives.format$value, 
+                                         diagnosis_count_descriptives.format$Prop))
+         ) %>% 
+  select(-c(value, Prop)) 
+
+diagnosis_count_descriptives.long
 ```
 
-## Look at N algorithm-based diagnoses in participants with >=1 single-item diagnoses
+```{r final diagnosis count table}
+#Convert table to wide format
+diagnosis_count_descriptives.wide <- diagnosis_count_descriptives.long %>%
+  pivot_wider(names_from = Descriptive, values_from = N_percent) %>% 
+  mutate(Total = 
+           c(nrow(dat), nrow(dat.glad), nrow(dat.nbr), nrow(dat.ab1), nrow(dat.si1))
+         )
+#Set column orer
+col_order_final <- c("Sample", "Total", "0 algorithm-based", "1 algorithm-based", "2 algorithm-based", "3+ algorithm-based",
+                     "NA algorithm-based", "mean algorithm-based", 
+                     "0 single-item", "1 single-item", "2 single-item", "3+ single-item", 
+                     "NA single-item", "mean single-item")
 
-```{r subset participants with 1+ single-item diagnosis}
-#Subset
-selfreport_n1 <- subset(dat.cc, selfreport.n > 0)
-#Check correct number of participants
-nrow(selfreport_n1)
+diagnosis_count_descriptives <- diagnosis_count_descriptives.wide[,col_order_final]
 
-```
-
-```{r get subset N with 0, 1 or 2+ algorithm-based diagnosis}
-
-#N with no algorithm-based diagnosis
-table(selfreport_n1[,c("algorithm_based_noNA.n")]==0)
-
-#N with 1 algorithm-based diagnosis
-table(selfreport_n1[,c("algorithm_based_count_numeric")]==1)
-
-#N with 2+ algorithm-based diagnoses
-table(selfreport_n1[,c("algorithm_based_count_numeric")]>1)
-
-```
-
-```{r get mean subset algorithm-based diagnoses}
-mean(selfreport_n1$algorithm_based_count_numeric, na.rm = T)
-```
-
-## Look at N single-item diagnoses in participants with >=1 algorithm-based diagnoses
-
-```{r subset participants with 1+ algorithm-based diagnosis}
-#Subset
-algorithm_based_n1 <- subset(dat.cc, algorithm_based_count_numeric > 0)
-#Check correct number of participants
-nrow(algorithm_based_n1)
-
-```
-
-```{r get subset N with 0, 1 or 2+ single-item diagnosis}
-
-#N with no algorithm-based diagnosis
-table(algorithm_based_n1[,c("selfreport.n")]==0)
-
-#N with 1 algorithm-based diagnosis
-table(algorithm_based_n1[,c("selfreport.n")]==1)
-
-#N with 2+ algorithm-based diagnoses
-table(algorithm_based_n1[,c("selfreport.n")]>1)
-
-```
-
-```{r get mean subset single-item diagnoses}
-mean(algorithm_based_n1$selfreport.n, na.rm = T)
+#View table
+kable(diagnosis_count_descriptives)
 ```
 
 # Agreement frequencies
@@ -387,53 +1368,53 @@ sum_ifelse <- function(x, y) {
 ##Create a blank matrix
 table0.m <- matrix(c(
                    #Fill in MDD row
-                   sum_ifelse(dat.cc$cidid.diagnosis_numeric == 0, dat.cc$mhd.mdd == 0),  
-                   sum_ifelse(dat.cc$cidid.diagnosis_numeric == 0, dat.cc$mhd.mdd == 1),
-                   sum_ifelse(dat.cc$cidid.diagnosis_numeric == 1, dat.cc$mhd.mdd == 0),
-                   sum_ifelse(dat.cc$cidid.diagnosis_numeric == 1, dat.cc$mhd.mdd == 1),
-                   sum_ifelse(!is.na(dat.cc$cidid.diagnosis_numeric), !is.na(dat.cc$mhd.mdd)),
+                   sum_ifelse(dat$cidid.diagnosis_numeric == 0, dat$mhd.mdd == 0),  
+                   sum_ifelse(dat$cidid.diagnosis_numeric == 0, dat$mhd.mdd == 1),
+                   sum_ifelse(dat$cidid.diagnosis_numeric == 1, dat$mhd.mdd == 0),
+                   sum_ifelse(dat$cidid.diagnosis_numeric == 1, dat$mhd.mdd == 1),
+                   sum_ifelse(!is.na(dat$cidid.diagnosis_numeric), !is.na(dat$mhd.mdd)),
                    #Fill in any anxiety row
-                   sum_ifelse(dat.cc$LifetimeAnyAnx.n == 0, dat.cc$ClinicianAnyAnx.n == 0),  
-                   sum_ifelse(dat.cc$LifetimeAnyAnx.n == 0, dat.cc$ClinicianAnyAnx.n == 1),
-                   sum_ifelse(dat.cc$LifetimeAnyAnx.n == 1, dat.cc$ClinicianAnyAnx.n == 0),
-                   sum_ifelse(dat.cc$LifetimeAnyAnx.n == 1, dat.cc$ClinicianAnyAnx.n == 1),
-                   sum_ifelse(!is.na(dat.cc$LifetimeAnyAnx), !is.na(dat.cc$ClinicianAnyAnx)),
+                   sum_ifelse(dat$LifetimeAnyAnx.n == 0, dat$ClinicianAnyAnx.n == 0),  
+                   sum_ifelse(dat$LifetimeAnyAnx.n == 0, dat$ClinicianAnyAnx.n == 1),
+                   sum_ifelse(dat$LifetimeAnyAnx.n == 1, dat$ClinicianAnyAnx.n == 0),
+                   sum_ifelse(dat$LifetimeAnyAnx.n == 1, dat$ClinicianAnyAnx.n == 1),
+                   sum_ifelse(!is.na(dat$LifetimeAnyAnx), !is.na(dat$ClinicianAnyAnx)),
                    #Fill in GAD row
-                   sum_ifelse(dat.cc$cidia.diagnosis_numeric == 0, dat.cc$mhd.gad == 0),               
-                   sum_ifelse(dat.cc$cidia.diagnosis_numeric == 0, dat.cc$mhd.gad == 1),       
-                   sum_ifelse(dat.cc$cidia.diagnosis_numeric == 1, dat.cc$mhd.gad == 0),
-                   sum_ifelse(dat.cc$cidia.diagnosis_numeric == 1, dat.cc$mhd.gad == 1),
-                   sum_ifelse(!is.na(dat.cc$cidia.diagnosis_numeric), !is.na(dat.cc$mhd.gad)),
+                   sum_ifelse(dat$cidia.diagnosis_numeric == 0, dat$mhd.gad == 0),               
+                   sum_ifelse(dat$cidia.diagnosis_numeric == 0, dat$mhd.gad == 1),       
+                   sum_ifelse(dat$cidia.diagnosis_numeric == 1, dat$mhd.gad == 0),
+                   sum_ifelse(dat$cidia.diagnosis_numeric == 1, dat$mhd.gad == 1),
+                   sum_ifelse(!is.na(dat$cidia.diagnosis_numeric), !is.na(dat$mhd.gad)),
                    #Fill in SpecPhob row
-                   sum_ifelse(dat.cc$spec.diagnosis_numeric == 0, dat.cc$mhd.specific_phobia == 0), 
-                   sum_ifelse(dat.cc$spec.diagnosis_numeric == 0, dat.cc$mhd.specific_phobia == 1), 
-                   sum_ifelse(dat.cc$spec.diagnosis_numeric == 1, dat.cc$mhd.specific_phobia == 0),
-                   sum_ifelse(dat.cc$spec.diagnosis_numeric == 1, dat.cc$mhd.specific_phobia == 1), 
-                   sum_ifelse(!is.na(dat.cc$spec.diagnosis_numeric), !is.na(dat.cc$mhd.specific_phobia)),
+                   sum_ifelse(dat$spec.diagnosis_numeric == 0, dat$mhd.specific_phobia == 0), 
+                   sum_ifelse(dat$spec.diagnosis_numeric == 0, dat$mhd.specific_phobia == 1), 
+                   sum_ifelse(dat$spec.diagnosis_numeric == 1, dat$mhd.specific_phobia == 0),
+                   sum_ifelse(dat$spec.diagnosis_numeric == 1, dat$mhd.specific_phobia == 1), 
+                   sum_ifelse(!is.na(dat$spec.diagnosis_numeric), !is.na(dat$mhd.specific_phobia)),
                    #Fill in SocialPhob row 
-                   sum_ifelse(dat.cc$socp.diagnosis_numeric == 0, dat.cc$mhd.social_anxiety == 0), 
-                   sum_ifelse(dat.cc$socp.diagnosis_numeric == 0, dat.cc$mhd.social_anxiety == 1), 
-                   sum_ifelse(dat.cc$socp.diagnosis_numeric == 1, dat.cc$mhd.social_anxiety == 0),
-                   sum_ifelse(dat.cc$socp.diagnosis_numeric == 1, dat.cc$mhd.social_anxiety == 1),
-                   sum_ifelse(!is.na(dat.cc$socp.diagnosis_numeric), !is.na(dat.cc$mhd.social_anxiety)),
+                   sum_ifelse(dat$socp.diagnosis_numeric == 0, dat$mhd.social_anxiety == 0), 
+                   sum_ifelse(dat$socp.diagnosis_numeric == 0, dat$mhd.social_anxiety == 1), 
+                   sum_ifelse(dat$socp.diagnosis_numeric == 1, dat$mhd.social_anxiety == 0),
+                   sum_ifelse(dat$socp.diagnosis_numeric == 1, dat$mhd.social_anxiety == 1),
+                   sum_ifelse(!is.na(dat$socp.diagnosis_numeric), !is.na(dat$mhd.social_anxiety)),
                    #Fill in Panic attacks row
-                   sum(ifelse(dat.cc$pad.diagnosis_numeric == 0 & dat.cc$mhd.panic_attacks == 0 & !is.na(dat.cc$mhd.panic_disorder), 1, 0), na.rm=T), 
-                   sum(ifelse(dat.cc$pad.diagnosis_numeric == 0 & dat.cc$mhd.panic_attacks == 1 & !is.na(dat.cc$mhd.panic_disorder), 1, 0), na.rm=T),
-                   sum(ifelse(dat.cc$pad.diagnosis_numeric == 1 & dat.cc$mhd.panic_attacks == 0 & !is.na(dat.cc$mhd.panic_disorder), 1, 0), na.rm=T),
-                   sum(ifelse(dat.cc$pad.diagnosis_numeric == 1 & dat.cc$mhd.panic_attacks == 1 & !is.na(dat.cc$mhd.panic_disorder), 1, 0), na.rm=T), 
-                   sum(ifelse(!is.na(dat.cc$pad.diagnosis_numeric) & !is.na(dat.cc$mhd.panic_attacks) & !is.na(dat.cc$mhd.panic_disorder), 1, 0), na.rm=T),
+                   sum(ifelse(dat$pad.diagnosis_numeric == 0 & dat$mhd.panic_attacks == 0 & !is.na(dat$mhd.panic_disorder), 1, 0), na.rm=T), 
+                   sum(ifelse(dat$pad.diagnosis_numeric == 0 & dat$mhd.panic_attacks == 1 & !is.na(dat$mhd.panic_disorder), 1, 0), na.rm=T),
+                   sum(ifelse(dat$pad.diagnosis_numeric == 1 & dat$mhd.panic_attacks == 0 & !is.na(dat$mhd.panic_disorder), 1, 0), na.rm=T),
+                   sum(ifelse(dat$pad.diagnosis_numeric == 1 & dat$mhd.panic_attacks == 1 & !is.na(dat$mhd.panic_disorder), 1, 0), na.rm=T), 
+                   sum(ifelse(!is.na(dat$pad.diagnosis_numeric) & !is.na(dat$mhd.panic_attacks) & !is.na(dat$mhd.panic_disorder), 1, 0), na.rm=T),
                    #Fill in Panic disorder row
-                   sum_ifelse(dat.cc$pad.diagnosis_numeric == 0, dat.cc$mhd.panic_disorder == 0), 
-                   sum_ifelse(dat.cc$pad.diagnosis_numeric == 0, dat.cc$mhd.panic_disorder == 1),
-                   sum_ifelse(dat.cc$pad.diagnosis_numeric == 1, dat.cc$mhd.panic_disorder == 0),
-                   sum_ifelse(dat.cc$pad.diagnosis_numeric == 1, dat.cc$mhd.panic_disorder == 1), 
-                   sum_ifelse(!is.na(dat.cc$pad.diagnosis_numeric), !is.na(dat.cc$mhd.panic_disorder)),
+                   sum_ifelse(dat$pad.diagnosis_numeric == 0, dat$mhd.panic_disorder == 0), 
+                   sum_ifelse(dat$pad.diagnosis_numeric == 0, dat$mhd.panic_disorder == 1),
+                   sum_ifelse(dat$pad.diagnosis_numeric == 1, dat$mhd.panic_disorder == 0),
+                   sum_ifelse(dat$pad.diagnosis_numeric == 1, dat$mhd.panic_disorder == 1), 
+                   sum_ifelse(!is.na(dat$pad.diagnosis_numeric), !is.na(dat$mhd.panic_disorder)),
                    #Fill in Agoraphobia row
-                   sum_ifelse(dat.cc$agp.diagnosis_numeric == 0, dat.cc$mhd.agoraphobia == 0),
-                   sum_ifelse(dat.cc$agp.diagnosis_numeric == 0, dat.cc$mhd.agoraphobia == 1),
-                   sum_ifelse(dat.cc$agp.diagnosis_numeric == 1, dat.cc$mhd.agoraphobia == 0),
-                   sum_ifelse(dat.cc$agp.diagnosis_numeric == 1, dat.cc$mhd.agoraphobia == 1),
-                   sum_ifelse(!is.na(dat.cc$agp.diagnosis_numeric), !is.na(dat.cc$mhd.agoraphobia))
+                   sum_ifelse(dat$agp.diagnosis_numeric == 0, dat$mhd.agoraphobia == 0),
+                   sum_ifelse(dat$agp.diagnosis_numeric == 0, dat$mhd.agoraphobia == 1),
+                   sum_ifelse(dat$agp.diagnosis_numeric == 1, dat$mhd.agoraphobia == 0),
+                   sum_ifelse(dat$agp.diagnosis_numeric == 1, dat$mhd.agoraphobia == 1),
+                   sum_ifelse(!is.na(dat$agp.diagnosis_numeric), !is.na(dat$mhd.agoraphobia))
                    ),
                    nrow = 8,
                    ncol = 5,
@@ -467,11 +1448,9 @@ table0
 
 ## Male-only dataset
 
-```{r dataset by sex}
-
-dat.male <- dat.cc %>% 
+```{r create male-only dataset}
+dat.male <- dat %>% 
   filter(sex == 0)
-
 ```
 
 
@@ -566,9 +1545,9 @@ table1
 
 ## Female-only dataset
 
-```{r dataset by sex}
+```{r create female-only dataset}
 
-dat.female <- dat.cc %>% 
+dat.female <- dat %>% 
   filter(sex == 1)
 
 ```
@@ -661,4 +1640,9 @@ rownames(table2) <- c("Major depressive disorder",
 
 ##Visualise
 table2
+```
+
+#Export dataset of eligible participants
+```{r Save combined dataset as rds file}
+#saveRDS(object = dat, file = paste0(cleaned_path, "DIAGCOMP_final_dataset_", Sys.Date(), ".rds"))
 ```
