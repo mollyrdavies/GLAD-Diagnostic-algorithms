@@ -824,7 +824,7 @@ dat$single_item_count_noPD <- rowSums(dat[,c("mhd.mdd",
                                            "mhd.agoraphobia")], na.rm=FALSE)
 
 #Add panic only for particpants without NA in count variable
-dat$single_item_count_numeric_noNA <- with(dat,
+dat$single_item_count_numeric <- with(dat,
                           ifelse(
                             is.na(single_item_count_noPD), 
                             NA, 
@@ -882,7 +882,7 @@ sum(ifelse(is.na(dat$mhd.panic_disorder) & dat$sample == "GLAD", 1, 0))
 #Create factor version of N single-item diagnoses
 dat <- dat %>% 
   mutate(single_item_factor = 
-           case_when(single_item_count_numeric_noNA == 0 ~ 0,
+           case_when(single_item_count_numeric == 0 ~ 0,
                      single_item_count_numeric == 1 ~ 1,
                      single_item_count_numeric == 2 ~ 2,
                      single_item_count_numeric >= 3 ~ 3))

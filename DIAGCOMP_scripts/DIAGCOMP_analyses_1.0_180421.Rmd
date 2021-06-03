@@ -48,6 +48,7 @@ knitr::opts_chunk$set(echo = TRUE)
 #install.packages("car")
 #install.packages("ggpubr")
 #install.packages("epiR")
+#install.packages("infer")
 
 ```
 
@@ -58,6 +59,7 @@ library(ggpubr)
 library(descr)
 library(kableExtra)
 library(epiR)
+library(infer)
 library(tidyverse)
 ```
 
@@ -75,6 +77,11 @@ Create new dataset with only crosstab variables of interest
 cidi <- dat %>%
   select("ID",
          "sample",
+         "age",
+         "sex",
+         "Ethnicity",
+         "highest_education",
+         "Employment",
          "mhd.mdd",
          "mhd.gad",
          "mhd.specific_phobia",
@@ -3105,6 +3112,968 @@ all_agreement_xtabs <- rbind(full_sample_all_agreement_xtabs,
 kable(all_agreement_xtabs)
 ```
 
+# Alternate diagnoses for MDD and GAD
+
+## MDD: SI yes, AB no
+Create dataset of participants with single-item but no algorithm-based MDD
+```{r mdd dataset si yes ab no}
+mdd_alt <- cidi %>% 
+  filter(cidid.diagnosis_numeric == 0 & mhd.mdd == 1)
+
+nrow(mdd_alt)
+```
+
+## GAD: SI yes, AB no
+Create dataset of participants with single-item but no algorithm-based GAD
+```{r gad dataset si yes ab no}
+gad_alt.df <- cidi %>% 
+  filter(cidia.diagnosis_numeric == 0 & mhd.gad == 1) %>% 
+  select(sample, cidid.diagnosis_numeric, spec.diagnosis_numeric, 
+         pad.diagnosis_numeric, socp.diagnosis_numeric, agp.diagnosis_numeric) 
+
+nrow(gad_alt.df)
+```
+
+Check N other diagnoses for participants with SI yes/AB no GAD
+```{r gad alternate ab diagnoses}
+
+#full sample
+gad_alt_totals_full_sample <- gad_alt.df %>%
+  mutate(no_diagnosis = 
+           case_when(
+             cidid.diagnosis_numeric == 0 & 
+               spec.diagnosis_numeric == 0 & 
+               socp.diagnosis_numeric == 0 &
+               pad.diagnosis_numeric == 0 &
+               agp.diagnosis_numeric == 0 ~ 1,
+             cidid.diagnosis_numeric == 1 | 
+               spec.diagnosis_numeric == 1 | 
+               socp.diagnosis_numeric == 1 |
+               pad.diagnosis_numeric == 1 |
+               agp.diagnosis_numeric == 1 ~ 0
+           ),
+         any_anxiety = case_when( 
+               spec.diagnosis_numeric == 0 & 
+               socp.diagnosis_numeric == 0 &
+               pad.diagnosis_numeric == 0 &
+               agp.diagnosis_numeric == 0 ~ 0,
+               spec.diagnosis_numeric == 1 | 
+               socp.diagnosis_numeric == 1 |
+               pad.diagnosis_numeric == 1 |
+               agp.diagnosis_numeric == 1 ~ 1)
+         ) %>% 
+  summarize(MDD = sum(cidid.diagnosis_numeric, na.rm = T),
+            MDD_prop = sum(cidid.diagnosis_numeric, na.rm = T)/sum(!is.na(cidid.diagnosis_numeric)),
+            AnyAnx = sum(any_anxiety, na.rm = T),
+            AnyAnx_prop = sum(any_anxiety, na.rm = T)/sum(!is.na(any_anxiety)),
+            SPEC = sum(spec.diagnosis_numeric, na.rm = T),
+            SPEC_prop = sum(spec.diagnosis_numeric, na.rm = T)/sum(!is.na(spec.diagnosis_numeric)),
+            SOCP = sum(socp.diagnosis_numeric, na.rm = T),
+            SOCP_prop = sum(socp.diagnosis_numeric, na.rm = T)/sum(!is.na(socp.diagnosis_numeric)),
+            PAD = sum(pad.diagnosis_numeric, na.rm = T),
+            PAD_prop = sum(pad.diagnosis_numeric, na.rm = T)/sum(!is.na(pad.diagnosis_numeric)),
+            AGP = sum(agp.diagnosis_numeric, na.rm = T),
+            AGP_prop = sum(agp.diagnosis_numeric, na.rm = T)/sum(!is.na(agp.diagnosis_numeric)),
+            None = sum(no_diagnosis, na.rm = T),
+            None_prop = sum(no_diagnosis, na.rm = T)/sum(!is.na(cidid.diagnosis_numeric) & !is.na(any_anxiety)),
+            total = n()) %>% 
+  mutate(sample = "Full sample")
+
+#by cohort
+gad_alt_totals_by_cohort <- gad_alt.df %>% 
+  group_by(sample) %>% 
+  mutate(no_diagnosis = 
+           case_when(
+             cidid.diagnosis_numeric == 0 & 
+               spec.diagnosis_numeric == 0 & 
+               socp.diagnosis_numeric == 0 &
+               pad.diagnosis_numeric == 0 &
+               agp.diagnosis_numeric == 0 ~ 1,
+             cidid.diagnosis_numeric == 1 | 
+               spec.diagnosis_numeric == 1 | 
+               socp.diagnosis_numeric == 1 |
+               pad.diagnosis_numeric == 1 |
+               agp.diagnosis_numeric == 1 ~ 0
+           ),
+         any_anxiety = case_when( 
+               spec.diagnosis_numeric == 0 & 
+               socp.diagnosis_numeric == 0 &
+               pad.diagnosis_numeric == 0 &
+               agp.diagnosis_numeric == 0 ~ 0,
+               spec.diagnosis_numeric == 1 | 
+               socp.diagnosis_numeric == 1 |
+               pad.diagnosis_numeric == 1 |
+               agp.diagnosis_numeric == 1 ~ 1)
+         ) %>% 
+  summarize(MDD = sum(cidid.diagnosis_numeric, na.rm = T),
+            MDD_prop = sum(cidid.diagnosis_numeric, na.rm = T)/sum(!is.na(cidid.diagnosis_numeric)),
+            AnyAnx = sum(any_anxiety, na.rm = T),
+            AnyAnx_prop = sum(any_anxiety, na.rm = T)/sum(!is.na(any_anxiety)),
+            SPEC = sum(spec.diagnosis_numeric, na.rm = T),
+            SPEC_prop = sum(spec.diagnosis_numeric, na.rm = T)/sum(!is.na(spec.diagnosis_numeric)),
+            SOCP = sum(socp.diagnosis_numeric, na.rm = T),
+            SOCP_prop = sum(socp.diagnosis_numeric, na.rm = T)/sum(!is.na(socp.diagnosis_numeric)),
+            PAD = sum(pad.diagnosis_numeric, na.rm = T),
+            PAD_prop = sum(pad.diagnosis_numeric, na.rm = T)/sum(!is.na(pad.diagnosis_numeric)),
+            AGP = sum(agp.diagnosis_numeric, na.rm = T),
+            AGP_prop = sum(agp.diagnosis_numeric, na.rm = T)/sum(!is.na(agp.diagnosis_numeric)),
+            None = sum(no_diagnosis, na.rm = T),
+            None_prop = sum(no_diagnosis, na.rm = T)/sum(!is.na(cidid.diagnosis_numeric) & !is.na(any_anxiety)),
+            total = n()) %>% 
+  mutate(sample = 
+           case_when(
+             sample == "GLAD" ~ "GLAD",
+             sample == "NBR" ~ "COPING NBR"
+           ))
+
+#merge full sample and by cohort
+gad_alt_totals <- rbind(gad_alt_totals_full_sample,
+                        gad_alt_totals_by_cohort)
+
+gad_alt_totals
+
+gad_alt_totals.long <- gad_alt_totals %>%
+  select(-c(MDD, AnyAnx, SPEC, SOCP, PAD, AGP, None, total)) %>% 
+  pivot_longer(cols = c(MDD_prop, AnyAnx_prop, SPEC_prop, SOCP_prop, PAD_prop, AGP_prop, None_prop)) %>% 
+  #pivot_wider(names_from = sample, values_from = value) %>% 
+  mutate(name = 
+           as.factor(case_when(
+             name == "MDD_prop" ~ "MDD",
+             name == "AnyAnx_prop" ~ "Any anxiety",
+             name == "SPEC_prop" ~ "Specific phobia",
+             name == "SOCP_prop" ~ "Social anxiety disorder",
+             name == "PAD_prop" ~ "Panic disorder",
+             name == "AGP_prop" ~ "Agoraphobia",
+             name == "None_prop" ~ "No diagnosis"
+           ))
+  )
+
+gad_alt_totals.long$name <- fct_relevel(gad_alt_totals.long$name, "MDD", "Any anxiety", "Specific phobia", "Social anxiety disorder", "Panic disorder", "Agoraphobia", "No diagnosis")
+
+gad_alt_totals.long$sample <- fct_relevel(gad_alt_totals.long$sample, "Full sample", "GLAD", "COPING NBR")
+
+gad_alt_totals.long
+```
+
+```{r gad graph alternate diagnoses}
+
+## Graph of alternate algorithm-based diagnoses for participants with single-item but no algorithm-based GAD
+
+gad_alt_ab_diagnoses_barchart <- ggplot(gad_alt_totals.long, aes(x = name, y = value, fill = sample, label = paste(round(value*100, 2), "%", sep = " "))) + 
+  labs(x = "Algorithm-based diagnosis", 
+       y = element_blank(), 
+       fill = "Cohort",
+       color="black",
+       subtitle = paste0("N = ", nrow(gad_alt.df), 
+                         " (GLAD: ", sum(gad_alt.df$sample == "GLAD"),
+                         "; COPING NBR: ", sum(gad_alt.df$sample == "NBR"), ")")) +
+  theme(plot.subtitle = element_text(face = "italic"),
+        axis.text.x = element_text(color="black",
+                                   #angle = 25, 
+                                   size = 10), 
+                                   #hjust = 1),
+        axis.title.x = element_text(color = "black",
+                                    size = 10,
+                                    vjust = -2),
+        axis.title.y = element_text(color = "black",
+                                    size = 10),
+        axis.ticks = element_blank(),
+        axis.text.y = element_text(colour="black", 
+                                   size = 10),
+        panel.grid.major.y = element_line(size = 0.5,
+                                        linetype = 'dashed',
+                                        colour = "light blue"),
+        panel.background = element_rect(color = "light blue", fill = "white"),
+        plot.margin = margin(10, 10, 10, 10)) +   
+  scale_color_manual(values = GLADpalette) +
+  scale_fill_manual(values = GLADpalette) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  geom_text(aes(label = paste0(round(value*100, 2), "%")), 
+            position = position_dodge(width = 0.95),
+            vjust = -0.5,
+            size = 3
+            ) +
+  scale_y_continuous(limits = c(0, 1), #Y-axis goes from 0-1
+                     breaks=seq(0,1, 0.1), #Y-axis goes from 0 - 1, with tick marks every 0.1
+                     labels = scales::percent_format(accuracy = 5L), #Makes y-axis % and removes decimals
+                     expand = c(0,0))
+
+gad_alt_ab_diagnoses_barchart
+```
+
+```{r save GAD alternate diagnosis barchart}
+grDevices::dev.set(1)
+#Save jpeg of diagnosis barchart
+ggsave(paste0("gad_alt_ab_diagnoses_barchart_", Sys.Date(), ".jpeg"),
+       path = "/Users/mollydavies/OneDrive - King's College London/PhD/GLAD Diagnosis paper/Figures/2021-04 SECOND SUBMISSION",
+       plot = gad_alt_ab_diagnoses_barchart,
+       width = 12,
+       height = 6.5,
+       dpi = 150,
+       units = "in")
+
+#Save tiff of diagnosis barchart
+ggsave(paste0("gad_alt_ab_diagnoses_barchart_", Sys.Date(), ".tiff"),
+       path = "/Users/mollydavies/OneDrive - King's College London/PhD/GLAD Diagnosis paper/Figures/2021-04 SECOND SUBMISSION",
+       plot = gad_alt_ab_diagnoses_barchart,
+       width = 12,
+       height = 6.5,
+       dpi = 150,
+       units = "in")
+```
+
+## Alternate SI diagnoses for AB anxiety disorders
+The purpose is to explore whether participants with an algorithm-based diagnosis of one of the anxiety disorders (excluding GAD) reported a different single-item diagnosis.
+
+### SPEC
+
+```{r spec dataset ab yes si no}
+spec_alt.df <- cidi %>% 
+  filter(spec.diagnosis_numeric == 1 & mhd.specific_phobia == 0)
+```
+
+```{r spec alternate si diagnoses}
+
+#full sample
+spec_alt_totals_full_sample <- spec_alt.df %>%
+  mutate(no_diagnosis = 
+           case_when(
+             mhd.mdd == 0 & 
+               mhd.gad == 0 & 
+               mhd.social_anxiety == 0 &
+               mhd.panic_disorder == 0 &
+               mhd.agoraphobia == 0 ~ 1,
+             mhd.mdd == 1 | 
+               mhd.gad == 1 | 
+               mhd.social_anxiety == 1 |
+               mhd.panic_disorder == 1 |
+               mhd.agoraphobia == 1 ~ 0
+           ),
+         any_anxiety = case_when( 
+               mhd.gad == 0 & 
+               mhd.social_anxiety == 0 &
+               mhd.panic_disorder == 0 &
+               mhd.agoraphobia == 0 ~ 0,
+               mhd.gad == 1 | 
+               mhd.social_anxiety == 1 |
+               mhd.panic_disorder == 1 |
+               mhd.agoraphobia == 1 ~ 1)
+         ) %>% 
+  summarize(MDD = sum(mhd.mdd, na.rm = T),
+            MDD_prop = sum(mhd.mdd, na.rm = T)/sum(!is.na(mhd.mdd)),
+            AnyAnx = sum(any_anxiety, na.rm = T),
+            AnyAnx_prop = sum(any_anxiety, na.rm = T)/sum(!is.na(any_anxiety)),
+            GAD = sum(mhd.gad, na.rm = T),
+            GAD_prop = sum(mhd.gad, na.rm = T)/sum(!is.na(mhd.gad)),
+            SOCP = sum(mhd.social_anxiety, na.rm = T),
+            SOCP_prop = sum(mhd.social_anxiety, na.rm = T)/sum(!is.na(mhd.social_anxiety)),
+            PAD = sum(mhd.panic_disorder, na.rm = T),
+            PAD_prop = sum(mhd.panic_disorder, na.rm = T)/sum(!is.na(mhd.panic_disorder)),
+            AGP = sum(mhd.agoraphobia, na.rm = T),
+            AGP_prop = sum(mhd.agoraphobia, na.rm = T)/sum(!is.na(mhd.agoraphobia)),
+            None = sum(no_diagnosis, na.rm = T),
+            None_prop = sum(no_diagnosis, na.rm = T)/sum(!is.na(mhd.mdd) & !is.na(any_anxiety)),
+            total = n()) %>% 
+  mutate(sample = "Full sample")
+
+#by cohort
+spec_alt_totals_by_cohort <- spec_alt.df %>% 
+  group_by(sample) %>% 
+  mutate(no_diagnosis = 
+           case_when(
+             mhd.mdd == 0 & 
+               mhd.gad == 0 & 
+               mhd.social_anxiety == 0 &
+               mhd.panic_disorder == 0 &
+               mhd.agoraphobia == 0 ~ 1,
+             mhd.mdd == 1 | 
+               mhd.gad == 1 | 
+               mhd.social_anxiety == 1 |
+               mhd.panic_disorder == 1 |
+               mhd.agoraphobia == 1 ~ 0
+           ),
+         any_anxiety = case_when( 
+               mhd.gad == 0 & 
+               mhd.social_anxiety == 0 &
+               mhd.panic_disorder == 0 &
+               mhd.agoraphobia == 0 ~ 0,
+               mhd.gad == 1 | 
+               mhd.social_anxiety == 1 |
+               mhd.panic_disorder == 1 |
+               mhd.agoraphobia == 1 ~ 1)
+         ) %>% 
+  summarize(MDD = sum(mhd.mdd, na.rm = T),
+            MDD_prop = sum(mhd.mdd, na.rm = T)/sum(!is.na(mhd.mdd)),
+            AnyAnx = sum(any_anxiety, na.rm = T),
+            AnyAnx_prop = sum(any_anxiety, na.rm = T)/sum(!is.na(any_anxiety)),
+            GAD = sum(mhd.gad, na.rm = T),
+            GAD_prop = sum(mhd.gad, na.rm = T)/sum(!is.na(mhd.gad)),
+            SOCP = sum(mhd.social_anxiety, na.rm = T),
+            SOCP_prop = sum(mhd.social_anxiety, na.rm = T)/sum(!is.na(mhd.social_anxiety)),
+            PAD = sum(mhd.panic_disorder, na.rm = T),
+            PAD_prop = sum(mhd.panic_disorder, na.rm = T)/sum(!is.na(mhd.panic_disorder)),
+            AGP = sum(mhd.agoraphobia, na.rm = T),
+            AGP_prop = sum(mhd.agoraphobia, na.rm = T)/sum(!is.na(mhd.agoraphobia)),
+            None = sum(no_diagnosis, na.rm = T),
+            None_prop = sum(no_diagnosis, na.rm = T)/sum(!is.na(mhd.mdd) & !is.na(any_anxiety)),
+            total = n()) %>% 
+  mutate(sample = 
+           case_when(
+             sample == "GLAD" ~ "GLAD",
+             sample == "NBR" ~ "COPING NBR"
+           ))
+
+#merge full sample and by cohort
+spec_alt_totals <- rbind(spec_alt_totals_full_sample,
+                        spec_alt_totals_by_cohort)
+
+spec_alt_totals
+
+spec_alt_totals.long <- spec_alt_totals %>%
+  select(-c(MDD, AnyAnx, GAD, SOCP, PAD, AGP, None, total)) %>% 
+  pivot_longer(cols = c(MDD_prop, AnyAnx_prop, GAD_prop, SOCP_prop, PAD_prop, AGP_prop, None_prop)) %>% 
+  #pivot_wider(names_from = sample, values_from = value) %>% 
+  mutate(name = 
+           as.factor(case_when(
+             name == "MDD_prop" ~ "MDD",
+             name == "AnyAnx_prop" ~ "Any anxiety",
+             name == "GAD_prop" ~ "GAD",
+             name == "SOCP_prop" ~ "Social anxiety disorder",
+             name == "PAD_prop" ~ "Panic disorder",
+             name == "AGP_prop" ~ "Agoraphobia",
+             name == "None_prop" ~ "No diagnosis"
+           ))
+  )
+
+spec_alt_totals.long$name <- fct_relevel(spec_alt_totals.long$name, "MDD", "Any anxiety", "GAD", "Social anxiety disorder", "Panic disorder", "Agoraphobia", "No diagnosis")
+
+spec_alt_totals.long$sample <- fct_relevel(spec_alt_totals.long$sample, "Full sample", "GLAD", "COPING NBR")
+
+spec_alt_totals.long
+```
+
+```{r spec graph alternate diagnoses}
+
+## Graph of alternate algorithm-based diagnoses for participants with single-item but no algorithm-based GAD
+
+spec_alt_si_diagnoses_barchart <- ggplot(spec_alt_totals.long, aes(x = name, y = value, fill = sample, label = paste(round(value*100, 2), "%", sep = " "))) + 
+  labs(x = "Single-item diagnosis", 
+       y = element_blank(), 
+       fill = "Cohort",
+       color="black",
+       title = "Specific phobia",
+       subtitle = paste0("N = ", nrow(spec_alt.df), 
+                         " (GLAD: ", sum(spec_alt.df$sample == "GLAD"),
+                         "; COPING NBR: ", sum(spec_alt.df$sample == "NBR"), ")")) +
+  theme(plot.subtitle = element_text(face = "italic"),
+        axis.text.x = element_text(color="black",
+                                   #angle = 25, 
+                                   size = 8), 
+                                   #hjust = 1),
+        axis.title.x = element_text(color = "black",
+                                    size = 8,
+                                    vjust = -2),
+        axis.title.y = element_text(color = "black",
+                                    size = 8),
+        axis.ticks = element_blank(),
+        axis.text.y = element_text(colour="black", 
+                                   size = 8),
+        panel.grid.major.y = element_line(size = 0.5,
+                                        linetype = 'dashed',
+                                        colour = "light blue"),
+        panel.background = element_rect(color = "light blue", fill = "white"),
+        plot.margin = margin(10, 10, 10, 10)) +   
+  scale_color_manual(values = GLADpalette) +
+  scale_fill_manual(values = GLADpalette) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  geom_text(aes(label = paste0(round(value*100, 2), "%")), 
+            position = position_dodge(width = 0.95),
+            vjust = -0.5,
+            size = 3
+            ) +
+  scale_y_continuous(limits = c(0, 1), #Y-axis goes from 0-1
+                     breaks=seq(0,1, 0.1), #Y-axis goes from 0 - 1, with tick marks every 0.1
+                     labels = scales::percent_format(accuracy = 5L), #Makes y-axis % and removes decimals
+                     expand = c(0,0))
+
+spec_alt_si_diagnoses_barchart
+```
+
+### SOCP
+
+```{r socp dataset ab yes si no}
+socp_alt.df <- cidi %>% 
+  filter(socp.diagnosis_numeric == 1 & mhd.social_anxiety == 0)
+```
+
+```{r socp alternate si diagnoses}
+
+#full sample
+socp_alt_totals_full_sample <- socp_alt.df %>%
+  mutate(no_diagnosis = 
+           case_when(
+             mhd.mdd == 0 & 
+               mhd.gad == 0 & 
+               mhd.specific_phobia == 0 &
+               mhd.panic_disorder == 0 &
+               mhd.agoraphobia == 0 ~ 1,
+             mhd.mdd == 1 | 
+               mhd.gad == 1 | 
+               mhd.specific_phobia == 1 |
+               mhd.panic_disorder == 1 |
+               mhd.agoraphobia == 1 ~ 0
+           ),
+         any_anxiety = case_when( 
+               mhd.gad == 0 & 
+               mhd.specific_phobia == 0 &
+               mhd.panic_disorder == 0 &
+               mhd.agoraphobia == 0 ~ 0,
+               mhd.gad == 1 | 
+               mhd.specific_phobia == 1 |
+               mhd.panic_disorder == 1 |
+               mhd.agoraphobia == 1 ~ 1)
+         ) %>% 
+  summarize(MDD = sum(mhd.mdd, na.rm = T),
+            MDD_prop = sum(mhd.mdd, na.rm = T)/sum(!is.na(mhd.mdd)),
+            AnyAnx = sum(any_anxiety, na.rm = T),
+            AnyAnx_prop = sum(any_anxiety, na.rm = T)/sum(!is.na(any_anxiety)),
+            GAD = sum(mhd.gad, na.rm = T),
+            GAD_prop = sum(mhd.gad, na.rm = T)/sum(!is.na(mhd.gad)),
+            SPEC = sum(mhd.specific_phobia, na.rm = T),
+            SPEC_prop = sum(mhd.specific_phobia, na.rm = T)/sum(!is.na(mhd.specific_phobia)),
+            PAD = sum(mhd.panic_disorder, na.rm = T),
+            PAD_prop = sum(mhd.panic_disorder, na.rm = T)/sum(!is.na(mhd.panic_disorder)),
+            AGP = sum(mhd.agoraphobia, na.rm = T),
+            AGP_prop = sum(mhd.agoraphobia, na.rm = T)/sum(!is.na(mhd.agoraphobia)),
+            None = sum(no_diagnosis, na.rm = T),
+            None_prop = sum(no_diagnosis, na.rm = T)/sum(!is.na(mhd.mdd) & !is.na(any_anxiety)),
+            total = n()) %>% 
+  mutate(sample = "Full sample")
+
+#by cohort
+socp_alt_totals_by_cohort <- socp_alt.df %>% 
+  group_by(sample) %>% 
+  mutate(no_diagnosis = 
+           case_when(
+             mhd.mdd == 0 & 
+               mhd.gad == 0 & 
+               mhd.specific_phobia == 0 &
+               mhd.panic_disorder == 0 &
+               mhd.agoraphobia == 0 ~ 1,
+             mhd.mdd == 1 | 
+               mhd.gad == 1 | 
+               mhd.specific_phobia == 1 |
+               mhd.panic_disorder == 1 |
+               mhd.agoraphobia == 1 ~ 0
+           ),
+         any_anxiety = case_when( 
+               mhd.gad == 0 & 
+               mhd.specific_phobia == 0 &
+               mhd.panic_disorder == 0 &
+               mhd.agoraphobia == 0 ~ 0,
+               mhd.gad == 1 | 
+               mhd.specific_phobia == 1 |
+               mhd.panic_disorder == 1 |
+               mhd.agoraphobia == 1 ~ 1)
+         ) %>% 
+  summarize(MDD = sum(mhd.mdd, na.rm = T),
+            MDD_prop = sum(mhd.mdd, na.rm = T)/sum(!is.na(mhd.mdd)),
+            AnyAnx = sum(any_anxiety, na.rm = T),
+            AnyAnx_prop = sum(any_anxiety, na.rm = T)/sum(!is.na(any_anxiety)),
+            GAD = sum(mhd.gad, na.rm = T),
+            GAD_prop = sum(mhd.gad, na.rm = T)/sum(!is.na(mhd.gad)),
+            SPEC = sum(mhd.specific_phobia, na.rm = T),
+            SPEC_prop = sum(mhd.specific_phobia, na.rm = T)/sum(!is.na(mhd.specific_phobia)),
+            PAD = sum(mhd.panic_disorder, na.rm = T),
+            PAD_prop = sum(mhd.panic_disorder, na.rm = T)/sum(!is.na(mhd.panic_disorder)),
+            AGP = sum(mhd.agoraphobia, na.rm = T),
+            AGP_prop = sum(mhd.agoraphobia, na.rm = T)/sum(!is.na(mhd.agoraphobia)),
+            None = sum(no_diagnosis, na.rm = T),
+            None_prop = sum(no_diagnosis, na.rm = T)/sum(!is.na(mhd.mdd) & !is.na(any_anxiety)),
+            total = n()) %>% 
+  mutate(sample = 
+           case_when(
+             sample == "GLAD" ~ "GLAD",
+             sample == "NBR" ~ "COPING NBR"
+           ))
+
+#merge full sample and by cohort
+socp_alt_totals <- rbind(socp_alt_totals_full_sample,
+                        socp_alt_totals_by_cohort)
+
+socp_alt_totals
+
+socp_alt_totals.long <- socp_alt_totals %>%
+  select(-c(MDD, AnyAnx, GAD, SPEC, PAD, AGP, None, total)) %>% 
+  pivot_longer(cols = c(MDD_prop, AnyAnx_prop, GAD_prop, SPEC_prop, PAD_prop, AGP_prop, None_prop)) %>% 
+  #pivot_wider(names_from = sample, values_from = value) %>% 
+  mutate(name = 
+           as.factor(case_when(
+             name == "MDD_prop" ~ "MDD",
+             name == "AnyAnx_prop" ~ "Any anxiety",
+             name == "GAD_prop" ~ "GAD",
+             name == "SPEC_prop" ~ "Specific phobia",
+             name == "PAD_prop" ~ "Panic disorder",
+             name == "AGP_prop" ~ "Agoraphobia",
+             name == "None_prop" ~ "No diagnosis"
+           ))
+  )
+
+socp_alt_totals.long$name <- fct_relevel(socp_alt_totals.long$name, "MDD", "Any anxiety", "GAD", "Specific phobia", "Panic disorder", "Agoraphobia", "No diagnosis")
+
+socp_alt_totals.long$sample <- fct_relevel(socp_alt_totals.long$sample, "Full sample", "GLAD", "COPING NBR")
+
+socp_alt_totals.long
+```
+
+```{r socp graph alternate diagnoses}
+
+## Graph of alternate algorithm-based diagnoses for participants with single-item but no algorithm-based GAD
+
+socp_alt_si_diagnoses_barchart <- ggplot(socp_alt_totals.long, aes(x = name, y = value, fill = sample, label = paste(round(value*100, 2), "%", sep = " "))) + 
+  labs(x = "Single-item diagnosis", 
+       y = element_blank(), 
+       fill = "Cohort",
+       color="black",
+       title = "Social anxiety disorder",
+       subtitle = paste0("N = ", nrow(socp_alt.df), 
+                         " (GLAD: ", sum(socp_alt.df$sample == "GLAD"),
+                         "; COPING NBR: ", sum(socp_alt.df$sample == "NBR"), ")")) +
+  theme(plot.subtitle = element_text(face = "italic"),
+        axis.text.x = element_text(color="black",
+                                   #angle = 25, 
+                                   size = 8), 
+                                   #hjust = 1),
+        axis.title.x = element_text(color = "black",
+                                    size = 8,
+                                    vjust = -2),
+        axis.title.y = element_text(color = "black",
+                                    size = 8),
+        axis.ticks = element_blank(),
+        axis.text.y = element_text(colour="black", 
+                                   size = 8),
+        panel.grid.major.y = element_line(size = 0.5,
+                                        linetype = 'dashed',
+                                        colour = "light blue"),
+        panel.background = element_rect(color = "light blue", fill = "white"),
+        plot.margin = margin(10, 10, 10, 10)) +   
+  scale_color_manual(values = GLADpalette) +
+  scale_fill_manual(values = GLADpalette) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  geom_text(aes(label = paste0(round(value*100, 2), "%")), 
+            position = position_dodge(width = 0.95),
+            vjust = -0.5,
+            size = 3
+            ) +
+  scale_y_continuous(limits = c(0, 1), #Y-axis goes from 0-1
+                     breaks=seq(0,1, 0.1), #Y-axis goes from 0 - 1, with tick marks every 0.1
+                     labels = scales::percent_format(accuracy = 5L), #Makes y-axis % and removes decimals
+                     expand = c(0,0))
+
+socp_alt_si_diagnoses_barchart
+```
+
+### PAD
+
+```{r pad dataset ab yes si no}
+pad_alt.df <- cidi %>% 
+  filter(pad.diagnosis_numeric == 1 & mhd.panic_disorder == 0)
+```
+
+```{r pad alternate si diagnoses}
+
+#full sample
+pad_alt_totals_full_sample <- pad_alt.df %>%
+  mutate(no_diagnosis = 
+           case_when(
+             mhd.mdd == 0 & 
+               mhd.gad == 0 & 
+               mhd.specific_phobia == 0 &
+               mhd.social_anxiety == 0 &
+               mhd.agoraphobia == 0 ~ 1,
+             mhd.mdd == 1 | 
+               mhd.gad == 1 | 
+               mhd.specific_phobia == 1 |
+               mhd.social_anxiety == 1 |
+               mhd.agoraphobia == 1 ~ 0
+           ),
+         any_anxiety = case_when( 
+               mhd.gad == 0 & 
+               mhd.specific_phobia == 0 &
+               mhd.social_anxiety == 0 &
+               mhd.agoraphobia == 0 ~ 0,
+               mhd.gad == 1 | 
+               mhd.specific_phobia == 1 |
+               mhd.social_anxiety == 1 |
+               mhd.agoraphobia == 1 ~ 1)
+         ) %>% 
+  summarize(MDD = sum(mhd.mdd, na.rm = T),
+            MDD_prop = sum(mhd.mdd, na.rm = T)/sum(!is.na(mhd.mdd)),
+            AnyAnx = sum(any_anxiety, na.rm = T),
+            AnyAnx_prop = sum(any_anxiety, na.rm = T)/sum(!is.na(any_anxiety)),
+            GAD = sum(mhd.gad, na.rm = T),
+            GAD_prop = sum(mhd.gad, na.rm = T)/sum(!is.na(mhd.gad)),
+            SPEC = sum(mhd.specific_phobia, na.rm = T),
+            SPEC_prop = sum(mhd.specific_phobia, na.rm = T)/sum(!is.na(mhd.specific_phobia)),
+            SOCP = sum(mhd.social_anxiety, na.rm = T),
+            SOCP_prop = sum(mhd.social_anxiety, na.rm = T)/sum(!is.na(mhd.social_anxiety)),
+            AGP = sum(mhd.agoraphobia, na.rm = T),
+            AGP_prop = sum(mhd.agoraphobia, na.rm = T)/sum(!is.na(mhd.agoraphobia)),
+            None = sum(no_diagnosis, na.rm = T),
+            None_prop = sum(no_diagnosis, na.rm = T)/sum(!is.na(mhd.mdd) & !is.na(any_anxiety)),
+            total = n()) %>% 
+  mutate(sample = "Full sample")
+
+#by cohort
+pad_alt_totals_by_cohort <- pad_alt.df %>% 
+  group_by(sample) %>% 
+  mutate(no_diagnosis = 
+           case_when(
+             mhd.mdd == 0 & 
+               mhd.gad == 0 & 
+               mhd.specific_phobia == 0 &
+               mhd.social_anxiety == 0 &
+               mhd.agoraphobia == 0 ~ 1,
+             mhd.mdd == 1 | 
+               mhd.gad == 1 | 
+               mhd.specific_phobia == 1 |
+               mhd.social_anxiety == 1 |
+               mhd.agoraphobia == 1 ~ 0
+           ),
+         any_anxiety = case_when( 
+               mhd.gad == 0 & 
+               mhd.specific_phobia == 0 &
+               mhd.social_anxiety == 0 &
+               mhd.agoraphobia == 0 ~ 0,
+               mhd.gad == 1 | 
+               mhd.specific_phobia == 1 |
+               mhd.social_anxiety == 1 |
+               mhd.agoraphobia == 1 ~ 1)
+         ) %>% 
+  summarize(MDD = sum(mhd.mdd, na.rm = T),
+            MDD_prop = sum(mhd.mdd, na.rm = T)/sum(!is.na(mhd.mdd)),
+            AnyAnx = sum(any_anxiety, na.rm = T),
+            AnyAnx_prop = sum(any_anxiety, na.rm = T)/sum(!is.na(any_anxiety)),
+            GAD = sum(mhd.gad, na.rm = T),
+            GAD_prop = sum(mhd.gad, na.rm = T)/sum(!is.na(mhd.gad)),
+            SPEC = sum(mhd.specific_phobia, na.rm = T),
+            SPEC_prop = sum(mhd.specific_phobia, na.rm = T)/sum(!is.na(mhd.specific_phobia)),
+            SOCP = sum(mhd.social_anxiety, na.rm = T),
+            SOCP_prop = sum(mhd.social_anxiety, na.rm = T)/sum(!is.na(mhd.social_anxiety)),
+            AGP = sum(mhd.agoraphobia, na.rm = T),
+            AGP_prop = sum(mhd.agoraphobia, na.rm = T)/sum(!is.na(mhd.agoraphobia)),
+            None = sum(no_diagnosis, na.rm = T),
+            None_prop = sum(no_diagnosis, na.rm = T)/sum(!is.na(mhd.mdd) & !is.na(any_anxiety)),
+            total = n()) %>% 
+  mutate(sample = 
+           case_when(
+             sample == "GLAD" ~ "GLAD",
+             sample == "NBR" ~ "COPING NBR"
+           ))
+
+#merge full sample and by cohort
+pad_alt_totals <- rbind(pad_alt_totals_full_sample,
+                        pad_alt_totals_by_cohort)
+
+pad_alt_totals
+
+pad_alt_totals.long <- pad_alt_totals %>%
+  select(-c(MDD, AnyAnx, GAD, SPEC, SOCP, AGP, None, total)) %>% 
+  pivot_longer(cols = c(MDD_prop, AnyAnx_prop, GAD_prop, SPEC_prop, SOCP_prop, AGP_prop, None_prop)) %>% 
+  #pivot_wider(names_from = sample, values_from = value) %>% 
+  mutate(name = 
+           as.factor(case_when(
+             name == "MDD_prop" ~ "MDD",
+             name == "AnyAnx_prop" ~ "Any anxiety",
+             name == "GAD_prop" ~ "GAD",
+             name == "SPEC_prop" ~ "Specific phobia",
+             name == "SOCP_prop" ~ "Social anxiety disorder",
+             name == "AGP_prop" ~ "Agoraphobia",
+             name == "None_prop" ~ "No diagnosis"
+           ))
+  )
+
+pad_alt_totals.long$name <- fct_relevel(pad_alt_totals.long$name, "MDD", "Any anxiety", "GAD", "Specific phobia", "Social anxiety disorder", "Agoraphobia", "No diagnosis")
+
+pad_alt_totals.long$sample <- fct_relevel(pad_alt_totals.long$sample, "Full sample", "GLAD", "COPING NBR")
+
+pad_alt_totals.long
+```
+
+```{r pad graph alternate diagnoses}
+
+## Graph of alternate algorithm-based diagnoses for participants with single-item but no algorithm-based GAD
+
+pad_alt_si_diagnoses_barchart <- ggplot(pad_alt_totals.long, aes(x = name, y = value, fill = sample, label = paste(round(value*100, 2), "%", sep = " "))) + 
+  labs(x = "Single-item diagnosis", 
+       y = element_blank(), 
+       fill = "Cohort",
+       color="black",
+       title = "Panic disorder",
+       subtitle = paste0("N = ", nrow(pad_alt.df), 
+                         " (GLAD: ", sum(pad_alt.df$sample == "GLAD"),
+                         "; COPING NBR: ", sum(pad_alt.df$sample == "NBR"), ")")) +
+  theme(plot.subtitle = element_text(face = "italic"),
+        axis.text.x = element_text(color="black",
+                                   #angle = 25, 
+                                   size = 8), 
+                                   #hjust = 1),
+        axis.title.x = element_text(color = "black",
+                                    size = 8,
+                                    vjust = -2),
+        axis.title.y = element_text(color = "black",
+                                    size = 8),
+        axis.ticks = element_blank(),
+        axis.text.y = element_text(colour="black", 
+                                   size = 8),
+        panel.grid.major.y = element_line(size = 0.5,
+                                        linetype = 'dashed',
+                                        colour = "light blue"),
+        panel.background = element_rect(color = "light blue", fill = "white"),
+        plot.margin = margin(10, 10, 10, 10)) +   
+  scale_color_manual(values = GLADpalette) +
+  scale_fill_manual(values = GLADpalette) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  geom_text(aes(label = paste0(round(value*100, 2), "%")), 
+            position = position_dodge(width = 0.95),
+            vjust = -0.5,
+            size = 3
+            ) +
+  scale_y_continuous(limits = c(0, 1), #Y-axis goes from 0-1
+                     breaks=seq(0,1, 0.1), #Y-axis goes from 0 - 1, with tick marks every 0.1
+                     labels = scales::percent_format(accuracy = 5L), #Makes y-axis % and removes decimals
+                     expand = c(0,0))
+
+pad_alt_si_diagnoses_barchart
+```
+
+### AGP
+
+```{r agp dataset ab yes si no}
+agp_alt.df <- cidi %>% 
+  filter(agp.diagnosis_numeric == 1 & mhd.agoraphobia == 0)
+```
+
+```{r agp alternate si diagnoses}
+
+#full sample
+agp_alt_totals_full_sample <- agp_alt.df %>%
+  mutate(no_diagnosis = 
+           case_when(
+             mhd.mdd == 0 & 
+               mhd.gad == 0 & 
+               mhd.specific_phobia == 0 &
+               mhd.social_anxiety == 0 &
+               mhd.panic_disorder == 0 ~ 1,
+             mhd.mdd == 1 | 
+               mhd.gad == 1 | 
+               mhd.specific_phobia == 1 |
+               mhd.social_anxiety == 1 |
+               mhd.panic_disorder == 1 ~ 0
+           ),
+         any_anxiety = case_when( 
+               mhd.gad == 0 & 
+               mhd.specific_phobia == 0 &
+               mhd.social_anxiety == 0 &
+               mhd.panic_disorder == 0 ~ 0,
+               mhd.gad == 1 | 
+               mhd.specific_phobia == 1 |
+               mhd.social_anxiety == 1 |
+               mhd.panic_disorder == 1 ~ 1)
+         ) %>% 
+  summarize(MDD = sum(mhd.mdd, na.rm = T),
+            MDD_prop = sum(mhd.mdd, na.rm = T)/sum(!is.na(mhd.mdd)),
+            AnyAnx = sum(any_anxiety, na.rm = T),
+            AnyAnx_prop = sum(any_anxiety, na.rm = T)/sum(!is.na(any_anxiety)),
+            GAD = sum(mhd.gad, na.rm = T),
+            GAD_prop = sum(mhd.gad, na.rm = T)/sum(!is.na(mhd.gad)),
+            SPEC = sum(mhd.specific_phobia, na.rm = T),
+            SPEC_prop = sum(mhd.specific_phobia, na.rm = T)/sum(!is.na(mhd.specific_phobia)),
+            SOCP = sum(mhd.social_anxiety, na.rm = T),
+            SOCP_prop = sum(mhd.social_anxiety, na.rm = T)/sum(!is.na(mhd.social_anxiety)),
+            PAD = sum(mhd.panic_disorder, na.rm = T),
+            PAD_prop = sum(mhd.panic_disorder, na.rm = T)/sum(!is.na(mhd.panic_disorder)),
+            None = sum(no_diagnosis, na.rm = T),
+            None_prop = sum(no_diagnosis, na.rm = T)/sum(!is.na(mhd.mdd) & !is.na(any_anxiety)),
+            total = n()) %>% 
+  mutate(sample = "Full sample")
+
+#by cohort
+agp_alt_totals_by_cohort <- agp_alt.df %>% 
+  group_by(sample) %>% 
+  mutate(no_diagnosis = 
+           case_when(
+             mhd.mdd == 0 & 
+               mhd.gad == 0 & 
+               mhd.specific_phobia == 0 &
+               mhd.social_anxiety == 0 &
+               mhd.panic_disorder == 0 ~ 1,
+             mhd.mdd == 1 | 
+               mhd.gad == 1 | 
+               mhd.specific_phobia == 1 |
+               mhd.social_anxiety == 1 |
+               mhd.panic_disorder == 1 ~ 0
+           ),
+         any_anxiety = case_when( 
+               mhd.gad == 0 & 
+               mhd.specific_phobia == 0 &
+               mhd.social_anxiety == 0 &
+               mhd.panic_disorder == 0 ~ 0,
+               mhd.gad == 1 | 
+               mhd.specific_phobia == 1 |
+               mhd.social_anxiety == 1 |
+               mhd.panic_disorder == 1 ~ 1)
+         ) %>% 
+  summarize(MDD = sum(mhd.mdd, na.rm = T),
+            MDD_prop = sum(mhd.mdd, na.rm = T)/sum(!is.na(mhd.mdd)),
+            AnyAnx = sum(any_anxiety, na.rm = T),
+            AnyAnx_prop = sum(any_anxiety, na.rm = T)/sum(!is.na(any_anxiety)),
+            GAD = sum(mhd.gad, na.rm = T),
+            GAD_prop = sum(mhd.gad, na.rm = T)/sum(!is.na(mhd.gad)),
+            SPEC = sum(mhd.specific_phobia, na.rm = T),
+            SPEC_prop = sum(mhd.specific_phobia, na.rm = T)/sum(!is.na(mhd.specific_phobia)),
+            SOCP = sum(mhd.social_anxiety, na.rm = T),
+            SOCP_prop = sum(mhd.social_anxiety, na.rm = T)/sum(!is.na(mhd.social_anxiety)),
+            PAD = sum(mhd.panic_disorder, na.rm = T),
+            PAD_prop = sum(mhd.panic_disorder, na.rm = T)/sum(!is.na(mhd.panic_disorder)),
+            None = sum(no_diagnosis, na.rm = T),
+            None_prop = sum(no_diagnosis, na.rm = T)/sum(!is.na(mhd.mdd) & !is.na(any_anxiety)),
+            total = n()) %>% 
+  mutate(sample = 
+           case_when(
+             sample == "GLAD" ~ "GLAD",
+             sample == "NBR" ~ "COPING NBR"
+           ))
+
+#merge full sample and by cohort
+agp_alt_totals <- rbind(agp_alt_totals_full_sample,
+                        agp_alt_totals_by_cohort)
+
+agp_alt_totals
+
+agp_alt_totals.long <- agp_alt_totals %>%
+  select(-c(MDD, AnyAnx, GAD, SPEC, SOCP, PAD, None, total)) %>% 
+  pivot_longer(cols = c(MDD_prop, AnyAnx_prop, GAD_prop, SPEC_prop, SOCP_prop, PAD_prop, None_prop)) %>% 
+  #pivot_wider(names_from = sample, values_from = value) %>% 
+  mutate(name = 
+           as.factor(case_when(
+             name == "MDD_prop" ~ "MDD",
+             name == "AnyAnx_prop" ~ "Any anxiety",
+             name == "GAD_prop" ~ "GAD",
+             name == "SPEC_prop" ~ "Specific phobia",
+             name == "SOCP_prop" ~ "Social anxiety disorder",
+             name == "PAD_prop" ~ "Panic disorder",
+             name == "None_prop" ~ "No diagnosis"
+           ))
+  )
+
+agp_alt_totals.long$name <- fct_relevel(agp_alt_totals.long$name, "MDD", "Any anxiety", "GAD", "Specific phobia", "Social anxiety disorder", "Panic disorder", "No diagnosis")
+
+agp_alt_totals.long$sample <- fct_relevel(agp_alt_totals.long$sample, "Full sample", "GLAD", "COPING NBR")
+
+agp_alt_totals.long
+```
+
+```{r agp graph alternate diagnoses}
+
+## Graph of alternate algorithm-based diagnoses for participants with algorithm-based but no single-item agoraphobia
+
+agp_alt_si_diagnoses_barchart <- ggplot(agp_alt_totals.long, aes(x = name, y = value, fill = sample, label = paste(round(value*100, 2), "%", sep = " "))) + 
+  labs(x = "Single-item diagnosis", 
+       y = element_blank(), 
+       fill = "Cohort",
+       color="black",
+       title = "Agoraphobia",
+       subtitle = paste0("N = ", nrow(agp_alt.df), 
+                         " (GLAD: ", sum(agp_alt.df$sample == "GLAD"),
+                         "; COPING NBR: ", sum(agp_alt.df$sample == "NBR"), ")")) +
+  theme(plot.subtitle = element_text(face = "italic"),
+        axis.text.x = element_text(color="black",
+                                   #angle = 25, 
+                                   size = 8), 
+                                   #hjust = 1),
+        axis.title.x = element_text(color = "black",
+                                    size = 8,
+                                    vjust = -2),
+        axis.title.y = element_text(color = "black",
+                                    size = 8),
+        axis.ticks = element_blank(),
+        axis.text.y = element_text(colour="black", 
+                                   size = 8),
+        panel.grid.major.y = element_line(size = 0.5,
+                                        linetype = 'dashed',
+                                        colour = "light blue"),
+        panel.background = element_rect(color = "light blue", fill = "white"),
+        plot.margin = margin(10, 10, 10, 10)) +   
+  scale_color_manual(values = GLADpalette) +
+  scale_fill_manual(values = GLADpalette) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  geom_text(aes(label = paste0(round(value*100, 2), "%")), 
+            position = position_dodge(width = 0.95),
+            vjust = -0.5,
+            size = 3
+            ) +
+  scale_y_continuous(limits = c(0, 1), #Y-axis goes from 0-1
+                     breaks=seq(0,1, 0.1), #Y-axis goes from 0 - 1, with tick marks every 0.1
+                     labels = scales::percent_format(accuracy = 5L), #Makes y-axis % and removes decimals
+                     expand = c(0,0))
+
+agp_alt_si_diagnoses_barchart
+```
+
+## Combine alternate SI diagnoses graphs
+
+```{r combine alternate si diagnosis graphs}
+#install.packages("patchwork")
+#library(patchwork)
+
+all_alt_si_diagnoses_barchart <- ((spec_alt_si_diagnoses_barchart + 
+    theme(legend.position = "none", 
+          axis.title.x = element_blank(),
+          title = element_text(size = 10),
+          axis.text = element_text(size = 10)) +
+    labs(title = "Specific phobia")
+  ) |
+  (socp_alt_si_diagnoses_barchart + 
+     theme(legend.position = "none", 
+           axis.title.x = element_blank(),
+           title = element_text(size = 10)) +
+     labs(title = "Social anxiety disorder"))) / 
+  ((pad_alt_si_diagnoses_barchart + 
+      theme(legend.position = "none",
+           title = element_text(size = 10)) +
+     labs(title = "Panic disorder")) |
+  (agp_alt_si_diagnoses_barchart + 
+     theme(title = element_text(size = 10)) +
+     labs(title = "Agoraphobia"))) +
+  plot_layout(guides = "collect", heights = c(10,10), widths = c(20,20))
+
+all_alt_si_diagnoses_barchart
+
+```
+
+```{r save all alternate si diagnosis barchart}
+grDevices::dev.set(1)
+#Save jpeg of diagnosis barchart
+ggsave(paste0("all_alt_si_diagnoses_barchart_subtitle_", Sys.Date(), ".jpeg"),
+       path = "/Users/mollydavies/OneDrive - King's College London/PhD/GLAD Diagnosis paper/Figures/2021-04 SECOND SUBMISSION",
+       plot = all_alt_si_diagnoses_barchart,
+       width = 20,
+       height = 10,
+       dpi = 150,
+       units = "in")
+
+#Save tiff of diagnosis barchart
+ggsave(paste0("all_alt_si_diagnoses_barchart_", Sys.Date(), ".tiff"),
+       path = "/Users/mollydavies/OneDrive - King's College London/PhD/GLAD Diagnosis paper/Figures/2021-04 SECOND SUBMISSION",
+       plot = all_alt_si_diagnoses_barchart,
+       width = 10,
+       height = 20,
+       dpi = 150,
+       units = "in")
+```
+
+**Supplementary materials**
 
 # Analyses of difference
 
@@ -3114,7 +4083,17 @@ kable(all_agreement_xtabs)
 
 Indendent samples t-test to assess differences in age between GLAD vs COPING cohorts
 ```{r t-test age}
+t_test_age_by_cohort <- cidi %>%
+  t_test(
+    age ~ sample,
+    order = c("GLAD", "NBR"),
+    alternative = "two.sided"
+) %>% 
+  select(c(statistic, p_value)) %>% 
+  mutate(characteristic = "age",
+         test = "t-test")
 
+t_test_age_by_cohort
 ```
 
 
@@ -3124,21 +4103,633 @@ Chi-square tests to assess differences between GLAD vs COPING cohorts in:
 - Highest education
 
 ```{r chi-square sex}
+chisq_sex_by_cohort <- cidi %>% 
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(sex ~ sample) %>% 
+  select(c(statistic, p_value)) %>% 
+  mutate(characteristic = "sex",
+         test = "chi-squared")
 
+chisq_sex_by_cohort
 ```
 
 ```{r chi-square ethnicity}
+chisq_ethnicity_by_cohort <- cidi %>% 
+  chisq_test(Ethnicity ~ sample) %>%  
+  select(c(statistic, p_value)) %>% 
+  mutate(characteristic = "ethnicity",
+         test = "chi-squared")
 
+chisq_ethnicity_by_cohort
 ```
 
 ```{r chi-square highest education}
+chisq_education_by_cohort <- cidi %>% 
+  chisq_test(highest_education ~ sample) %>%  
+  select(c(statistic, p_value)) %>% 
+  mutate(characteristic = "education",
+         test = "chi-squared")
 
+chisq_education_by_cohort
 ```
+
+```{r table of all variance analyses by cohort}
+comparisons_by_cohort <- rbind(
+  t_test_age_by_cohort,
+  chisq_sex_by_cohort,
+  chisq_ethnicity_by_cohort,
+  chisq_education_by_cohort
+) %>% 
+  relocate(c(test, characteristic))
+
+kable(comparisons_by_cohort)
+```
+
 
 ## Male vs female diagnostic agreements
     Chi-square test (Female: Yes/No)
 
-```{r}
+```{r recode agreements as factors}
+dat.sex <- cidi %>% 
+  mutate(mdd_agreement_binary_numeric = as.factor(
+    case_when(
+      cidid.diagnosis_numeric == 1 & mhd.mdd == 1 ~ 0,
+      cidid.diagnosis_numeric == 0 & mhd.mdd == 0 ~ 0,
+      cidid.diagnosis_numeric == 0 & mhd.mdd == 1 ~ 1,
+      cidid.diagnosis_numeric == 1 & mhd.mdd == 0 ~ 0
+    )),
+    anyanx_agreement_binary_numeric = as.factor(
+    case_when(
+      LifetimeAnyAnx.n == 1 & ClinicianAnyAnx.n == 1 ~ 0,
+      LifetimeAnyAnx.n == 0 & ClinicianAnyAnx.n == 0 ~ 0,
+      LifetimeAnyAnx.n == 0 & ClinicianAnyAnx.n == 1 ~ 1,
+      LifetimeAnyAnx.n == 1 & ClinicianAnyAnx.n == 0 ~ 0,
+    )),
+    gad_agreement_binary_numeric = as.factor(
+    case_when(
+      cidia.diagnosis_numeric == 1 & mhd.gad == 1 ~ 0,
+      cidia.diagnosis_numeric == 0 & mhd.gad == 0 ~ 0,
+      cidia.diagnosis_numeric == 0 & mhd.gad == 1 ~ 1,
+      cidia.diagnosis_numeric == 1 & mhd.gad == 0 ~ 0
+    )),
+    spec_agreement_binary_numeric = as.factor(
+    case_when(
+      spec.diagnosis_numeric == 1 & mhd.specific_phobia == 1 ~ 0,
+      spec.diagnosis_numeric == 0 & mhd.specific_phobia == 0 ~ 0,
+      spec.diagnosis_numeric == 0 & mhd.specific_phobia == 1 ~ 1,
+      spec.diagnosis_numeric == 1 & mhd.specific_phobia == 0 ~ 0
+    )),
+    socp_agreement_binary_numeric = as.factor(
+    case_when(
+      socp.diagnosis_numeric == 1 & mhd.social_anxiety == 1 ~ 0,
+      socp.diagnosis_numeric == 0 & mhd.social_anxiety == 0 ~ 0,
+      socp.diagnosis_numeric == 0 & mhd.social_anxiety == 1 ~ 1,
+      socp.diagnosis_numeric == 1 & mhd.social_anxiety == 0 ~ 0
+    )),
+    pattacks_agreement_binary_numeric = as.factor(
+    case_when(
+      pad.diagnosis_numeric == 1 & mhd.panic_attacks == 1 & !is.na(mhd.panic_disorder) ~ 0,
+      pad.diagnosis_numeric == 0 & mhd.panic_attacks == 0 & !is.na(mhd.panic_disorder) ~ 0,
+      pad.diagnosis_numeric == 0 & mhd.panic_attacks == 1 & !is.na(mhd.panic_disorder) ~ 1,
+      pad.diagnosis_numeric == 1 & mhd.panic_attacks == 0 & !is.na(mhd.panic_disorder) ~ 0
+    )),
+    pad_agreement_binary_numeric = as.factor(
+    case_when(
+      pad.diagnosis_numeric == 1 & mhd.panic_disorder == 1 ~ 0,
+      pad.diagnosis_numeric == 0 & mhd.panic_disorder == 0 ~ 0,
+      pad.diagnosis_numeric == 0 & mhd.panic_disorder == 1 ~ 1,
+      pad.diagnosis_numeric == 1 & mhd.panic_disorder == 0 ~ 0
+    )),
+    agp_agreement_binary_numeric = as.factor(
+    case_when(
+      agp.diagnosis_numeric == 1 & mhd.agoraphobia == 1 ~ 0,
+      agp.diagnosis_numeric == 0 & mhd.agoraphobia == 0 ~ 0,
+      agp.diagnosis_numeric == 0 & mhd.agoraphobia == 1 ~ 1,
+      agp.diagnosis_numeric == 1 & mhd.agoraphobia == 0 ~ 0
+    )),
+    mdd_agreement_numeric = as.factor(
+    case_when(
+      cidid.diagnosis_numeric == 1 & mhd.mdd == 1 ~ 0,
+      cidid.diagnosis_numeric == 0 & mhd.mdd == 0 ~ 1,
+      cidid.diagnosis_numeric == 0 & mhd.mdd == 1 ~ 2,
+      cidid.diagnosis_numeric == 1 & mhd.mdd == 0 ~ 3
+    )),
+    anyanx_agreement_numeric = as.factor(
+    case_when(
+      LifetimeAnyAnx.n == 1 & ClinicianAnyAnx.n == 1 ~ 0,
+      LifetimeAnyAnx.n == 0 & ClinicianAnyAnx.n == 0 ~ 1,
+      LifetimeAnyAnx.n == 0 & ClinicianAnyAnx.n == 1 ~ 2,
+      LifetimeAnyAnx.n == 1 & ClinicianAnyAnx.n == 0 ~ 3,
+    )),
+    gad_agreement_numeric = as.factor(
+    case_when(
+      cidia.diagnosis_numeric == 1 & mhd.gad == 1 ~ 0,
+      cidia.diagnosis_numeric == 0 & mhd.gad == 0 ~ 1,
+      cidia.diagnosis_numeric == 0 & mhd.gad == 1 ~ 2,
+      cidia.diagnosis_numeric == 1 & mhd.gad == 0 ~ 3
+    )),
+    spec_agreement_numeric = as.factor(
+    case_when(
+      spec.diagnosis_numeric == 1 & mhd.specific_phobia == 1 ~ 0,
+      spec.diagnosis_numeric == 0 & mhd.specific_phobia == 0 ~ 1,
+      spec.diagnosis_numeric == 0 & mhd.specific_phobia == 1 ~ 2,
+      spec.diagnosis_numeric == 1 & mhd.specific_phobia == 0 ~ 3
+    )),
+    socp_agreement_numeric = as.factor(
+    case_when(
+      socp.diagnosis_numeric == 1 & mhd.social_anxiety == 1 ~ 0,
+      socp.diagnosis_numeric == 0 & mhd.social_anxiety == 0 ~ 1,
+      socp.diagnosis_numeric == 0 & mhd.social_anxiety == 1 ~ 2,
+      socp.diagnosis_numeric == 1 & mhd.social_anxiety == 0 ~ 3
+    )),
+    pattacks_agreement_numeric = as.factor(
+    case_when(
+      pad.diagnosis_numeric == 1 & mhd.panic_attacks == 1 & !is.na(mhd.panic_disorder) ~ 0,
+      pad.diagnosis_numeric == 0 & mhd.panic_attacks == 0 & !is.na(mhd.panic_disorder) ~ 1,
+      pad.diagnosis_numeric == 0 & mhd.panic_attacks == 1 & !is.na(mhd.panic_disorder) ~ 2,
+      pad.diagnosis_numeric == 1 & mhd.panic_attacks == 0 & !is.na(mhd.panic_disorder) ~ 3
+    )),
+    pad_agreement_numeric = as.factor(
+    case_when(
+      pad.diagnosis_numeric == 1 & mhd.panic_disorder == 1 ~ 0,
+      pad.diagnosis_numeric == 0 & mhd.panic_disorder == 0 ~ 1,
+      pad.diagnosis_numeric == 0 & mhd.panic_disorder == 1 ~ 2,
+      pad.diagnosis_numeric == 1 & mhd.panic_disorder == 0 ~ 3
+    )),
+    agp_agreement_numeric = as.factor(
+    case_when(
+      agp.diagnosis_numeric == 1 & mhd.agoraphobia == 1 ~ 0,
+      agp.diagnosis_numeric == 0 & mhd.agoraphobia == 0 ~ 1,
+      agp.diagnosis_numeric == 0 & mhd.agoraphobia == 1 ~ 2,
+      agp.diagnosis_numeric == 1 & mhd.agoraphobia == 0 ~ 3
+    ))
+  ) %>% 
+  select(c(sex, mdd_agreement_binary_numeric, anyanx_agreement_binary_numeric, 
+           gad_agreement_binary_numeric, spec_agreement_binary_numeric, socp_agreement_binary_numeric,
+           pattacks_agreement_binary_numeric, pad_agreement_binary_numeric, agp_agreement_binary_numeric,
+           mdd_agreement_numeric, anyanx_agreement_numeric, 
+           gad_agreement_numeric, spec_agreement_numeric, socp_agreement_numeric,
+           pattacks_agreement_numeric, pad_agreement_numeric, agp_agreement_numeric))
+  
+```
+
+## Fine-grained agreement
+
+```{r chi-square test MDD agreement by sex}
+chisq_mdd_agreement_by_sex <- dat.sex %>%
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(mdd_agreement_numeric ~ sex) %>% 
+  mutate(disorder = "MDD")
+
+chisq_mdd_agreement_by_sex
+```
+
+```{r chi-square test AnyAnx agreement by sex}
+chisq_anyanx_agreement_by_sex <- dat.sex %>%
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(anyanx_agreement_numeric ~ sex) %>% 
+  mutate(disorder = "Any anxiety")
+
+chisq_anyanx_agreement_by_sex
+```
+
+```{r chi-square test GAD agreement by sex}
+chisq_gad_agreement_by_sex <- dat.sex %>%
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(gad_agreement_numeric ~ sex) %>% 
+  mutate(disorder = "GAD")
+
+chisq_gad_agreement_by_sex
+```
+
+
+```{r chi-square test SPEC agreement by sex}
+chisq_spec_agreement_by_sex <- dat.sex %>%
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(spec_agreement_numeric ~ sex) %>% 
+  mutate(disorder = "Specific phobia")
+
+chisq_spec_agreement_by_sex
+```
+
+```{r chi-square test SOCP agreement by sex}
+chisq_socp_agreement_by_sex <- dat.sex %>%
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(socp_agreement_numeric ~ sex) %>% 
+  mutate(disorder = "Social phobia")
+
+chisq_socp_agreement_by_sex
+```
+
+```{r chi-square test PanicAttacks agreement by sex}
+chisq_pattacks_agreement_by_sex <- dat.sex %>%
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(pattacks_agreement_numeric ~ sex) %>% 
+  mutate(disorder = "Panic attacks")
+
+chisq_pattacks_agreement_by_sex
+```
+
+```{r chi-square test PAD agreement by sex}
+chisq_pad_agreement_by_sex <- dat.sex %>%
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(pad_agreement_numeric ~ sex) %>% 
+  mutate(disorder = "Panic disorder")
+
+chisq_pad_agreement_by_sex
+```
+
+```{r chi-square test AGP agreement by sex}
+chisq_agp_agreement_by_sex <- dat.sex %>%
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(agp_agreement_numeric ~ sex) %>% 
+  mutate(disorder = "Agoraphobia")
+
+chisq_agp_agreement_by_sex
+```
+
+```{r combine all fine-grained chi-squared agreement tables}
+
+chisq_all_agreement_by_sex <- rbind(chisq_mdd_agreement_by_sex,
+                                    chisq_anyanx_agreement_by_sex,
+                                    chisq_gad_agreement_by_sex,
+                                    chisq_spec_agreement_by_sex,
+                                    chisq_socp_agreement_by_sex,
+                                    chisq_pattacks_agreement_by_sex,
+                                    chisq_pad_agreement_by_sex,
+                                    chisq_agp_agreement_by_sex) %>% 
+  relocate(disorder)
+
+kable(chisq_all_agreement_by_sex)
 
 ```
 
+
+## Binary agreement
+```{r chi-square test MDD binary agreement by sex}
+chisq_mdd_agreement_binary_by_sex <- dat.sex %>%
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(mdd_agreement_binary_numeric ~ sex) %>% 
+  mutate(disorder = "MDD")
+
+chisq_mdd_agreement_binary_by_sex
+```
+
+```{r chi-square test AnyAnx binary agreement by sex}
+chisq_anyanx_agreement_binary_by_sex <- dat.sex %>%
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(anyanx_agreement_binary_numeric ~ sex) %>% 
+  mutate(disorder = "Any anxiety")
+
+chisq_anyanx_agreement_binary_by_sex
+```
+
+```{r chi-square test GAD binary agreement by sex}
+chisq_gad_agreement_binary_by_sex <- dat.sex %>%
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(gad_agreement_binary_numeric ~ sex) %>% 
+  mutate(disorder = "GAD")
+
+chisq_gad_agreement_binary_by_sex
+```
+
+```{r chi-square test SPEC binary agreement by sex}
+chisq_spec_agreement_binary_by_sex <- dat.sex %>%
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(spec_agreement_binary_numeric ~ sex) %>% 
+  mutate(disorder = "Specific phobia")
+
+chisq_spec_agreement_binary_by_sex
+```
+
+```{r chi-square test SOCP binary agreement by sex}
+chisq_socp_agreement_binary_by_sex <- dat.sex %>%
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(socp_agreement_binary_numeric ~ sex) %>% 
+  mutate(disorder = "Social anxiety disorder")
+
+chisq_socp_agreement_binary_by_sex
+```
+
+```{r chi-square test PanicAttacks binary agreement by sex}
+chisq_pattacks_agreement_binary_by_sex <- dat.sex %>%
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(pattacks_agreement_binary_numeric ~ sex) %>% 
+  mutate(disorder = "Panic attacks")
+
+chisq_pattacks_agreement_binary_by_sex
+```
+
+```{r chi-square test PAD binary agreement by sex}
+chisq_pad_agreement_binary_by_sex <- dat.sex %>%
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(pad_agreement_binary_numeric ~ sex) %>% 
+  mutate(disorder = "Panic disorder")
+
+chisq_pad_agreement_binary_by_sex
+```
+
+```{r chi-square test AGP binary agreement by sex}
+chisq_agp_agreement_binary_by_sex <- dat.sex %>%
+  mutate(sex = as.factor(sex)) %>% 
+  chisq_test(agp_agreement_binary_numeric ~ sex) %>% 
+  mutate(disorder = "Agoraphobia")
+
+chisq_agp_agreement_binary_by_sex
+```
+
+```{r combine all binary chi-squared agreement tables}
+
+chisq_all_agreement_binary_by_sex <- rbind(chisq_mdd_agreement_binary_by_sex,
+                                           chisq_anyanx_agreement_binary_by_sex,
+                                           chisq_gad_agreement_binary_by_sex,
+                                           chisq_spec_agreement_binary_by_sex,
+                                           chisq_socp_agreement_binary_by_sex,
+                                           chisq_pattacks_agreement_binary_by_sex,
+                                           chisq_pad_agreement_binary_by_sex,
+                                           chisq_agp_agreement_binary_by_sex) %>% 
+  relocate(disorder)
+
+kable(chisq_all_agreement_binary_by_sex)
+
+```
+
+# Missing data 
+
+## Table of missing data for each variable
+
+```{r table of missing data}
+na_count <- as.data.frame(colSums(is.na(cidi))) %>% 
+  rownames_to_column() %>% 
+  rename("variable" = "rowname",
+         "NA Count" = "colSums(is.na(cidi))") %>% 
+  filter(variable == "Ethnicity" | 
+                       variable == "highest_education" | 
+                       variable == "Employment" |
+                       variable == "mhd.mdd" |
+                       variable == "mhd.gad" |
+                       variable == "mhd.specific_phobia" |
+                       variable == "mhd.social_anxiety" |
+                       variable == "mhd.panic_attacks" |
+                       variable == "mhd.panic_disorder" |
+                       variable == "mhd.agoraphobia" |
+                       variable == "ClinicianAnyAnx.n" |
+                       variable == "cidid.diagnosis_numeric" |
+                       variable == "cidia.diagnosis_numeric" |
+                       variable == "spec.diagnosis_numeric" |
+                       variable == "socp.diagnosis_numeric" |
+                       variable == "pad.diagnosis_numeric" |
+                       variable == "agp.diagnosis_numeric" |
+                       variable == "LifetimeAnyAnx.n") %>% 
+  mutate(variable = 
+           case_when(
+             variable == "Ethnicity" ~ "Ethnicity", 
+             variable == "highest_education" ~ "Highest education", 
+             variable == "Employment" ~ "Employment",
+             variable == "mhd.mdd" ~ "Single-item MDD",
+             variable == "mhd.gad" ~ "Single-item GAD",
+             variable == "mhd.specific_phobia" ~ "Single-item specific phobia",
+             variable == "mhd.social_anxiety" ~ "Single-item social anxiety disorder",
+             variable == "mhd.panic_attacks" ~ "Single-item panic attacks",
+             variable == "mhd.panic_disorder" ~ "Single-item panic disorder",
+             variable == "mhd.agoraphobia" ~ "Single-item agoraphobia",
+             variable == "ClinicianAnyAnx.n" ~ "Single-item any anxiety",
+             variable == "cidid.diagnosis_numeric" ~ "Algorithm-based MDD",
+             variable == "cidia.diagnosis_numeric" ~ "Algorithm-based GAD",
+             variable == "spec.diagnosis_numeric" ~ "Algorithm-based specific phobia",
+             variable == "socp.diagnosis_numeric" ~ "Algorithm-based social anxiety disorder",
+             variable == "pad.diagnosis_numeric" ~ "Algorithm-based panic disorder",
+             variable == "agp.diagnosis_numeric" ~ "Algorithm-based agoraphobia",
+             variable == "LifetimeAnyAnx.n" ~ "Algorithm-based any anxiety"
+           ))
+
+kable(na_count)
+```
+
+## Associations with missing data
+
+```{r set-up for missing data associations}
+#install.packages("finalfit")
+library(finalfit)
+
+#Set explanatory variables
+explanatory = c("age", "sex", 
+  "highest_education",  
+  "Ethnicity")
+
+```
+
+```{r associations with AB MDD}
+#Algorithm-based
+missing_cidid <- dat %>% 
+  missing_compare("cidid.diagnosis", explanatory) %>% 
+  mutate(diagnosis = "MDD",
+         method = "Algorithm-based")
+
+kable(missing_cidid)
+```
+
+```{r associations with SI MDD}
+#Single-item
+missing_mhd.mdd <- dat %>% 
+  missing_compare("mhd.mdd", explanatory) %>% 
+  mutate(diagnosis = "MDD",
+         method = "Single-item")
+
+kable(missing_mhd.mdd)
+```
+
+```{r associations with AB GAD}
+#Algorithm-based
+missing_cidia <- dat %>% 
+  missing_compare("cidia.diagnosis", explanatory) %>% 
+  mutate(diagnosis = "GAD",
+         method = "Algorithm-based")
+
+kable(missing_cidia)
+```
+
+```{r associations with SI GAD}
+#Single-item
+missing_mhd.gad <- dat %>% 
+  missing_compare("mhd.gad", explanatory) %>% 
+  mutate(diagnosis = "GAD",
+         method = "Single-item")
+
+kable(missing_mhd.gad)
+```
+
+```{r associations with AB SPEC}
+#Algorithm-based
+missing_spec <- dat %>% 
+  missing_compare("spec.diagnosis", explanatory) %>% 
+  mutate(diagnosis = "Specific phobia",
+         method = "Algorithm-based")
+
+kable(missing_spec)
+```
+
+```{r associations with SI SPEC}
+#Single-item
+missing_mhd.specific_phobia <- dat %>% 
+  missing_compare("mhd.specific_phobia", explanatory) %>% 
+  mutate(diagnosis = "Specific phobia",
+         method = "Single-item")
+
+kable(missing_mhd.specific_phobia)
+```
+
+```{r associations with AB SOCP}
+#Algorithm-based
+missing_socp <- dat %>% 
+  missing_compare("socp.diagnosis", explanatory) %>% 
+  mutate(diagnosis = "Social anxiety disorder",
+         method = "Algorithm-based")
+
+kable(missing_socp)
+```
+
+```{r associations with SI SOCP}
+#Single-item
+missing_mhd.social_anxiety <- dat %>% 
+  missing_compare("mhd.social_anxiety", explanatory)%>% 
+  mutate(diagnosis = "Social anxiety disorder",
+         method = "Single-item")
+
+kable(missing_mhd.social_anxiety)
+```
+
+```{r associations with AB PAD}
+#Algorithm-based
+missing_pad <- dat %>% 
+  missing_compare("pad.diagnosis", explanatory) %>% 
+  mutate(diagnosis = "Panic disorder",
+         method = "Algorithm-based")
+
+kable(missing_pad)
+```
+
+```{r associations with SI PAD}
+#Single-item
+missing_mhd.panic_disorder <- dat %>% 
+  missing_compare("mhd.panic_disorder", explanatory) %>% 
+  mutate(diagnosis = "Panic disorder",
+         method = "Single-item")
+
+kable(missing_mhd.panic_disorder)
+```
+
+```{r associations with SI Panic Attacks}
+#Single-item
+missing_mhd.panic_attacks <- dat %>% 
+  missing_compare("mhd.panic_attacks", explanatory) %>% 
+  mutate(diagnosis = "Panic attacks",
+         method = "Single-item")
+
+kable(missing_mhd.panic_attacks)
+```
+
+```{r associations with AB AGP}
+#Algorithm-based
+missing_agp <- dat %>% 
+  missing_compare("agp.diagnosis", explanatory) %>% 
+  mutate(diagnosis = "Agoraphobia",
+         method = "Algorithm-based")
+
+kable(missing_agp)
+```
+
+```{r associations with SI AGP}
+#Single-item
+missing_mhd.agoraphobia <- dat %>% 
+  missing_compare("mhd.agoraphobia", explanatory) %>% 
+  mutate(diagnosis = "Agoraphobia",
+         method = "Single-item")
+
+kable(missing_mhd.agoraphobia)
+```
+
+```{r combine all missing data association tables}
+#missing_all_associations <- rbind(missing_cidid,
+#                                  missing_mhd.mdd,
+#                                  missing_cidia,
+#                                  missing_mhd.gad,
+#                                  missing_spec,
+#                                  missing_mhd.specific_phobia,
+#                                  missing_socp,
+#                                  missing_mhd.social_anxiety,
+#                                  missing_pad,
+#                                  missing_mhd.panic_attacks,
+#                                  missing_mhd.panic_disorder,
+#                                  missing_agp,
+#                                  missing_mhd.agoraphobia)
+#
+#missing_all_associations
+```
+
+## Associations with NA counts
+
+```{r NA algorithm-based diagnosis count}
+
+cidi$algorithm_based_na_count<-0
+
+cidi$algorithm_based_na_count<-with(cidi, 
+                                    ifelse(is.na(cidid.diagnosis_numeric), 
+                                           algorithm_based_na_count + 1, algorithm_based_na_count))
+
+cidi$algorithm_based_na_count<-with(cidi,
+                                    ifelse(is.na(cidia.diagnosis_numeric),
+                                           algorithm_based_na_count + 1, algorithm_based_na_count))
+
+cidi$algorithm_based_na_count<-with(cidi,
+                                    ifelse(is.na(spec.diagnosis_numeric),
+                                           algorithm_based_na_count + 1, algorithm_based_na_count))
+
+cidi$algorithm_based_na_count<-with(cidi, 
+                                    ifelse(is.na(socp.diagnosis_numeric), 
+                                           algorithm_based_na_count + 1, algorithm_based_na_count))
+
+cidi$algorithm_based_na_count<-with(cidi, 
+                                    ifelse(is.na(pad.diagnosis_numeric), 
+                                           algorithm_based_na_count + 1, algorithm_based_na_count))
+
+cidi$algorithm_based_na_count<-with(cidi, 
+                                    ifelse(is.na(agp.diagnosis_numeric), 
+                                           algorithm_based_na_count + 1, algorithm_based_na_count))
+
+kable(freq(cidi$algorithm_based_na_count))
+```
+
+Note that due to the formatting of the single-item diagnoses in the survey, participants are either missing all or none of the single-item disorder data. Therefore, the single-item NA count variable is created using only one single-item diagnosis to reflect the missingness as a binary variable (0 = no missing data, 1 = all missing data).
+
+The exception is panic disorder, which was added partway through data collection. As a result, panic disorder is not considered here.
+```{r NA single-item diagnosis count}
+
+cidi$single_item_na_count<-0
+
+cidi$single_item_na_count<-with(cidi, 
+                                    ifelse(is.na(mhd.mdd), 
+                                           single_item_na_count + 1, single_item_na_count))
+
+freq(cidi$single_item_na_count)
+```
+
+```{r get package for regression summary tables}
+#install.packages("gtsummary")
+library(gtsummary)
+```
+
+
+```{r calculating associations with AB missingness}
+algorithm_missingness_associations <- lm(algorithm_based_na_count ~ age + sex + Ethnicity + highest_education, data = cidi)
+
+summary(algorithm_missingness_associations)
+tbl_regression(algorithm_missingness_associations)
+```
+
+```{r calculating associations with SI missingness}
+single_item_missingness_associations <- lm(single_item_na_count ~ age + sex + Ethnicity + highest_education, data = cidi)
+
+summary(single_item_missingness_associations)
+tbl_regression(single_item_missingness_associations)
+```
