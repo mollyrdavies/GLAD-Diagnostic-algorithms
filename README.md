@@ -1,7 +1,7 @@
 # Comparing algorithm-based and single-item phenotyping measures of major depression and anxiety disorders
 
 ## Summary
-Code repository for Davies et al (in prep) "Comparison of algorithm-based versus single-item phenotyping measures of depression and anxiety disorders in the GLAD Study cohort"
+Code repository for [Davies et al (2022) "Comparison of symptom-based versus self-reported diagnostic measures of anxiety and depression disorders in the GLAD and COPING cohorts"](https://doi.org/10.1016/j.janxdis.2021.102491)
 
 The project uses data from the [Genetic Links to Anxiety and Depression (GLAD) Study](https://gladstudy.org.uk/), but can be applied to other datasets that include the CIDI and DSM-5 checklist questionnaires.
 
@@ -31,7 +31,7 @@ Assess the comparability of two commonly used phenotyping methods for depression
 ## Project details
 
 ***Authors*** 
-Molly R. Davies, ..., Gerome Breen, Thalia C. Eley
+Molly R. Davies, Joshua E.J. Buckman, Brett N. Adey, Chérie Armour, John R.Bradley, Susannah C.B. Curzons, Helena L. Davies, Katrina A.S. Davis, Kimberley A. Goldsmith, Colette R. Hirsch, Matthew Hotopf, Christopher Hübel, Ian R. Jones, Gursharan Kalsi, Georgina Krebs, Yuhao Lin, Ian Marsh, Monika McAtarsney-Kovacs, Andrew M. McIntosh, Jessica Mundy, Dina Monssen, Alicia J. Peel, Henry C.Rogers, Megan Skelton, Daniel J. Smith, Abigail ter Kuile, Katherine N. Thompson, David Veale, James T.R. Walters, Roland Zahn, Gerome Breen, Thalia C. Eley
 
 ***Analyst***
 Molly R. Davies
@@ -40,7 +40,7 @@ Molly R. Davies
 Megan Skelton, Abigail Ter Kuile, Helena Davies, Jessica Mundy
 
 ***Data processing team*** 
-Yuhao Lin, Henry C. Rogers, Christopher Hübel
+Yuhao Lin, Henry C. Rogers, Christopher Hübel, Helena Davies, Jessica Mundy, Alicia J. Peel
 
 ***Principal investigators***
 Gerome Breen, Thalia C. Eley
